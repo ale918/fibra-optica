@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Materiales Fibra Óptica</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="estilo_formulario.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <div>
+      <span class="logo">⬡ FibraLog</span>
+      <span class="logo-sub">Control de materiales</span>
+    </div>
+    <div class="tabs">
+      <button class="tab active" onclick="mostrarTab('registro')">Nuevo registro</button>
+      <button class="tab" onclick="mostrarTab('historial')">Historial</button>
+    </div>
+  </div>
+</header>
+
+<main>
+
+  <!-- ═══ TAB: REGISTRO ═══ -->
+  <section id="tab-registro">
+
+    <div class="card">
+      <h3>Información del día</h3>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Fecha</label>
+          <input type="date" id="fecha" />
+        </div>
+        <div class="form-group">
+          <label>Integrantes del grupo <span class="hint">(separados por coma)</span></label>
+          <input type="text" id="integrantes" placeholder="Ej. Juan Pérez, Carlos López, Ana Mora" />
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Observaciones generales del día</label>
+        <textarea id="observaciones" placeholder="Trabajo realizado, sector, novedad del día..."></textarea>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Materiales utilizados</h3>
+      <p class="card-sub">Ingresa solo los que se usaron. Deja en 0 los que no aplican.</p>
+
+      <div class="materiales-grid">
+
+        <div class="mat-group">
+          <span class="mat-cat">Herrajes</span>
+          <div class="mat-row">
+            <label>Herrajes A</label>
+            <input type="number" min="0" id="herrajesA" placeholder="0" />
+            <span class="unidad">und</span>
+          </div>
+          <div class="mat-row">
+            <label>Herrajes U</label>
+            <input type="number" min="0" id="herrajesU" placeholder="0" />
+            <span class="unidad">und</span>
+          </div>
+        </div>
+
+        <div class="mat-group">
+          <span class="mat-cat">Cintas</span>
+          <div class="mat-row">
+            <label>Cinta 3/4"</label>
+            <input type="number" min="0" id="cinta34" placeholder="0" />
+            <span class="unidad">m</span>
+          </div>
+          <div class="mat-row">
+            <label>Cinta 3/2"</label>
+            <input type="number" min="0" id="cinta32" placeholder="0" />
+            <span class="unidad">m</span>
+          </div>
+        </div>
+
+        <div class="mat-group">
+          <span class="mat-cat">Cable</span>
+          <div class="mat-row">
+            <label>Cable Drop</label>
+            <input type="number" min="0" id="cableDrop" placeholder="0" />
+            <span class="unidad">m</span>
+          </div>
+          <div class="mat-row">
+            <label>Fibra Principal</label>
+            <input type="number" min="0" id="fibraPrincipal" placeholder="0" />
+            <span class="unidad">m</span>
+          </div>
+        </div>
+
+        <div class="mat-group">
+          <span class="mat-cat">Hebillas</span>
+          <div class="mat-row">
+            <label>Hebilla metálica 3/4"</label>
+            <input type="number" min="0" id="hebilla34" placeholder="0" />
+            <span class="unidad">und</span>
+          </div>
+          <div class="mat-row">
+            <label>Hebilla metálica 3/2"</label>
+            <input type="number" min="0" id="hebilla32" placeholder="0" />
+            <span class="unidad">und</span>
+          </div>
+        </div>
+
+        <div class="mat-group">
+          <span class="mat-cat">Accesorios</span>
+          <div class="mat-row">
+            <label>Chupones</label>
+            <input type="number" min="0" id="chupones" placeholder="0" />
+            <span class="unidad">und</span>
+          </div>
+          <div class="mat-row">
+            <label>Preformados</label>
+            <input type="number" min="0" id="preformados" placeholder="0" />
+            <span class="unidad">und</span>
+          </div>
+        </div>
+
+        <div class="mat-group">
+          <span class="mat-cat">Cajas / Splitters</span>
+          <div class="mat-row">
+            <label>Cajas NAT</label>
+            <input type="number" min="0" id="cajasNat" placeholder="0" />
+            <span class="unidad">und</span>
+          </div>
+          <div class="mat-row">
+            <label>Splitter 1/16</label>
+            <input type="number" min="0" id="splitter116" placeholder="0" />
+            <span class="unidad">und</span>
+          </div>
+          <div class="mat-row">
+            <label>Splitter 1/4</label>
+            <input type="number" min="0" id="splitter14" placeholder="0" />
+            <span class="unidad">und</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn-primary" onclick="guardarReporte()">Guardar reporte del día</button>
+      <button onclick="limpiarFormulario()">Limpiar</button>
+    </div>
+
+  </section>
+
+  <!-- ═══ TAB: HISTORIAL ═══ -->
+  <section id="tab-historial" style="display:none;">
+
+    <div class="toolbar">
+      <input type="text" id="buscar-fecha" placeholder="Buscar por fecha (YYYY-MM-DD)..." oninput="filtrarHistorial()" />
+      <button onclick="exportarTodoExcel()">↓ Exportar historial a Excel</button>
+    </div>
+
+    <div id="lista-reportes">
+      <p class="empty">Cargando reportes...</p>
+    </div>
+
+  </section>
+
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script src="funcion_formulario.js"></script>
+</body>
+</html>
