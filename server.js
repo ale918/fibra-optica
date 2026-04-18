@@ -1,11 +1,15 @@
 import express from 'express';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { mkdirSync } from 'fs';
 import { Low } from 'lowdb';
 import { JSONFileSync } from 'lowdb/node';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+
+// Crear carpeta data si no existe
+try { mkdirSync('/app/data', { recursive: true }); } catch(e) {}
 
 const app = express();
 app.use(express.json());
