@@ -8,7 +8,6 @@ import { JSONFileSync } from 'lowdb/node';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Ruta del volumen de Railway o carpeta local
 const DATA_DIR = process.env.RAILWAY_VOLUME_MOUNT_PATH || join(__dirname, 'data');
 try { mkdirSync(DATA_DIR, { recursive: true }); } catch(e) {}
 
@@ -34,7 +33,7 @@ app.post('/api/reportes', (req, res) => {
     id: Date.now(),
     fecha,
     observaciones,
-    integrantes,
+    integrantes: Array.isArray(integrantes) ? integrantes : integrantes.split(',').map(i => i.trim()),
     materiales,
     creado_en: new Date().toLocaleString('es-EC')
   };
@@ -44,7 +43,10 @@ app.post('/api/reportes', (req, res) => {
 });
 
 app.get('/api/reportes', (req, res) => {
-  const reportes = [...db.data.reportes].reverse();
+  const reportes = [...db.data.reportes].reverse().map(r => ({
+    ...r,
+    integrantes: Array.isArray(r.integrantes) ? r.integrantes : r.integrantes.split(',').map(i => i.trim())
+  }));
   res.json(reportes);
 });
 
