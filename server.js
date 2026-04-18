@@ -15,7 +15,7 @@ app.get('/', (req, res) => {
   res.sendFile(join(__dirname, 'público', 'formulario.html'));
 });
 
-const adapter = new JSONFileSync('database.json');
+const adapter = new JSONFileSync('/app/data/database.json');
 const defaultData = { reportes: [] };
 const db = new Low(adapter, defaultData);
 db.read();
