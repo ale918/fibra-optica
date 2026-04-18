@@ -8,8 +8,9 @@ import { JSONFileSync } from 'lowdb/node';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Crear carpeta data si no existe
-try { mkdirSync('/app/data', { recursive: true }); } catch(e) {}
+// Ruta del volumen de Railway o carpeta local
+const DATA_DIR = process.env.RAILWAY_VOLUME_MOUNT_PATH || join(__dirname, 'data');
+try { mkdirSync(DATA_DIR, { recursive: true }); } catch(e) {}
 
 const app = express();
 app.use(express.json());
@@ -19,7 +20,7 @@ app.get('/', (req, res) => {
   res.sendFile(join(__dirname, 'público', 'formulario.html'));
 });
 
-const adapter = new JSONFileSync('/app/data/database.json');
+const adapter = new JSONFileSync(join(DATA_DIR, 'database.json'));
 const defaultData = { reportes: [] };
 const db = new Low(adapter, defaultData);
 db.read();
