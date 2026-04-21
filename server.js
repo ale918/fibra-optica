@@ -20,10 +20,13 @@ app.get('/', (req, res) => {
 });
 
 const adapter = new JSONFileSync(join(DATA_DIR, 'database.json'));
-const defaultData = { reportes: [] };
+const defaultData = { reportes: [], bodega: [], movimientos: [] };
 const db = new Low(adapter, defaultData);
 db.read();
+if (!db.data.bodega) db.data.bodega = [];
+if (!db.data.movimientos) db.data.movimientos = [];
 
+// ── Reportes ─────────────────────────────────────────────
 app.post('/api/reportes', (req, res) => {
   const { fecha, observaciones, integrantes, materiales } = req.body;
   if (!fecha || !integrantes || !materiales?.length) {
@@ -54,6 +57,58 @@ app.delete('/api/reportes/:id', (req, res) => {
   db.data.reportes = db.data.reportes.filter(r => r.id !== parseInt(req.params.id));
   db.write();
   res.json({ ok: true });
+});
+
+// ── Bodega ───────────────────────────────────────────────
+app.get('/api/bodega', (req, res) => {
+  res.json(db.data.bodega);
+});
+
+app.post('/api/bodega/stock', (req, res) => {
+  const { material, cantidad } = req.body;
+  if (!material || cantidad === undefined) {
+    return res.status(400).json({ error: 'Faltan datos' });
+  }
+  const item = db.data.bodega.find(b => b.material === material);
+  if (item) {
+    item.cantidad = cantidad;
+  } else {
+    db.data.bodega.push({ material, cantidad });
+  }
+  db.write();
+  res.json({ ok: true });
+});
+
+app.post('/api/bodega/movimiento', (req, res) => {
+  const { tipo, material, cantidad, responsable, nota } = req.body;
+  if (!tipo || !material || !cantidad || !responsable) {
+    return res.status(400).json({ error: 'Faltan datos' });
+  }
+  const item = db.data.bodega.find(b => b.material === material);
+  if (!item) return res.status(400).json({ error: 'Material no encontrado' });
+
+  if (tipo === 'salida' && item.cantidad < cantidad) {
+    return res.status(400).json({ error: 'Stock insuficiente' });
+  }
+
+  item.cantidad += tipo === 'entrada' || tipo === 'devolucion' ? cantidad : -cantidad;
+
+  const movimiento = {
+    id: Date.now(),
+    tipo,
+    material,
+    cantidad,
+    responsable,
+    nota: nota || '',
+    fecha: new Date().toLocaleString('es-EC')
+  };
+  db.data.movimientos.push(movimiento);
+  db.write();
+  res.json({ ok: true });
+});
+
+app.get('/api/bodega/movimientos', (req, res) => {
+  res.json([...db.data.movimientos].reverse());
 });
 
 const PORT = process.env.PORT || 3000;

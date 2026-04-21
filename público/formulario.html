@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Materiales Fibra Óptica</title>
+  <title>Airnet</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="estilo_formulario.css" />
@@ -14,12 +14,13 @@
 <header>
   <div class="header-inner">
     <div>
-      <span class="logo">AIRNET</span>
+      <span class="logo">⬡ Airnet</span>
       <span class="logo-sub">Control de materiales</span>
     </div>
     <div class="tabs">
       <button class="tab active" onclick="mostrarTab('registro')">Nuevo registro</button>
       <button class="tab" onclick="mostrarTab('historial')">Historial</button>
+      <button class="tab" onclick="mostrarTab('bodega')">Bodega</button>
     </div>
   </div>
 </header>
@@ -28,7 +29,6 @@
 
   <!-- ═══ TAB: REGISTRO ═══ -->
   <section id="tab-registro">
-
     <div class="card">
       <h3>Información del día</h3>
       <div class="form-row">
@@ -50,98 +50,38 @@
     <div class="card">
       <h3>Materiales utilizados</h3>
       <p class="card-sub">Ingresa solo los que se usaron. Deja en 0 los que no aplican.</p>
-
       <div class="materiales-grid">
-
         <div class="mat-group">
           <span class="mat-cat">Herrajes</span>
-          <div class="mat-row">
-            <label>Herrajes A</label>
-            <input type="number" min="0" id="herrajesA" placeholder="0" />
-            <span class="unidad">und</span>
-          </div>
-          <div class="mat-row">
-            <label>Herrajes U</label>
-            <input type="number" min="0" id="herrajesU" placeholder="0" />
-            <span class="unidad">und</span>
-          </div>
+          <div class="mat-row"><label>Herrajes A</label><input type="number" min="0" id="herrajesA" placeholder="0" /><span class="unidad">und</span></div>
+          <div class="mat-row"><label>Herrajes U</label><input type="number" min="0" id="herrajesU" placeholder="0" /><span class="unidad">und</span></div>
         </div>
-
         <div class="mat-group">
           <span class="mat-cat">Cintas</span>
-          <div class="mat-row">
-            <label>Cinta 3/4"</label>
-            <input type="number" min="0" id="cinta34" placeholder="0" />
-            <span class="unidad">m</span>
-          </div>
-          <div class="mat-row">
-            <label>Cinta 3/2"</label>
-            <input type="number" min="0" id="cinta32" placeholder="0" />
-            <span class="unidad">m</span>
-          </div>
+          <div class="mat-row"><label>Cinta 3/4"</label><input type="number" min="0" id="cinta34" placeholder="0" /><span class="unidad">m</span></div>
+          <div class="mat-row"><label>Cinta 3/2"</label><input type="number" min="0" id="cinta32" placeholder="0" /><span class="unidad">m</span></div>
         </div>
-
         <div class="mat-group">
           <span class="mat-cat">Cable</span>
-          <div class="mat-row">
-            <label>Cable Drop</label>
-            <input type="number" min="0" id="cableDrop" placeholder="0" />
-            <span class="unidad">m</span>
-          </div>
-          <div class="mat-row">
-            <label>Fibra Principal</label>
-            <input type="number" min="0" id="fibraPrincipal" placeholder="0" />
-            <span class="unidad">m</span>
-          </div>
+          <div class="mat-row"><label>Cable Drop</label><input type="number" min="0" id="cableDrop" placeholder="0" /><span class="unidad">m</span></div>
+          <div class="mat-row"><label>Fibra Principal</label><input type="number" min="0" id="fibraPrincipal" placeholder="0" /><span class="unidad">m</span></div>
         </div>
-
         <div class="mat-group">
           <span class="mat-cat">Hebillas</span>
-          <div class="mat-row">
-            <label>Hebilla metálica 3/4"</label>
-            <input type="number" min="0" id="hebilla34" placeholder="0" />
-            <span class="unidad">und</span>
-          </div>
-          <div class="mat-row">
-            <label>Hebilla metálica 3/2"</label>
-            <input type="number" min="0" id="hebilla32" placeholder="0" />
-            <span class="unidad">und</span>
-          </div>
+          <div class="mat-row"><label>Hebilla metálica 3/4"</label><input type="number" min="0" id="hebilla34" placeholder="0" /><span class="unidad">und</span></div>
+          <div class="mat-row"><label>Hebilla metálica 3/2"</label><input type="number" min="0" id="hebilla32" placeholder="0" /><span class="unidad">und</span></div>
         </div>
-
         <div class="mat-group">
           <span class="mat-cat">Accesorios</span>
-          <div class="mat-row">
-            <label>Chupones</label>
-            <input type="number" min="0" id="chupones" placeholder="0" />
-            <span class="unidad">und</span>
-          </div>
-          <div class="mat-row">
-            <label>Preformados</label>
-            <input type="number" min="0" id="preformados" placeholder="0" />
-            <span class="unidad">und</span>
-          </div>
+          <div class="mat-row"><label>Chupones</label><input type="number" min="0" id="chupones" placeholder="0" /><span class="unidad">und</span></div>
+          <div class="mat-row"><label>Preformados</label><input type="number" min="0" id="preformados" placeholder="0" /><span class="unidad">und</span></div>
         </div>
-
         <div class="mat-group">
           <span class="mat-cat">Cajas / Splitters</span>
-          <div class="mat-row">
-            <label>Cajas NAT</label>
-            <input type="number" min="0" id="cajasNat" placeholder="0" />
-            <span class="unidad">und</span>
-          </div>
-          <div class="mat-row">
-            <label>Splitter 1/16</label>
-            <input type="number" min="0" id="splitter116" placeholder="0" />
-            <span class="unidad">und</span>
-          </div>
-          <div class="mat-row">
-            <label>Splitter 1/4</label>
-            <input type="number" min="0" id="splitter14" placeholder="0" />
-            <span class="unidad">und</span>
-          </div>
+          <div class="mat-row"><label>Cajas NAT</label><input type="number" min="0" id="cajasNat" placeholder="0" /><span class="unidad">und</span></div>
+          <div class="mat-row"><label>Splitter 1/16</label><input type="number" min="0" id="splitter116" placeholder="0" /><span class="unidad">und</span></div>
+          <div class="mat-row"><label>Splitter 1/4</label><input type="number" min="0" id="splitter14" placeholder="0" /><span class="unidad">und</span></div>
         </div>
-
       </div>
     </div>
 
@@ -149,27 +89,88 @@
       <button class="btn-primary" onclick="guardarReporte()">Guardar reporte del día</button>
       <button onclick="limpiarFormulario()">Limpiar</button>
     </div>
-
   </section>
 
   <!-- ═══ TAB: HISTORIAL ═══ -->
   <section id="tab-historial" style="display:none;">
-
     <div class="toolbar">
       <input type="text" id="buscar-fecha" placeholder="Buscar por fecha (YYYY-MM-DD)..." oninput="filtrarHistorial()" />
       <button onclick="exportarTodoExcel()">↓ Exportar historial a Excel</button>
     </div>
+    <div id="lista-reportes"><p class="empty">Cargando reportes...</p></div>
+  </section>
 
-    <div id="lista-reportes">
-      <p class="empty">Cargando reportes...</p>
+  <!-- ═══ TAB: BODEGA ═══ -->
+  <section id="tab-bodega" style="display:none;">
+
+    <div class="card">
+      <h3>Stock actual</h3>
+      <p class="card-sub">Cantidades disponibles en bodega.</p>
+      <div id="tabla-stock"><p class="empty">Cargando...</p></div>
+      <div class="btn-row" style="margin-top:1rem;">
+        <button onclick="mostrarModalStock()">+ Actualizar stock</button>
+        <button onclick="exportarBodegaExcel()">↓ Exportar a Excel</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Registrar movimiento</h3>
+      <p class="card-sub">Registra una salida, entrada o devolución de material.</p>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Tipo</label>
+          <select id="mov-tipo">
+            <option value="salida">Salida</option>
+            <option value="entrada">Entrada</option>
+            <option value="devolucion">Devolución</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Material</label>
+          <select id="mov-material"></select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Cantidad</label>
+          <input type="number" min="1" id="mov-cantidad" placeholder="0" />
+        </div>
+        <div class="form-group">
+          <label>Responsable</label>
+          <input type="text" id="mov-responsable" placeholder="Nombre del responsable" />
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Nota <span class="hint">(opcional)</span></label>
+        <input type="text" id="mov-nota" placeholder="Observación..." />
+      </div>
+      <div class="btn-row" style="margin-top:1rem;">
+        <button class="btn-primary" onclick="registrarMovimiento()">Registrar movimiento</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Historial de movimientos</h3>
+      <div id="tabla-movimientos"><p class="empty">Cargando...</p></div>
     </div>
 
   </section>
 
+  <!-- Modal stock -->
+  <div id="modal-stock" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:200;align-items:center;justify-content:center;">
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:2rem;width:90%;max-width:500px;max-height:80vh;overflow-y:auto;">
+      <h3 style="color:var(--accent);font-family:'IBM Plex Mono',monospace;font-size:13px;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:1rem;">Actualizar stock</h3>
+      <div id="modal-stock-items"></div>
+      <div class="btn-row" style="margin-top:1rem;">
+        <button class="btn-primary" onclick="guardarStock()">Guardar</button>
+        <button onclick="cerrarModalStock()">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
 </main>
 
 <div class="toast" id="toast"></div>
-
 <script src="funcion_formulario.js"></script>
 </body>
 </html>
