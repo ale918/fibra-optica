@@ -181,7 +181,7 @@ async function cargarBodega() {
     const res = await fetch('/api/bodega');
     stockActual = await res.json();
     renderStock();
-    llenarSelectMaterial();
+    setTimeout(() => llenarSelectMaterial(), 100);
     cargarMovimientos();
   } catch(e) {
     document.getElementById('tabla-stock').innerHTML = '<p class="empty">Error al cargar bodega.</p>';
@@ -211,6 +211,7 @@ function renderStock() {
 
 function llenarSelectMaterial() {
   const sel = document.getElementById('mov-material');
+  if (!sel) return;
   sel.innerHTML = MATERIALES.map(m => `<option value="${m.label}">${m.label}</option>`).join('');
 }
 
@@ -235,17 +236,25 @@ function cerrarModalStock() {
 async function guardarStock() {
   try {
     for (const m of MATERIALES) {
-      const cantidad = parseFloat(document.getElementById('stock-' + m.id).value) || 0;
-      await fetch('/api/bodega/stock', {
+      const el = document.getElementById('stock-' + m.id);
+      const cantidad = el ? parseFloat(el.value) || 0 : 0;
+      const res = await fetch('/api/bodega/stock', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ material: m.label, cantidad })
       });
+      const data = await res.json();
+      if (!data.ok) {
+        toast('Error: ' + data.error);
+        return;
+      }
     }
     cerrarModalStock();
     await cargarBodega();
     toast('✓ Stock actualizado');
-  } catch(e) { toast('Error al guardar stock'); }
+  } catch(e) {
+    toast('Error: ' + e.message);
+  }
 }
 
 async function registrarMovimiento() {
@@ -289,7 +298,7 @@ async function cargarMovimientos() {
     const colores = { salida: 'var(--danger)', entrada: 'var(--accent)', devolucion: '#f59e0b' };
     cont.innerHTML = `
       <table class="mat-table">
-        <thead><tr><th>Fecha</th><th>Tipo</th><th>Material</th><th>Cantidad</th><th>Responsable</th><th>Nota</th></tr></thead>
+        <thead><tr><th>Fecha</th><th>Tipo</th><th>Material</th><th>Cantidad</th><th>Responsable</th><th>Nota</th><th></th></tr></thead>
         <tbody>${movimientos.map(m => `
           <tr>
             <td style="font-size:12px;color:var(--muted);">${m.fecha}</td>
@@ -298,10 +307,23 @@ async function cargarMovimientos() {
             <td class="cant">${m.cantidad}</td>
             <td>${m.responsable}</td>
             <td style="color:var(--muted);">${m.nota || '—'}</td>
+            <td><button class="del-btn" onclick="eliminarMovimiento(${m.id})">✕</button></td>
           </tr>`).join('')}
         </tbody>
       </table>`;
   } catch(e) {}
+}
+
+async function eliminarMovimiento(id) {
+  if (!confirm('¿Eliminar este movimiento?')) return;
+  try {
+    const res = await fetch('/api/bodega/movimientos/' + id, { method: 'DELETE' });
+    const data = await res.json();
+    if (data.ok) {
+      toast('Movimiento eliminado');
+      cargarMovimientos();
+    }
+  } catch(e) { toast('Error al eliminar'); }
 }
 
 function exportarBodegaExcel() {

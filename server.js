@@ -24,7 +24,6 @@ const defaultData = { reportes: [], bodega: [], movimientos: [] };
 const db = new Low(adapter, defaultData);
 db.read();
 
-// Asegurar que todos los campos existen
 if (!db.data) db.data = { reportes: [], bodega: [], movimientos: [] };
 if (!db.data.reportes) db.data.reportes = [];
 if (!db.data.bodega) db.data.bodega = [];
@@ -114,6 +113,12 @@ app.post('/api/bodega/movimiento', (req, res) => {
 
 app.get('/api/bodega/movimientos', (req, res) => {
   res.json([...db.data.movimientos].reverse());
+});
+
+app.delete('/api/bodega/movimientos/:id', (req, res) => {
+  db.data.movimientos = db.data.movimientos.filter(m => m.id !== parseInt(req.params.id));
+  db.write();
+  res.json({ ok: true });
 });
 
 const PORT = process.env.PORT || 3000;
