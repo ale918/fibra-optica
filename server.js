@@ -23,8 +23,13 @@ const adapter = new JSONFileSync(join(DATA_DIR, 'database.json'));
 const defaultData = { reportes: [], bodega: [], movimientos: [] };
 const db = new Low(adapter, defaultData);
 db.read();
+
+// Asegurar que todos los campos existen
+if (!db.data) db.data = { reportes: [], bodega: [], movimientos: [] };
+if (!db.data.reportes) db.data.reportes = [];
 if (!db.data.bodega) db.data.bodega = [];
 if (!db.data.movimientos) db.data.movimientos = [];
+db.write();
 
 // ── Reportes ─────────────────────────────────────────────
 app.post('/api/reportes', (req, res) => {
@@ -85,7 +90,7 @@ app.post('/api/bodega/movimiento', (req, res) => {
     return res.status(400).json({ error: 'Faltan datos' });
   }
   const item = db.data.bodega.find(b => b.material === material);
-  if (!item) return res.status(400).json({ error: 'Material no encontrado' });
+  if (!item) return res.status(400).json({ error: 'Material no encontrado en bodega' });
 
   if (tipo === 'salida' && item.cantidad < cantidad) {
     return res.status(400).json({ error: 'Stock insuficiente' });
