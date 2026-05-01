@@ -27,14 +27,15 @@ function toast(msg) {
 }
 
 function mostrarTab(tab) {
-  ['registro','historial','bodega'].forEach(t => {
+  ['registro','historial','bodega','indicadores'].forEach(t => {
     document.getElementById('tab-' + t).style.display = t === tab ? 'block' : 'none';
   });
   document.querySelectorAll('.tab').forEach((btn, i) => {
-    btn.classList.toggle('active', i === ['registro','historial','bodega'].indexOf(tab));
+    btn.classList.toggle('active', i === ['registro','historial','bodega','indicadores'].indexOf(tab));
   });
   if (tab === 'historial') cargarHistorial();
   if (tab === 'bodega') cargarBodega();
+  if (tab === 'indicadores') iniciarIndicadores();
 }
 
 // ── Reportes ─────────────────────────────────────────────
@@ -44,15 +45,12 @@ async function guardarReporte() {
   const observaciones = document.getElementById('observaciones').value.trim();
   if (!fecha)       { toast('⚠ Selecciona la fecha'); return; }
   if (!integrantes) { toast('⚠ Ingresa los integrantes'); return; }
-
   const materiales = MATERIALES.map(m => ({
     material: m.label,
     cantidad: parseFloat(document.getElementById(m.id).value) || 0,
     unidad: m.unidad
   })).filter(m => m.cantidad > 0);
-
   if (!materiales.length) { toast('⚠ Ingresa al menos un material'); return; }
-
   try {
     const res = await fetch('/api/reportes', {
       method: 'POST',
@@ -244,17 +242,12 @@ async function guardarStock() {
         body: JSON.stringify({ material: m.label, cantidad })
       });
       const data = await res.json();
-      if (!data.ok) {
-        toast('Error: ' + data.error);
-        return;
-      }
+      if (!data.ok) { toast('Error: ' + data.error); return; }
     }
     cerrarModalStock();
     await cargarBodega();
     toast('✓ Stock actualizado');
-  } catch(e) {
-    toast('Error: ' + e.message);
-  }
+  } catch(e) { toast('Error: ' + e.message); }
 }
 
 async function registrarMovimiento() {
@@ -263,10 +256,8 @@ async function registrarMovimiento() {
   const cantidad = parseFloat(document.getElementById('mov-cantidad').value);
   const responsable = document.getElementById('mov-responsable').value.trim();
   const nota = document.getElementById('mov-nota').value.trim();
-
   if (!cantidad || cantidad <= 0) { toast('⚠ Ingresa una cantidad válida'); return; }
   if (!responsable) { toast('⚠ Ingresa el responsable'); return; }
-
   try {
     const res = await fetch('/api/bodega/movimiento', {
       method: 'POST',
@@ -280,9 +271,7 @@ async function registrarMovimiento() {
       document.getElementById('mov-responsable').value = '';
       document.getElementById('mov-nota').value = '';
       await cargarBodega();
-    } else {
-      toast('Error: ' + data.error);
-    }
+    } else { toast('Error: ' + data.error); }
   } catch(e) { toast('Error de conexión'); }
 }
 
@@ -319,10 +308,7 @@ async function eliminarMovimiento(id) {
   try {
     const res = await fetch('/api/bodega/movimientos/' + id, { method: 'DELETE' });
     const data = await res.json();
-    if (data.ok) {
-      toast('Movimiento eliminado');
-      cargarMovimientos();
-    }
+    if (data.ok) { toast('Movimiento eliminado'); cargarMovimientos(); }
   } catch(e) { toast('Error al eliminar'); }
 }
 
@@ -335,4 +321,194 @@ function exportarBodegaExcel() {
   XLSX.utils.book_append_sheet(wb, ws, 'Stock');
   XLSX.writeFile(wb, `bodega_${new Date().toISOString().slice(0,10)}.xlsx`);
   toast('✓ Stock exportado');
+}
+
+// ── Indicadores ──────────────────────────────────────────
+function getLunes(fecha) {
+  const d = new Date(fecha + 'T12:00:00');
+  const dia = d.getDay();
+  const diff = dia === 0 ? -6 : 1 - dia;
+  d.setDate(d.getDate() + diff);
+  return d.toISOString().slice(0, 10);
+}
+
+function formatFecha(fecha) {
+  const d = new Date(fecha + 'T12:00:00');
+  return d.toLocaleDateString('es-EC', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+async function iniciarIndicadores() {
+  try {
+    const res = await fetch('/api/reportes');
+    todosLosReportes = await res.json();
+
+    const semanas = {};
+    todosLosReportes.forEach(r => {
+      const lunes = getLunes(r.fecha);
+      semanas[lunes] = true;
+    });
+
+    const semanasOrdenadas = Object.keys(semanas).sort().reverse();
+    const sel = document.getElementById('semana-select');
+    sel.innerHTML = semanasOrdenadas.map(s => {
+      const lunes = new Date(s + 'T12:00:00');
+      const sabado = new Date(lunes);
+      sabado.setDate(sabado.getDate() + 5);
+      const label = `${lunes.toLocaleDateString('es-EC', {day:'2-digit',month:'short'})} – ${sabado.toLocaleDateString('es-EC', {day:'2-digit',month:'short',year:'numeric'})}`;
+      return `<option value="${s}">${label}</option>`;
+    }).join('');
+
+    cargarIndicadores();
+  } catch(e) {
+    document.getElementById('dias-semana').innerHTML = '<p class="empty">Error al cargar indicadores.</p>';
+  }
+}
+
+function cargarIndicadores() {
+  const lunes = document.getElementById('semana-select').value;
+  if (!lunes) return;
+
+  const inicio = new Date(lunes + 'T12:00:00');
+  const diasSemana = [];
+  for (let i = 0; i < 6; i++) {
+    const d = new Date(inicio);
+    d.setDate(d.getDate() + i);
+    diasSemana.push(d.toISOString().slice(0, 10));
+  }
+
+  const reportesPorFecha = {};
+  todosLosReportes.forEach(r => {
+    if (!reportesPorFecha[r.fecha]) reportesPorFecha[r.fecha] = [];
+    reportesPorFecha[r.fecha].push(r);
+  });
+
+  const nombres = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+  let diasProductivos = 0;
+  let totalMateriales = 0;
+
+  // Métricas resumen
+  diasSemana.slice(0, 5).forEach(fecha => {
+    const reportes = reportesPorFecha[fecha] || [];
+    if (reportes.length > 0) {
+      const total = reportes.reduce((s, r) => s + r.materiales.reduce((a, m) => a + m.cantidad, 0), 0);
+      if (total >= 10) diasProductivos++;
+    }
+  });
+
+  diasSemana.forEach(fecha => {
+    const reportes = reportesPorFecha[fecha] || [];
+    reportes.forEach(r => {
+      r.materiales.forEach(m => { totalMateriales += m.cantidad; });
+    });
+  });
+
+  const tieneSabado = (reportesPorFecha[diasSemana[5]] || []).length > 0;
+
+  document.getElementById('metricas-resumen').innerHTML = `
+    <div style="background:var(--surface2);border-radius:8px;padding:1rem;">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Días productivos</div>
+      <div style="font-size:22px;font-weight:600;color:var(--accent);">${diasProductivos}/5</div>
+      <div style="font-size:11px;color:var(--muted);">Lun – Vie</div>
+    </div>
+    <div style="background:var(--surface2);border-radius:8px;padding:1rem;">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Total materiales</div>
+      <div style="font-size:22px;font-weight:600;">${totalMateriales}</div>
+      <div style="font-size:11px;color:var(--muted);">unidades usadas</div>
+    </div>
+    <div style="background:var(--surface2);border-radius:8px;padding:1rem;">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Horas extra</div>
+      <div style="font-size:22px;font-weight:600;color:${tieneSabado ? '#f59e0b' : 'var(--muted)'};">${tieneSabado ? 'Sáb' : '—'}</div>
+      <div style="font-size:11px;color:var(--muted);">${tieneSabado ? '1 día registrado' : 'sin registro'}</div>
+    </div>`;
+
+  // Días de la semana
+  const cont = document.getElementById('dias-semana');
+  cont.innerHTML = diasSemana.map((fecha, i) => {
+    const reportes = reportesPorFecha[fecha] || [];
+    const esSabado = i === 5;
+    const total = reportes.reduce((s, r) => s + r.materiales.reduce((a, m) => a + m.cantidad, 0), 0);
+
+    let badge, badgeColor, badgeBg;
+    if (esSabado) {
+      badge = 'Extra'; badgeColor = '#854F0B'; badgeBg = '#FAEEDA';
+    } else if (reportes.length === 0) {
+      badge = 'Sin registro'; badgeColor = 'var(--muted)'; badgeBg = 'var(--surface2)';
+    } else if (total >= 20) {
+      badge = 'Productivo'; badgeColor = '#3B6D11'; badgeBg = '#EAF3DE';
+    } else if (total >= 5) {
+      badge = 'Parcial'; badgeColor = '#854F0B'; badgeBg = '#FAEEDA';
+    } else {
+      badge = 'Bajo'; badgeColor = '#A32D2D'; badgeBg = '#FCEBEB';
+    }
+
+    const integrantes = [...new Set(reportes.flatMap(r => Array.isArray(r.integrantes) ? r.integrantes : r.integrantes.split(',').map(x => x.trim())))];
+    const observaciones = reportes.map(r => r.observaciones).filter(Boolean);
+    const materialesUsados = {};
+    reportes.forEach(r => r.materiales.forEach(m => {
+      materialesUsados[m.material] = (materialesUsados[m.material] || 0) + m.cantidad;
+    }));
+
+    return `
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:1rem;margin-bottom:10px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+          <div>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:600;color:var(--accent);">${nombres[i]}</span>
+            <span style="font-size:12px;color:var(--muted);margin-left:8px;">${fecha}</span>
+            ${esSabado ? '<span style="font-size:10px;background:var(--surface);border:1px solid var(--border);color:var(--muted);padding:2px 6px;border-radius:10px;margin-left:6px;">horas extra</span>' : ''}
+          </div>
+          <span style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;background:${badgeBg};color:${badgeColor};">${badge}</span>
+        </div>
+
+        ${reportes.length === 0 ? '<p style="font-size:12px;color:var(--muted);text-align:center;padding:0.5rem 0;">Sin actividad registrada</p>' : `
+          ${integrantes.length > 0 ? `
+            <div style="margin-bottom:8px;">
+              <span style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;">👷 Integrantes</span>
+              <div style="font-size:13px;margin-top:3px;">${integrantes.join(', ')}</div>
+            </div>` : ''}
+
+          ${observaciones.length > 0 ? `
+            <div style="margin-bottom:8px;background:var(--surface);border-left:3px solid var(--accent2);border-radius:0 6px 6px 0;padding:8px 12px;">
+              <span style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;">📋 Observaciones</span>
+              <div style="font-size:13px;margin-top:3px;line-height:1.5;">${observaciones.join(' | ')}</div>
+            </div>` : ''}
+
+          ${Object.keys(materialesUsados).length > 0 ? `
+            <div>
+              <span style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;">📦 Materiales usados</span>
+              <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;">
+                ${Object.entries(materialesUsados).map(([mat, cant]) => `
+                  <span style="font-size:12px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:3px 8px;">
+                    ${mat}: <strong>${cant}</strong>
+                  </span>`).join('')}
+              </div>
+            </div>` : ''}
+        `}
+      </div>`;
+  }).join('');
+
+  // Top materiales
+  const contMat = document.getElementById('top-materiales');
+  const totalesMat = {};
+  diasSemana.forEach(fecha => {
+    (reportesPorFecha[fecha] || []).forEach(r => {
+      r.materiales.forEach(m => {
+        totalesMat[m.material] = (totalesMat[m.material] || 0) + m.cantidad;
+      });
+    });
+  });
+
+  const sorted = Object.entries(totalesMat).sort((a, b) => b[1] - a[1]);
+  if (!sorted.length) {
+    contMat.innerHTML = '<p class="empty">No hay materiales registrados esta semana.</p>';
+    return;
+  }
+  const max = sorted[0][1];
+  contMat.innerHTML = sorted.map(([mat, cant]) => `
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+      <span style="font-size:12px;color:var(--muted);width:160px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${mat}</span>
+      <div style="flex:1;height:6px;background:var(--surface2);border-radius:3px;overflow:hidden;">
+        <div style="width:${Math.round(cant/max*100)}%;height:100%;background:var(--accent);border-radius:3px;"></div>
+      </div>
+      <span style="font-size:12px;color:var(--muted);width:30px;text-align:right;">${cant}</span>
+    </div>`).join('');
 }

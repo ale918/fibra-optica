@@ -21,6 +21,7 @@
       <button class="tab active" onclick="mostrarTab('registro')">Nuevo registro</button>
       <button class="tab" onclick="mostrarTab('historial')">Historial</button>
       <button class="tab" onclick="mostrarTab('bodega')">Bodega</button>
+      <button class="tab" onclick="mostrarTab('indicadores')">Indicadores</button>
     </div>
   </div>
 </header>
@@ -102,7 +103,6 @@
 
   <!-- ═══ TAB: BODEGA ═══ -->
   <section id="tab-bodega" style="display:none;">
-
     <div class="card">
       <h3>Stock actual</h3>
       <p class="card-sub">Cantidades disponibles en bodega.</p>
@@ -128,20 +128,20 @@
         <div class="form-group">
           <label>Material</label>
           <select id="mov-material">
-  <option value="Herrajes A">Herrajes A</option>
-  <option value="Herrajes U">Herrajes U</option>
-  <option value="Cinta 3/4&quot;">Cinta 3/4"</option>
-  <option value="Cinta 3/2&quot;">Cinta 3/2"</option>
-  <option value="Cable Drop">Cable Drop</option>
-  <option value="Fibra Principal">Fibra Principal</option>
-  <option value="Hebilla metálica 3/4&quot;">Hebilla metálica 3/4"</option>
-  <option value="Hebilla metálica 3/2&quot;">Hebilla metálica 3/2"</option>
-  <option value="Chupones">Chupones</option>
-  <option value="Preformados">Preformados</option>
-  <option value="Cajas NAT">Cajas NAT</option>
-  <option value="Splitter 1/16">Splitter 1/16</option>
-  <option value="Splitter 1/4">Splitter 1/4</option>
-</select>
+            <option value="Herrajes A">Herrajes A</option>
+            <option value="Herrajes U">Herrajes U</option>
+            <option value="Cinta 3/4&quot;">Cinta 3/4"</option>
+            <option value="Cinta 3/2&quot;">Cinta 3/2"</option>
+            <option value="Cable Drop">Cable Drop</option>
+            <option value="Fibra Principal">Fibra Principal</option>
+            <option value="Hebilla metálica 3/4&quot;">Hebilla metálica 3/4"</option>
+            <option value="Hebilla metálica 3/2&quot;">Hebilla metálica 3/2"</option>
+            <option value="Chupones">Chupones</option>
+            <option value="Preformados">Preformados</option>
+            <option value="Cajas NAT">Cajas NAT</option>
+            <option value="Splitter 1/16">Splitter 1/16</option>
+            <option value="Splitter 1/4">Splitter 1/4</option>
+          </select>
         </div>
       </div>
       <div class="form-row">
@@ -168,19 +168,40 @@
       <div id="tabla-movimientos"><p class="empty">Cargando...</p></div>
     </div>
 
-  </section>
-
-  <!-- Modal stock -->
-  <div id="modal-stock" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:200;align-items:center;justify-content:center;">
-    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:2rem;width:90%;max-width:500px;max-height:80vh;overflow-y:auto;">
-      <h3 style="color:var(--accent);font-family:'IBM Plex Mono',monospace;font-size:13px;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:1rem;">Actualizar stock</h3>
-      <div id="modal-stock-items"></div>
-      <div class="btn-row" style="margin-top:1rem;">
-        <button class="btn-primary" onclick="guardarStock()">Guardar</button>
-        <button onclick="cerrarModalStock()">Cancelar</button>
+    <div id="modal-stock" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:200;align-items:center;justify-content:center;">
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:2rem;width:90%;max-width:500px;max-height:80vh;overflow-y:auto;">
+        <h3 style="color:var(--accent);font-family:'IBM Plex Mono',monospace;font-size:13px;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:1rem;">Actualizar stock</h3>
+        <div id="modal-stock-items"></div>
+        <div class="btn-row" style="margin-top:1rem;">
+          <button class="btn-primary" onclick="guardarStock()">Guardar</button>
+          <button onclick="cerrarModalStock()">Cancelar</button>
+        </div>
       </div>
     </div>
-  </div>
+  </section>
+
+  <!-- ═══ TAB: INDICADORES ═══ -->
+  <section id="tab-indicadores" style="display:none;">
+
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:1.25rem;">
+      <span style="font-size:13px;color:var(--muted);">Semana del</span>
+      <select id="semana-select" onchange="cargarIndicadores()" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'IBM Plex Sans',sans-serif;font-size:13px;padding:6px 10px;">
+      </select>
+    </div>
+
+    <div id="metricas-resumen" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:1.25rem;"></div>
+
+    <div class="card">
+      <h3>Rendimiento por día</h3>
+      <div id="dias-semana"></div>
+    </div>
+
+    <div class="card">
+      <h3>Materiales más usados</h3>
+      <div id="top-materiales"></div>
+    </div>
+
+  </section>
 
 </main>
 
