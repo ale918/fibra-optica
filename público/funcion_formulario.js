@@ -14,6 +14,12 @@ const MATERIALES = [
   { id: 'splitter14',    label: 'Splitter 1/4',         unidad: 'und' },
 ];
 
+const METAS = {
+  fibraPrincipal: { label: 'Fibra Principal', meta: 2000, unidad: 'm', productivo: 2000, parcial: 1000 },
+  cajasNat:       { label: 'Cajas NAT',        meta: 5,    unidad: 'und', productivo: 5, parcial: 3 },
+  herrajes:       { label: 'Herrajes (A+U)',   meta: 40,   unidad: 'und', productivo: 40, parcial: 20 },
+};
+
 let todosLosReportes = [];
 let stockActual = [];
 
@@ -332,9 +338,23 @@ function getLunes(fecha) {
   return d.toISOString().slice(0, 10);
 }
 
-function formatFecha(fecha) {
-  const d = new Date(fecha + 'T12:00:00');
-  return d.toLocaleDateString('es-EC', { day: '2-digit', month: 'short', year: 'numeric' });
+function getMaterialCantidad(reportes, labelMaterial) {
+  return reportes.reduce((s, r) => {
+    const m = r.materiales.find(m => m.material === labelMaterial);
+    return s + (m ? m.cantidad : 0);
+  }, 0);
+}
+
+function barMeta(valor, meta, colorOk, colorParcial, colorBajo) {
+  const pct = Math.min(Math.round(valor / meta * 100), 100);
+  const color = valor >= meta ? colorOk : valor >= meta / 2 ? colorParcial : colorBajo;
+  return `
+    <div style="display:flex;align-items:center;gap:8px;">
+      <div style="flex:1;height:7px;background:var(--surface2);border-radius:4px;overflow:hidden;">
+        <div style="width:${pct}%;height:100%;background:${color};border-radius:4px;transition:width 0.3s;"></div>
+      </div>
+      <span style="font-size:11px;color:var(--muted);width:60px;text-align:right;">${valor} / ${meta}</span>
+    </div>`;
 }
 
 async function iniciarIndicadores() {
@@ -384,22 +404,15 @@ function cargarIndicadores() {
 
   const nombres = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
   let diasProductivos = 0;
-  let totalMateriales = 0;
+  let totalFibra = 0;
+  let totalCajas = 0;
 
-  // Métricas resumen
   diasSemana.slice(0, 5).forEach(fecha => {
     const reportes = reportesPorFecha[fecha] || [];
-    if (reportes.length > 0) {
-      const total = reportes.reduce((s, r) => s + r.materiales.reduce((a, m) => a + m.cantidad, 0), 0);
-      if (total >= 10) diasProductivos++;
-    }
-  });
-
-  diasSemana.forEach(fecha => {
-    const reportes = reportesPorFecha[fecha] || [];
-    reportes.forEach(r => {
-      r.materiales.forEach(m => { totalMateriales += m.cantidad; });
-    });
+    const fibra = getMaterialCantidad(reportes, 'Fibra Principal');
+    if (fibra >= METAS.fibraPrincipal.productivo) diasProductivos++;
+    totalFibra += fibra;
+    totalCajas += getMaterialCantidad(reportes, 'Cajas NAT');
   });
 
   const tieneSabado = (reportesPorFecha[diasSemana[5]] || []).length > 0;
@@ -407,13 +420,18 @@ function cargarIndicadores() {
   document.getElementById('metricas-resumen').innerHTML = `
     <div style="background:var(--surface2);border-radius:8px;padding:1rem;">
       <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Días productivos</div>
-      <div style="font-size:22px;font-weight:600;color:var(--accent);">${diasProductivos}/5</div>
+      <div style="font-size:22px;font-weight:600;color:${diasProductivos >= 4 ? 'var(--accent)' : diasProductivos >= 2 ? '#f59e0b' : 'var(--danger)'};">${diasProductivos}/5</div>
       <div style="font-size:11px;color:var(--muted);">Lun – Vie</div>
     </div>
     <div style="background:var(--surface2);border-radius:8px;padding:1rem;">
-      <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Total materiales</div>
-      <div style="font-size:22px;font-weight:600;">${totalMateriales}</div>
-      <div style="font-size:11px;color:var(--muted);">unidades usadas</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Fibra tendida</div>
+      <div style="font-size:22px;font-weight:600;">${totalFibra}m</div>
+      <div style="font-size:11px;color:var(--muted);">meta: ${METAS.fibraPrincipal.productivo * 5}m semana</div>
+    </div>
+    <div style="background:var(--surface2);border-radius:8px;padding:1rem;">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Cajas instaladas</div>
+      <div style="font-size:22px;font-weight:600;">${totalCajas}</div>
+      <div style="font-size:11px;color:var(--muted);">meta: ${METAS.cajasNat.productivo * 5} semana</div>
     </div>
     <div style="background:var(--surface2);border-radius:8px;padding:1rem;">
       <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Horas extra</div>
@@ -426,16 +444,21 @@ function cargarIndicadores() {
   cont.innerHTML = diasSemana.map((fecha, i) => {
     const reportes = reportesPorFecha[fecha] || [];
     const esSabado = i === 5;
-    const total = reportes.reduce((s, r) => s + r.materiales.reduce((a, m) => a + m.cantidad, 0), 0);
+    const fibra = getMaterialCantidad(reportes, 'Fibra Principal');
+    const cajas = getMaterialCantidad(reportes, 'Cajas NAT');
+    const herrajesA = getMaterialCantidad(reportes, 'Herrajes A');
+    const herrajesU = getMaterialCantidad(reportes, 'Herrajes U');
+    const herrajes = herrajesA + herrajesU;
+    const metaHerrajesDia = Math.round(fibra / 50);
 
     let badge, badgeColor, badgeBg;
     if (esSabado) {
       badge = 'Extra'; badgeColor = '#854F0B'; badgeBg = '#FAEEDA';
     } else if (reportes.length === 0) {
       badge = 'Sin registro'; badgeColor = 'var(--muted)'; badgeBg = 'var(--surface2)';
-    } else if (total >= 20) {
+    } else if (fibra >= METAS.fibraPrincipal.productivo) {
       badge = 'Productivo'; badgeColor = '#3B6D11'; badgeBg = '#EAF3DE';
-    } else if (total >= 5) {
+    } else if (fibra >= METAS.fibraPrincipal.parcial) {
       badge = 'Parcial'; badgeColor = '#854F0B'; badgeBg = '#FAEEDA';
     } else {
       badge = 'Bajo'; badgeColor = '#A32D2D'; badgeBg = '#FCEBEB';
@@ -443,10 +466,6 @@ function cargarIndicadores() {
 
     const integrantes = [...new Set(reportes.flatMap(r => Array.isArray(r.integrantes) ? r.integrantes : r.integrantes.split(',').map(x => x.trim())))];
     const observaciones = reportes.map(r => r.observaciones).filter(Boolean);
-    const materialesUsados = {};
-    reportes.forEach(r => r.materiales.forEach(m => {
-      materialesUsados[m.material] = (materialesUsados[m.material] || 0) + m.cantidad;
-    }));
 
     return `
       <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:1rem;margin-bottom:10px;">
@@ -460,28 +479,60 @@ function cargarIndicadores() {
         </div>
 
         ${reportes.length === 0 ? '<p style="font-size:12px;color:var(--muted);text-align:center;padding:0.5rem 0;">Sin actividad registrada</p>' : `
+
           ${integrantes.length > 0 ? `
-            <div style="margin-bottom:8px;">
-              <span style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;">👷 Integrantes</span>
-              <div style="font-size:13px;margin-top:3px;">${integrantes.join(', ')}</div>
+            <div style="margin-bottom:10px;">
+              <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:3px;">👷 Integrantes</div>
+              <div style="font-size:13px;">${integrantes.join(', ')}</div>
             </div>` : ''}
 
           ${observaciones.length > 0 ? `
-            <div style="margin-bottom:8px;background:var(--surface);border-left:3px solid var(--accent2);border-radius:0 6px 6px 0;padding:8px 12px;">
-              <span style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;">📋 Observaciones</span>
-              <div style="font-size:13px;margin-top:3px;line-height:1.5;">${observaciones.join(' | ')}</div>
+            <div style="margin-bottom:10px;background:var(--surface);border-left:3px solid var(--accent2);border-radius:0 6px 6px 0;padding:8px 12px;">
+              <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:3px;">📋 Observaciones</div>
+              <div style="font-size:13px;line-height:1.5;">${observaciones.join(' | ')}</div>
             </div>` : ''}
 
-          ${Object.keys(materialesUsados).length > 0 ? `
-            <div>
-              <span style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;">📦 Materiales usados</span>
-              <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;">
-                ${Object.entries(materialesUsados).map(([mat, cant]) => `
-                  <span style="font-size:12px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:3px 8px;">
-                    ${mat}: <strong>${cant}</strong>
-                  </span>`).join('')}
+          <div style="margin-bottom:10px;">
+            <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">📊 Metas del día</div>
+
+            <div style="margin-bottom:8px;">
+              <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
+                <span style="font-size:12px;color:var(--text);">Fibra Principal</span>
+                <span style="font-size:11px;color:var(--muted);">meta: ${METAS.fibraPrincipal.meta}m</span>
               </div>
-            </div>` : ''}
+              ${barMeta(fibra, METAS.fibraPrincipal.meta, '#1D9E75', '#BA7517', '#E24B4A')}
+            </div>
+
+            <div style="margin-bottom:8px;">
+              <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
+                <span style="font-size:12px;color:var(--text);">Cajas NAT</span>
+                <span style="font-size:11px;color:var(--muted);">meta: ${METAS.cajasNat.meta}</span>
+              </div>
+              ${barMeta(cajas, METAS.cajasNat.meta, '#1D9E75', '#BA7517', '#E24B4A')}
+            </div>
+
+            <div>
+              <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
+                <span style="font-size:12px;color:var(--text);">Herrajes (A+U)</span>
+                <span style="font-size:11px;color:var(--muted);">meta según fibra: ${metaHerrajesDia > 0 ? metaHerrajesDia : METAS.herrajes.meta}</span>
+              </div>
+              ${barMeta(herrajes, metaHerrajesDia > 0 ? metaHerrajesDia : METAS.herrajes.meta, '#1D9E75', '#BA7517', '#E24B4A')}
+            </div>
+          </div>
+
+          <div>
+            <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">📦 Materiales usados</div>
+            <div style="display:flex;flex-wrap:wrap;gap:6px;">
+              ${(() => {
+                const mat = {};
+                reportes.forEach(r => r.materiales.forEach(m => { mat[m.material] = (mat[m.material] || 0) + m.cantidad; }));
+                return Object.entries(mat).map(([m, c]) => `
+                  <span style="font-size:12px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:3px 8px;">
+                    ${m}: <strong>${c}</strong>
+                  </span>`).join('');
+              })()}
+            </div>
+          </div>
         `}
       </div>`;
   }).join('');
