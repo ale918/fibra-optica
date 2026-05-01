@@ -210,9 +210,11 @@
 
   <!-- ═══ TAB: INDICADORES ═══ -->
   <section id="tab-indicadores" style="display:none;">
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:1.25rem;">
-      <span style="font-size:13px;color:var(--muted);">Semana del</span>
-      <select id="semana-select" onchange="cargarIndicadores()" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'IBM Plex Sans',sans-serif;font-size:13px;padding:6px 10px;"></select>
+   <div style="display:flex;align-items:center;gap:12px;margin-bottom:1.25rem;flex-wrap:wrap;">
+  <span style="font-size:13px;color:var(--muted);">Semana del</span>
+  <select id="semana-select" onchange="cargarIndicadores()" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'IBM Plex Sans',sans-serif;font-size:13px;padding:6px 10px;"></select>
+  <button onclick="exportarInformeSemanal()">↓ Exportar informe semanal</button>
+</div>
     </div>
     <div id="metricas-resumen" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:1.25rem;"></div>
     <div class="card">

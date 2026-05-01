@@ -26,6 +26,7 @@ const ACTIVIDADES_INFO = {
 let actividadesSeleccionadas = new Set();
 let todosLosReportes = [];
 let stockActual = [];
+let semanaActual = '';
 
 document.getElementById('fecha').valueAsDate = new Date();
 
@@ -67,23 +68,17 @@ async function guardarReporte() {
   if (!fecha)       { toast('⚠ Selecciona la fecha'); return; }
   if (!integrantes) { toast('⚠ Ingresa los integrantes'); return; }
   if (actividadesSeleccionadas.size === 0) { toast('⚠ Selecciona al menos una actividad'); return; }
-
   const materiales = MATERIALES.map(m => ({
     material: m.label,
     cantidad: parseFloat(document.getElementById(m.id).value) || 0,
     unidad: m.unidad
   })).filter(m => m.cantidad > 0);
-
   if (!materiales.length) { toast('⚠ Ingresa al menos un material'); return; }
-
   try {
     const res = await fetch('/api/reportes', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        fecha, integrantes, observaciones, materiales,
-        actividades: [...actividadesSeleccionadas]
-      })
+      body: JSON.stringify({ fecha, integrantes, observaciones, materiales, actividades: [...actividadesSeleccionadas] })
     });
     const data = await res.json();
     if (data.ok) { toast('✓ Reporte guardado'); limpiarFormulario(); }
@@ -170,8 +165,7 @@ function exportarReporteExcel(id) {
   const d = new Date(r.fecha + 'T12:00:00');
   const acts = (r.actividades || []).map(a => ACTIVIDADES_INFO[a]?.label || a).join(', ');
   const datos = r.materiales.map(m => ({
-    'Fecha': r.fecha, 'Día': dias[d.getDay()],
-    'Actividades': acts,
+    'Fecha': r.fecha, 'Día': dias[d.getDay()], 'Actividades': acts,
     'Integrantes': r.integrantes.join(', '),
     'Material': m.material, 'Cantidad': m.cantidad,
     'Unidad': m.unidad, 'Observaciones': r.observaciones || ''
@@ -193,8 +187,7 @@ function exportarTodoExcel() {
     const acts = (r.actividades || []).map(a => ACTIVIDADES_INFO[a]?.label || a).join(', ');
     r.materiales.forEach(m => {
       filas.push({
-        'Fecha': r.fecha, 'Día': dias[d.getDay()],
-        'Actividades': acts,
+        'Fecha': r.fecha, 'Día': dias[d.getDay()], 'Actividades': acts,
         'Integrantes': r.integrantes.join(', '),
         'Material': m.material, 'Cantidad': m.cantidad,
         'Unidad': m.unidad, 'Observaciones': r.observaciones || ''
@@ -375,7 +368,7 @@ function getMat(reportes, label) {
   }, 0);
 }
 
-function barMeta(valor, meta, color) {
+function barMeta(valor, meta) {
   const pct = Math.min(Math.round(valor / meta * 100), 100);
   const c = valor >= meta ? '#1D9E75' : valor >= meta / 2 ? '#BA7517' : '#E24B4A';
   return `
@@ -389,33 +382,21 @@ function barMeta(valor, meta, color) {
 
 function calcularBadge(reportes, actividades) {
   if (reportes.length === 0) return { badge: 'Sin registro', color: 'var(--muted)', bg: 'var(--surface2)' };
-
   const fibra = getMat(reportes, 'Fibra Principal');
   const cajas = getMat(reportes, 'Cajas NAT');
-  const tieneInstalacion = actividades.includes('instalacion');
-  const tieneFibra = actividades.includes('fibra');
-  const tieneCajas = actividades.includes('cajas');
-
-  let puntos = 0;
-  let total = 0;
-
-  if (tieneFibra) {
+  let puntos = 0; let total = 0;
+  if (actividades.includes('fibra')) {
     total++;
     if (fibra >= 2000) puntos++;
     else if (fibra >= 1000) puntos += 0.5;
   }
-  if (tieneCajas) {
+  if (actividades.includes('cajas')) {
     total++;
     if (cajas >= 5) puntos++;
     else if (cajas >= 3) puntos += 0.5;
   }
-  if (tieneInstalacion) {
-    total++;
-    puntos++; // cualquier instalación = productivo
-  }
-
+  if (actividades.includes('instalacion')) { total++; puntos++; }
   if (total === 0) return { badge: 'Sin actividad', color: 'var(--muted)', bg: 'var(--surface2)' };
-
   const ratio = puntos / total;
   if (ratio >= 0.8) return { badge: 'Productivo', color: '#3B6D11', bg: '#EAF3DE' };
   if (ratio >= 0.4) return { badge: 'Parcial', color: '#854F0B', bg: '#FAEEDA' };
@@ -444,10 +425,10 @@ async function iniciarIndicadores() {
 }
 
 function cargarIndicadores() {
-  const lunes = document.getElementById('semana-select').value;
-  if (!lunes) return;
+  semanaActual = document.getElementById('semana-select').value;
+  if (!semanaActual) return;
 
-  const inicio = new Date(lunes + 'T12:00:00');
+  const inicio = new Date(semanaActual + 'T12:00:00');
   const diasSemana = [];
   for (let i = 0; i < 6; i++) {
     const d = new Date(inicio);
@@ -512,14 +493,11 @@ function cargarIndicadores() {
     const herrajesA = getMat(reportes, 'Herrajes A');
     const herrajesU = getMat(reportes, 'Herrajes U');
     const herrajes = herrajesA + herrajesU;
-    const metaHerrajes = fibra > 0 ? Math.round(fibra / 50) : 40;
+    const herrajesEsperados = fibra > 0 ? Math.round(fibra / 50) : 0;
 
-    let badgeInfo;
-    if (esSabado) {
-      badgeInfo = { badge: 'Extra', color: '#854F0B', bg: '#FAEEDA' };
-    } else {
-      badgeInfo = calcularBadge(reportes, actividades);
-    }
+    let badgeInfo = esSabado
+      ? { badge: 'Extra', color: '#854F0B', bg: '#FAEEDA' }
+      : calcularBadge(reportes, actividades);
 
     const integrantes = [...new Set(reportes.flatMap(r => Array.isArray(r.integrantes) ? r.integrantes : r.integrantes.split(',').map(x => x.trim())))];
     const observaciones = reportes.map(r => r.observaciones).filter(Boolean);
@@ -544,24 +522,19 @@ function cargarIndicadores() {
         </div>
 
         ${reportes.length === 0 ? '<p style="font-size:12px;color:var(--muted);text-align:center;padding:0.5rem 0;">Sin actividad registrada</p>' : `
-
           ${actsHTML}
-
           ${integrantes.length > 0 ? `
             <div style="margin-bottom:10px;">
               <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:3px;">👷 Integrantes</div>
               <div style="font-size:13px;">${integrantes.join(', ')}</div>
             </div>` : ''}
-
           ${observaciones.length > 0 ? `
             <div style="margin-bottom:10px;background:var(--surface);border-left:3px solid var(--accent2);border-radius:0 6px 6px 0;padding:8px 12px;">
               <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:3px;">📋 Observaciones</div>
               <div style="font-size:13px;line-height:1.5;">${observaciones.join(' | ')}</div>
             </div>` : ''}
-
           <div style="margin-bottom:10px;">
-            <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">📊 Metas del día</div>
-
+            <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">📊 Rendimiento del día</div>
             ${actividades.includes('fibra') ? `
               <div style="margin-bottom:8px;">
                 <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
@@ -570,14 +543,19 @@ function cargarIndicadores() {
                 </div>
                 ${barMeta(fibra, 2000)}
               </div>
+              ${herrajesEsperados > 0 ? `
               <div style="margin-bottom:8px;">
                 <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
                   <span style="font-size:12px;color:var(--text);">📡 Herrajes (A+U)</span>
-                  <span style="font-size:11px;color:var(--muted);">meta: ${metaHerrajes}</span>
+                  <span style="font-size:11px;color:var(--muted);">referencia: ${herrajesEsperados} (1 c/50m)</span>
                 </div>
-                ${barMeta(herrajes, metaHerrajes)}
-              </div>` : ''}
-
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <div style="flex:1;height:7px;background:var(--surface2);border-radius:4px;overflow:hidden;">
+                    <div style="width:${Math.min(Math.round(herrajes/herrajesEsperados*100),100)}%;height:100%;background:#378ADD;border-radius:4px;"></div>
+                  </div>
+                  <span style="font-size:11px;color:var(--muted);width:70px;text-align:right;">${herrajes} / ${herrajesEsperados}</span>
+                </div>
+              </div>` : ''}` : ''}
             ${actividades.includes('cajas') ? `
               <div style="margin-bottom:8px;">
                 <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
@@ -586,7 +564,6 @@ function cargarIndicadores() {
                 </div>
                 ${barMeta(cajas, 5)}
               </div>` : ''}
-
             ${actividades.includes('instalacion') ? `
               <div style="margin-bottom:8px;">
                 <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
@@ -598,7 +575,6 @@ function cargarIndicadores() {
                 </div>
               </div>` : ''}
           </div>
-
           <div>
             <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">📦 Materiales usados</div>
             <div style="display:flex;flex-wrap:wrap;gap:6px;">
@@ -635,4 +611,89 @@ function cargarIndicadores() {
       </div>
       <span style="font-size:12px;color:var(--muted);width:30px;text-align:right;">${cant}</span>
     </div>`).join('');
+}
+
+// ── Exportar informe semanal ──────────────────────────────
+function exportarInformeSemanal() {
+  if (!semanaActual) { toast('⚠ Selecciona una semana'); return; }
+
+  const inicio = new Date(semanaActual + 'T12:00:00');
+  const diasSemana = [];
+  for (let i = 0; i < 6; i++) {
+    const d = new Date(inicio);
+    d.setDate(d.getDate() + i);
+    diasSemana.push(d.toISOString().slice(0, 10));
+  }
+
+  const reportesPorFecha = {};
+  todosLosReportes.forEach(r => {
+    if (!reportesPorFecha[r.fecha]) reportesPorFecha[r.fecha] = [];
+    reportesPorFecha[r.fecha].push(r);
+  });
+
+  const nombres = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+  const wb = XLSX.utils.book_new();
+
+  // Hoja 1 — Resumen semanal
+  const resumenFilas = [];
+  diasSemana.forEach((fecha, i) => {
+    const reportes = reportesPorFecha[fecha] || [];
+    const actividades = [...new Set(reportes.flatMap(r => r.actividades || []))];
+    const { badge } = i === 5
+      ? { badge: 'Extra' }
+      : calcularBadge(reportes, actividades);
+    const integrantes = [...new Set(reportes.flatMap(r => Array.isArray(r.integrantes) ? r.integrantes : r.integrantes.split(',').map(x => x.trim())))];
+    const fibra = getMat(reportes, 'Fibra Principal');
+    const cajas = getMat(reportes, 'Cajas NAT');
+    const herrajesA = getMat(reportes, 'Herrajes A');
+    const herrajesU = getMat(reportes, 'Herrajes U');
+    const obs = reportes.map(r => r.observaciones).filter(Boolean).join(' | ');
+
+    resumenFilas.push({
+      'Día': nombres[i],
+      'Fecha': fecha,
+      'Estado': badge,
+      'Actividades': actividades.map(a => ACTIVIDADES_INFO[a]?.label || a).join(', ') || '—',
+      'Integrantes': integrantes.join(', ') || '—',
+      'Fibra Principal (m)': fibra,
+      'Herrajes A': herrajesA,
+      'Herrajes U': herrajesU,
+      'Herrajes total': herrajesA + herrajesU,
+      'Cajas NAT': cajas,
+      'Observaciones': obs || '—'
+    });
+  });
+
+  const wsResumen = XLSX.utils.json_to_sheet(resumenFilas);
+  wsResumen['!cols'] = [{wch:12},{wch:12},{wch:14},{wch:45},{wch:35},{wch:18},{wch:12},{wch:12},{wch:14},{wch:12},{wch:40}];
+  XLSX.utils.book_append_sheet(wb, wsResumen, 'Resumen semanal');
+
+  // Hoja 2 — Detalle de materiales
+  const matFilas = [];
+  diasSemana.forEach((fecha, i) => {
+    const reportes = reportesPorFecha[fecha] || [];
+    const actividades = [...new Set(reportes.flatMap(r => r.actividades || []))];
+    reportes.forEach(r => {
+      r.materiales.forEach(m => {
+        matFilas.push({
+          'Día': nombres[i],
+          'Fecha': fecha,
+          'Actividades': actividades.map(a => ACTIVIDADES_INFO[a]?.label || a).join(', ') || '—',
+          'Integrantes': Array.isArray(r.integrantes) ? r.integrantes.join(', ') : r.integrantes,
+          'Material': m.material,
+          'Cantidad': m.cantidad,
+          'Unidad': m.unidad
+        });
+      });
+    });
+  });
+
+  const wsMat = XLSX.utils.json_to_sheet(matFilas);
+  wsMat['!cols'] = [{wch:12},{wch:12},{wch:45},{wch:35},{wch:28},{wch:12},{wch:8}];
+  XLSX.utils.book_append_sheet(wb, wsMat, 'Detalle materiales');
+
+  const sabado = new Date(inicio);
+  sabado.setDate(sabado.getDate() + 5);
+  XLSX.writeFile(wb, `informe_semana_${semanaActual}.xlsx`);
+  toast('✓ Informe semanal exportado');
 }
