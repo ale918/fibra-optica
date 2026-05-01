@@ -116,7 +116,22 @@ app.get('/api/bodega/movimientos', (req, res) => {
 });
 
 app.delete('/api/bodega/movimientos/:id', (req, res) => {
-  db.data.movimientos = db.data.movimientos.filter(m => m.id !== parseInt(req.params.id));
+  const id = parseInt(req.params.id);
+  const movimiento = db.data.movimientos.find(m => m.id === id);
+  if (!movimiento) return res.status(404).json({ error: 'Movimiento no encontrado' });
+
+  // Revertir el efecto en el stock
+  const item = db.data.bodega.find(b => b.material === movimiento.material);
+  if (item) {
+    if (movimiento.tipo === 'salida') {
+      item.cantidad += movimiento.cantidad;
+    } else if (movimiento.tipo === 'entrada' || movimiento.tipo === 'devolucion') {
+      item.cantidad -= movimiento.cantidad;
+      if (item.cantidad < 0) item.cantidad = 0;
+    }
+  }
+
+  db.data.movimientos = db.data.movimientos.filter(m => m.id !== id);
   db.write();
   res.json({ ok: true });
 });
