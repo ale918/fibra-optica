@@ -12,14 +12,18 @@ const MATERIALES = [
   { id: 'cajasNat',      label: 'Cajas NAT',            unidad: 'und' },
   { id: 'splitter116',   label: 'Splitter 1/16',        unidad: 'und' },
   { id: 'splitter14',    label: 'Splitter 1/4',         unidad: 'und' },
+  { id: 'ganchosTel',    label: 'Ganchos telefónicos',  unidad: 'und' },
+  { id: 'conectorUpc',   label: 'Conector UPC',         unidad: 'und' },
+  { id: 'conectorApc',   label: 'Conector APC',         unidad: 'und' },
 ];
 
-const METAS = {
-  fibraPrincipal: { label: 'Fibra Principal', meta: 2000, unidad: 'm', productivo: 2000, parcial: 1000 },
-  cajasNat:       { label: 'Cajas NAT',        meta: 5,    unidad: 'und', productivo: 5, parcial: 3 },
-  herrajes:       { label: 'Herrajes (A+U)',   meta: 40,   unidad: 'und', productivo: 40, parcial: 20 },
+const ACTIVIDADES_INFO = {
+  fibra:       { label: 'Pasado de fibra principal', icon: '📡' },
+  cajas:       { label: 'Armado de cajas NAT',       icon: '📦' },
+  instalacion: { label: 'Instalación cliente final', icon: '🔌' },
 };
 
+let actividadesSeleccionadas = new Set();
 let todosLosReportes = [];
 let stockActual = [];
 
@@ -30,6 +34,17 @@ function toast(msg) {
   t.textContent = msg;
   t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+function toggleActividad(id) {
+  const btn = document.getElementById('act-' + id);
+  if (actividadesSeleccionadas.has(id)) {
+    actividadesSeleccionadas.delete(id);
+    btn.classList.remove('selected');
+  } else {
+    actividadesSeleccionadas.add(id);
+    btn.classList.add('selected');
+  }
 }
 
 function mostrarTab(tab) {
@@ -51,17 +66,24 @@ async function guardarReporte() {
   const observaciones = document.getElementById('observaciones').value.trim();
   if (!fecha)       { toast('⚠ Selecciona la fecha'); return; }
   if (!integrantes) { toast('⚠ Ingresa los integrantes'); return; }
+  if (actividadesSeleccionadas.size === 0) { toast('⚠ Selecciona al menos una actividad'); return; }
+
   const materiales = MATERIALES.map(m => ({
     material: m.label,
     cantidad: parseFloat(document.getElementById(m.id).value) || 0,
     unidad: m.unidad
   })).filter(m => m.cantidad > 0);
+
   if (!materiales.length) { toast('⚠ Ingresa al menos un material'); return; }
+
   try {
     const res = await fetch('/api/reportes', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fecha, integrantes, observaciones, materiales })
+      body: JSON.stringify({
+        fecha, integrantes, observaciones, materiales,
+        actividades: [...actividadesSeleccionadas]
+      })
     });
     const data = await res.json();
     if (data.ok) { toast('✓ Reporte guardado'); limpiarFormulario(); }
@@ -74,6 +96,8 @@ function limpiarFormulario() {
   document.getElementById('observaciones').value = '';
   document.getElementById('fecha').valueAsDate = new Date();
   MATERIALES.forEach(m => { document.getElementById(m.id).value = ''; });
+  actividadesSeleccionadas.clear();
+  document.querySelectorAll('.actividad-btn').forEach(b => b.classList.remove('selected'));
 }
 
 async function cargarHistorial() {
@@ -98,12 +122,14 @@ function renderHistorial(reportes) {
   cont.innerHTML = reportes.map(r => {
     const d = new Date(r.fecha + 'T12:00:00');
     const dia = dias[d.getDay()];
+    const acts = (r.actividades || []).map(a => ACTIVIDADES_INFO[a] ? `${ACTIVIDADES_INFO[a].icon} ${ACTIVIDADES_INFO[a].label}` : a).join(' · ');
     return `
       <div class="reporte-card">
         <div class="reporte-header" onclick="toggleReporte(${r.id})">
           <div>
             <div class="reporte-fecha">${dia}, ${r.fecha}</div>
             <div class="reporte-integrantes">👷 ${r.integrantes.join(' · ')}</div>
+            ${acts ? `<div style="font-size:11px;color:var(--muted);margin-top:2px;">${acts}</div>` : ''}
           </div>
           <div style="color:var(--muted);font-size:18px;" id="arrow-${r.id}">▼</div>
         </div>
@@ -142,14 +168,16 @@ function exportarReporteExcel(id) {
   if (!r) return;
   const dias = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
   const d = new Date(r.fecha + 'T12:00:00');
+  const acts = (r.actividades || []).map(a => ACTIVIDADES_INFO[a]?.label || a).join(', ');
   const datos = r.materiales.map(m => ({
     'Fecha': r.fecha, 'Día': dias[d.getDay()],
+    'Actividades': acts,
     'Integrantes': r.integrantes.join(', '),
     'Material': m.material, 'Cantidad': m.cantidad,
     'Unidad': m.unidad, 'Observaciones': r.observaciones || ''
   }));
   const ws = XLSX.utils.json_to_sheet(datos);
-  ws['!cols'] = [{wch:12},{wch:12},{wch:35},{wch:25},{wch:10},{wch:8},{wch:40}];
+  ws['!cols'] = [{wch:12},{wch:12},{wch:40},{wch:35},{wch:25},{wch:10},{wch:8},{wch:40}];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Reporte');
   XLSX.writeFile(wb, `reporte_${r.fecha}.xlsx`);
@@ -162,9 +190,11 @@ function exportarTodoExcel() {
   const filas = [];
   todosLosReportes.forEach(r => {
     const d = new Date(r.fecha + 'T12:00:00');
+    const acts = (r.actividades || []).map(a => ACTIVIDADES_INFO[a]?.label || a).join(', ');
     r.materiales.forEach(m => {
       filas.push({
         'Fecha': r.fecha, 'Día': dias[d.getDay()],
+        'Actividades': acts,
         'Integrantes': r.integrantes.join(', '),
         'Material': m.material, 'Cantidad': m.cantidad,
         'Unidad': m.unidad, 'Observaciones': r.observaciones || ''
@@ -172,7 +202,7 @@ function exportarTodoExcel() {
     });
   });
   const ws = XLSX.utils.json_to_sheet(filas);
-  ws['!cols'] = [{wch:12},{wch:12},{wch:35},{wch:25},{wch:10},{wch:8},{wch:40}];
+  ws['!cols'] = [{wch:12},{wch:12},{wch:40},{wch:35},{wch:25},{wch:10},{wch:8},{wch:40}];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Historial');
   XLSX.writeFile(wb, `historial_${new Date().toISOString().slice(0,10)}.xlsx`);
@@ -338,36 +368,66 @@ function getLunes(fecha) {
   return d.toISOString().slice(0, 10);
 }
 
-function getMaterialCantidad(reportes, labelMaterial) {
+function getMat(reportes, label) {
   return reportes.reduce((s, r) => {
-    const m = r.materiales.find(m => m.material === labelMaterial);
+    const m = r.materiales.find(m => m.material === label);
     return s + (m ? m.cantidad : 0);
   }, 0);
 }
 
-function barMeta(valor, meta, colorOk, colorParcial, colorBajo) {
+function barMeta(valor, meta, color) {
   const pct = Math.min(Math.round(valor / meta * 100), 100);
-  const color = valor >= meta ? colorOk : valor >= meta / 2 ? colorParcial : colorBajo;
+  const c = valor >= meta ? '#1D9E75' : valor >= meta / 2 ? '#BA7517' : '#E24B4A';
   return `
     <div style="display:flex;align-items:center;gap:8px;">
       <div style="flex:1;height:7px;background:var(--surface2);border-radius:4px;overflow:hidden;">
-        <div style="width:${pct}%;height:100%;background:${color};border-radius:4px;transition:width 0.3s;"></div>
+        <div style="width:${pct}%;height:100%;background:${c};border-radius:4px;"></div>
       </div>
-      <span style="font-size:11px;color:var(--muted);width:60px;text-align:right;">${valor} / ${meta}</span>
+      <span style="font-size:11px;color:var(--muted);width:70px;text-align:right;">${valor} / ${meta}</span>
     </div>`;
+}
+
+function calcularBadge(reportes, actividades) {
+  if (reportes.length === 0) return { badge: 'Sin registro', color: 'var(--muted)', bg: 'var(--surface2)' };
+
+  const fibra = getMat(reportes, 'Fibra Principal');
+  const cajas = getMat(reportes, 'Cajas NAT');
+  const tieneInstalacion = actividades.includes('instalacion');
+  const tieneFibra = actividades.includes('fibra');
+  const tieneCajas = actividades.includes('cajas');
+
+  let puntos = 0;
+  let total = 0;
+
+  if (tieneFibra) {
+    total++;
+    if (fibra >= 2000) puntos++;
+    else if (fibra >= 1000) puntos += 0.5;
+  }
+  if (tieneCajas) {
+    total++;
+    if (cajas >= 5) puntos++;
+    else if (cajas >= 3) puntos += 0.5;
+  }
+  if (tieneInstalacion) {
+    total++;
+    puntos++; // cualquier instalación = productivo
+  }
+
+  if (total === 0) return { badge: 'Sin actividad', color: 'var(--muted)', bg: 'var(--surface2)' };
+
+  const ratio = puntos / total;
+  if (ratio >= 0.8) return { badge: 'Productivo', color: '#3B6D11', bg: '#EAF3DE' };
+  if (ratio >= 0.4) return { badge: 'Parcial', color: '#854F0B', bg: '#FAEEDA' };
+  return { badge: 'Bajo', color: '#A32D2D', bg: '#FCEBEB' };
 }
 
 async function iniciarIndicadores() {
   try {
     const res = await fetch('/api/reportes');
     todosLosReportes = await res.json();
-
     const semanas = {};
-    todosLosReportes.forEach(r => {
-      const lunes = getLunes(r.fecha);
-      semanas[lunes] = true;
-    });
-
+    todosLosReportes.forEach(r => { semanas[getLunes(r.fecha)] = true; });
     const semanasOrdenadas = Object.keys(semanas).sort().reverse();
     const sel = document.getElementById('semana-select');
     sel.innerHTML = semanasOrdenadas.map(s => {
@@ -377,7 +437,6 @@ async function iniciarIndicadores() {
       const label = `${lunes.toLocaleDateString('es-EC', {day:'2-digit',month:'short'})} – ${sabado.toLocaleDateString('es-EC', {day:'2-digit',month:'short',year:'numeric'})}`;
       return `<option value="${s}">${label}</option>`;
     }).join('');
-
     cargarIndicadores();
   } catch(e) {
     document.getElementById('dias-semana').innerHTML = '<p class="empty">Error al cargar indicadores.</p>';
@@ -406,13 +465,16 @@ function cargarIndicadores() {
   let diasProductivos = 0;
   let totalFibra = 0;
   let totalCajas = 0;
+  let totalInstalaciones = 0;
 
   diasSemana.slice(0, 5).forEach(fecha => {
     const reportes = reportesPorFecha[fecha] || [];
-    const fibra = getMaterialCantidad(reportes, 'Fibra Principal');
-    if (fibra >= METAS.fibraPrincipal.productivo) diasProductivos++;
-    totalFibra += fibra;
-    totalCajas += getMaterialCantidad(reportes, 'Cajas NAT');
+    const actividades = [...new Set(reportes.flatMap(r => r.actividades || []))];
+    const { badge } = calcularBadge(reportes, actividades);
+    if (badge === 'Productivo') diasProductivos++;
+    totalFibra += getMat(reportes, 'Fibra Principal');
+    totalCajas += getMat(reportes, 'Cajas NAT');
+    if (actividades.includes('instalacion') && reportes.length > 0) totalInstalaciones++;
   });
 
   const tieneSabado = (reportesPorFecha[diasSemana[5]] || []).length > 0;
@@ -426,17 +488,17 @@ function cargarIndicadores() {
     <div style="background:var(--surface2);border-radius:8px;padding:1rem;">
       <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Fibra tendida</div>
       <div style="font-size:22px;font-weight:600;">${totalFibra}m</div>
-      <div style="font-size:11px;color:var(--muted);">meta: ${METAS.fibraPrincipal.productivo * 5}m semana</div>
+      <div style="font-size:11px;color:var(--muted);">meta: 10,000m semana</div>
     </div>
     <div style="background:var(--surface2);border-radius:8px;padding:1rem;">
-      <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Cajas instaladas</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Cajas armadas</div>
       <div style="font-size:22px;font-weight:600;">${totalCajas}</div>
-      <div style="font-size:11px;color:var(--muted);">meta: ${METAS.cajasNat.productivo * 5} semana</div>
+      <div style="font-size:11px;color:var(--muted);">meta: 25 semana</div>
     </div>
     <div style="background:var(--surface2);border-radius:8px;padding:1rem;">
-      <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Horas extra</div>
-      <div style="font-size:22px;font-weight:600;color:${tieneSabado ? '#f59e0b' : 'var(--muted)'};">${tieneSabado ? 'Sáb' : '—'}</div>
-      <div style="font-size:11px;color:var(--muted);">${tieneSabado ? '1 día registrado' : 'sin registro'}</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Instalaciones</div>
+      <div style="font-size:22px;font-weight:600;color:var(--accent);">${totalInstalaciones}</div>
+      <div style="font-size:11px;color:var(--muted);">${tieneSabado ? '+ Sáb extra' : 'días con instalaciones'}</div>
     </div>`;
 
   // Días de la semana
@@ -444,28 +506,31 @@ function cargarIndicadores() {
   cont.innerHTML = diasSemana.map((fecha, i) => {
     const reportes = reportesPorFecha[fecha] || [];
     const esSabado = i === 5;
-    const fibra = getMaterialCantidad(reportes, 'Fibra Principal');
-    const cajas = getMaterialCantidad(reportes, 'Cajas NAT');
-    const herrajesA = getMaterialCantidad(reportes, 'Herrajes A');
-    const herrajesU = getMaterialCantidad(reportes, 'Herrajes U');
+    const actividades = [...new Set(reportes.flatMap(r => r.actividades || []))];
+    const fibra = getMat(reportes, 'Fibra Principal');
+    const cajas = getMat(reportes, 'Cajas NAT');
+    const herrajesA = getMat(reportes, 'Herrajes A');
+    const herrajesU = getMat(reportes, 'Herrajes U');
     const herrajes = herrajesA + herrajesU;
-    const metaHerrajesDia = Math.round(fibra / 50);
+    const metaHerrajes = fibra > 0 ? Math.round(fibra / 50) : 40;
 
-    let badge, badgeColor, badgeBg;
+    let badgeInfo;
     if (esSabado) {
-      badge = 'Extra'; badgeColor = '#854F0B'; badgeBg = '#FAEEDA';
-    } else if (reportes.length === 0) {
-      badge = 'Sin registro'; badgeColor = 'var(--muted)'; badgeBg = 'var(--surface2)';
-    } else if (fibra >= METAS.fibraPrincipal.productivo) {
-      badge = 'Productivo'; badgeColor = '#3B6D11'; badgeBg = '#EAF3DE';
-    } else if (fibra >= METAS.fibraPrincipal.parcial) {
-      badge = 'Parcial'; badgeColor = '#854F0B'; badgeBg = '#FAEEDA';
+      badgeInfo = { badge: 'Extra', color: '#854F0B', bg: '#FAEEDA' };
     } else {
-      badge = 'Bajo'; badgeColor = '#A32D2D'; badgeBg = '#FCEBEB';
+      badgeInfo = calcularBadge(reportes, actividades);
     }
 
     const integrantes = [...new Set(reportes.flatMap(r => Array.isArray(r.integrantes) ? r.integrantes : r.integrantes.split(',').map(x => x.trim())))];
     const observaciones = reportes.map(r => r.observaciones).filter(Boolean);
+
+    const actsHTML = actividades.length > 0 ? `
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">
+        ${actividades.map(a => ACTIVIDADES_INFO[a] ? `
+          <span style="font-size:11px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:3px 8px;">
+            ${ACTIVIDADES_INFO[a].icon} ${ACTIVIDADES_INFO[a].label}
+          </span>` : '').join('')}
+      </div>` : '';
 
     return `
       <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:1rem;margin-bottom:10px;">
@@ -475,10 +540,12 @@ function cargarIndicadores() {
             <span style="font-size:12px;color:var(--muted);margin-left:8px;">${fecha}</span>
             ${esSabado ? '<span style="font-size:10px;background:var(--surface);border:1px solid var(--border);color:var(--muted);padding:2px 6px;border-radius:10px;margin-left:6px;">horas extra</span>' : ''}
           </div>
-          <span style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;background:${badgeBg};color:${badgeColor};">${badge}</span>
+          <span style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;background:${badgeInfo.bg};color:${badgeInfo.color};">${badgeInfo.badge}</span>
         </div>
 
         ${reportes.length === 0 ? '<p style="font-size:12px;color:var(--muted);text-align:center;padding:0.5rem 0;">Sin actividad registrada</p>' : `
+
+          ${actsHTML}
 
           ${integrantes.length > 0 ? `
             <div style="margin-bottom:10px;">
@@ -495,29 +562,41 @@ function cargarIndicadores() {
           <div style="margin-bottom:10px;">
             <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">📊 Metas del día</div>
 
-            <div style="margin-bottom:8px;">
-              <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
-                <span style="font-size:12px;color:var(--text);">Fibra Principal</span>
-                <span style="font-size:11px;color:var(--muted);">meta: ${METAS.fibraPrincipal.meta}m</span>
+            ${actividades.includes('fibra') ? `
+              <div style="margin-bottom:8px;">
+                <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
+                  <span style="font-size:12px;color:var(--text);">📡 Fibra Principal</span>
+                  <span style="font-size:11px;color:var(--muted);">meta: 2000m</span>
+                </div>
+                ${barMeta(fibra, 2000)}
               </div>
-              ${barMeta(fibra, METAS.fibraPrincipal.meta, '#1D9E75', '#BA7517', '#E24B4A')}
-            </div>
+              <div style="margin-bottom:8px;">
+                <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
+                  <span style="font-size:12px;color:var(--text);">📡 Herrajes (A+U)</span>
+                  <span style="font-size:11px;color:var(--muted);">meta: ${metaHerrajes}</span>
+                </div>
+                ${barMeta(herrajes, metaHerrajes)}
+              </div>` : ''}
 
-            <div style="margin-bottom:8px;">
-              <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
-                <span style="font-size:12px;color:var(--text);">Cajas NAT</span>
-                <span style="font-size:11px;color:var(--muted);">meta: ${METAS.cajasNat.meta}</span>
-              </div>
-              ${barMeta(cajas, METAS.cajasNat.meta, '#1D9E75', '#BA7517', '#E24B4A')}
-            </div>
+            ${actividades.includes('cajas') ? `
+              <div style="margin-bottom:8px;">
+                <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
+                  <span style="font-size:12px;color:var(--text);">📦 Cajas NAT</span>
+                  <span style="font-size:11px;color:var(--muted);">meta: 5</span>
+                </div>
+                ${barMeta(cajas, 5)}
+              </div>` : ''}
 
-            <div>
-              <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
-                <span style="font-size:12px;color:var(--text);">Herrajes (A+U)</span>
-                <span style="font-size:11px;color:var(--muted);">meta según fibra: ${metaHerrajesDia > 0 ? metaHerrajesDia : METAS.herrajes.meta}</span>
-              </div>
-              ${barMeta(herrajes, metaHerrajesDia > 0 ? metaHerrajesDia : METAS.herrajes.meta, '#1D9E75', '#BA7517', '#E24B4A')}
-            </div>
+            ${actividades.includes('instalacion') ? `
+              <div style="margin-bottom:8px;">
+                <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
+                  <span style="font-size:12px;color:var(--text);">🔌 Instalación cliente</span>
+                  <span style="font-size:11px;color:var(--accent);">✓ Día productivo</span>
+                </div>
+                <div style="height:7px;background:#EAF3DE;border-radius:4px;">
+                  <div style="width:100%;height:100%;background:#1D9E75;border-radius:4px;"></div>
+                </div>
+              </div>` : ''}
           </div>
 
           <div>
@@ -542,17 +621,11 @@ function cargarIndicadores() {
   const totalesMat = {};
   diasSemana.forEach(fecha => {
     (reportesPorFecha[fecha] || []).forEach(r => {
-      r.materiales.forEach(m => {
-        totalesMat[m.material] = (totalesMat[m.material] || 0) + m.cantidad;
-      });
+      r.materiales.forEach(m => { totalesMat[m.material] = (totalesMat[m.material] || 0) + m.cantidad; });
     });
   });
-
   const sorted = Object.entries(totalesMat).sort((a, b) => b[1] - a[1]);
-  if (!sorted.length) {
-    contMat.innerHTML = '<p class="empty">No hay materiales registrados esta semana.</p>';
-    return;
-  }
+  if (!sorted.length) { contMat.innerHTML = '<p class="empty">No hay materiales registrados esta semana.</p>'; return; }
   const max = sorted[0][1];
   contMat.innerHTML = sorted.map(([mat, cant]) => `
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">

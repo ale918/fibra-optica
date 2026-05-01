@@ -49,6 +49,25 @@
     </div>
 
     <div class="card">
+      <h3>Tipo de actividad del día</h3>
+      <p class="card-sub">Selecciona una o varias actividades realizadas hoy.</p>
+      <div class="actividades-grid">
+        <div class="actividad-btn" id="act-fibra" onclick="toggleActividad('fibra')">
+          <span class="act-icon">📡</span>
+          <span class="act-label">Pasado de fibra principal</span>
+        </div>
+        <div class="actividad-btn" id="act-cajas" onclick="toggleActividad('cajas')">
+          <span class="act-icon">📦</span>
+          <span class="act-label">Armado de cajas NAT</span>
+        </div>
+        <div class="actividad-btn" id="act-instalacion" onclick="toggleActividad('instalacion')">
+          <span class="act-icon">🔌</span>
+          <span class="act-label">Instalación cliente final</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
       <h3>Materiales utilizados</h3>
       <p class="card-sub">Ingresa solo los que se usaron. Deja en 0 los que no aplican.</p>
       <div class="materiales-grid">
@@ -82,6 +101,12 @@
           <div class="mat-row"><label>Cajas NAT</label><input type="number" min="0" id="cajasNat" placeholder="0" /><span class="unidad">und</span></div>
           <div class="mat-row"><label>Splitter 1/16</label><input type="number" min="0" id="splitter116" placeholder="0" /><span class="unidad">und</span></div>
           <div class="mat-row"><label>Splitter 1/4</label><input type="number" min="0" id="splitter14" placeholder="0" /><span class="unidad">und</span></div>
+        </div>
+        <div class="mat-group">
+          <span class="mat-cat">Instalación cliente</span>
+          <div class="mat-row"><label>Ganchos telefónicos</label><input type="number" min="0" id="ganchosTel" placeholder="0" /><span class="unidad">und</span></div>
+          <div class="mat-row"><label>Conector UPC</label><input type="number" min="0" id="conectorUpc" placeholder="0" /><span class="unidad">und</span></div>
+          <div class="mat-row"><label>Conector APC</label><input type="number" min="0" id="conectorApc" placeholder="0" /><span class="unidad">und</span></div>
         </div>
       </div>
     </div>
@@ -141,6 +166,9 @@
             <option value="Cajas NAT">Cajas NAT</option>
             <option value="Splitter 1/16">Splitter 1/16</option>
             <option value="Splitter 1/4">Splitter 1/4</option>
+            <option value="Ganchos telefónicos">Ganchos telefónicos</option>
+            <option value="Conector UPC">Conector UPC</option>
+            <option value="Conector APC">Conector APC</option>
           </select>
         </div>
       </div>
@@ -182,25 +210,19 @@
 
   <!-- ═══ TAB: INDICADORES ═══ -->
   <section id="tab-indicadores" style="display:none;">
-
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:1.25rem;">
       <span style="font-size:13px;color:var(--muted);">Semana del</span>
-      <select id="semana-select" onchange="cargarIndicadores()" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'IBM Plex Sans',sans-serif;font-size:13px;padding:6px 10px;">
-      </select>
+      <select id="semana-select" onchange="cargarIndicadores()" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'IBM Plex Sans',sans-serif;font-size:13px;padding:6px 10px;"></select>
     </div>
-
     <div id="metricas-resumen" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:1.25rem;"></div>
-
     <div class="card">
       <h3>Rendimiento por día</h3>
       <div id="dias-semana"></div>
     </div>
-
     <div class="card">
       <h3>Materiales más usados</h3>
       <div id="top-materiales"></div>
     </div>
-
   </section>
 
 </main>

@@ -30,9 +30,8 @@ if (!db.data.bodega) db.data.bodega = [];
 if (!db.data.movimientos) db.data.movimientos = [];
 db.write();
 
-// ── Reportes ─────────────────────────────────────────────
 app.post('/api/reportes', (req, res) => {
-  const { fecha, observaciones, integrantes, materiales } = req.body;
+  const { fecha, observaciones, integrantes, materiales, actividades } = req.body;
   if (!fecha || !integrantes || !materiales?.length) {
     return res.status(400).json({ error: 'Faltan datos obligatorios' });
   }
@@ -42,6 +41,7 @@ app.post('/api/reportes', (req, res) => {
     observaciones,
     integrantes: Array.isArray(integrantes) ? integrantes : integrantes.split(',').map(i => i.trim()),
     materiales,
+    actividades: actividades || [],
     creado_en: new Date().toLocaleString('es-EC')
   };
   db.data.reportes.push(nuevoReporte);
@@ -52,7 +52,8 @@ app.post('/api/reportes', (req, res) => {
 app.get('/api/reportes', (req, res) => {
   const reportes = [...db.data.reportes].reverse().map(r => ({
     ...r,
-    integrantes: Array.isArray(r.integrantes) ? r.integrantes : r.integrantes.split(',').map(i => i.trim())
+    integrantes: Array.isArray(r.integrantes) ? r.integrantes : r.integrantes.split(',').map(i => i.trim()),
+    actividades: r.actividades || []
   }));
   res.json(reportes);
 });
@@ -63,7 +64,6 @@ app.delete('/api/reportes/:id', (req, res) => {
   res.json({ ok: true });
 });
 
-// ── Bodega ───────────────────────────────────────────────
 app.get('/api/bodega', (req, res) => {
   res.json(db.data.bodega);
 });
@@ -90,19 +90,13 @@ app.post('/api/bodega/movimiento', (req, res) => {
   }
   const item = db.data.bodega.find(b => b.material === material);
   if (!item) return res.status(400).json({ error: 'Material no encontrado en bodega' });
-
   if (tipo === 'salida' && item.cantidad < cantidad) {
     return res.status(400).json({ error: 'Stock insuficiente' });
   }
-
   item.cantidad += tipo === 'entrada' || tipo === 'devolucion' ? cantidad : -cantidad;
-
   const movimiento = {
     id: Date.now(),
-    tipo,
-    material,
-    cantidad,
-    responsable,
+    tipo, material, cantidad, responsable,
     nota: nota || '',
     fecha: new Date().toLocaleString('es-EC')
   };
@@ -119,8 +113,6 @@ app.delete('/api/bodega/movimientos/:id', (req, res) => {
   const id = parseInt(req.params.id);
   const movimiento = db.data.movimientos.find(m => m.id === id);
   if (!movimiento) return res.status(404).json({ error: 'Movimiento no encontrado' });
-
-  // Revertir el efecto en el stock
   const item = db.data.bodega.find(b => b.material === movimiento.material);
   if (item) {
     if (movimiento.tipo === 'salida') {
@@ -130,7 +122,6 @@ app.delete('/api/bodega/movimientos/:id', (req, res) => {
       if (item.cantidad < 0) item.cantidad = 0;
     }
   }
-
   db.data.movimientos = db.data.movimientos.filter(m => m.id !== id);
   db.write();
   res.json({ ok: true });
