@@ -118,6 +118,7 @@ function renderHistorial(reportes) {
     const d = new Date(r.fecha + 'T12:00:00');
     const dia = dias[d.getDay()];
     const acts = (r.actividades || []).map(a => ACTIVIDADES_INFO[a] ? `${ACTIVIDADES_INFO[a].icon} ${ACTIVIDADES_INFO[a].label}` : a).join(' · ');
+    const fotos = r.fotos || [];
     return `
       <div class="reporte-card">
         <div class="reporte-header" onclick="toggleReporte(${r.id})">
@@ -126,7 +127,10 @@ function renderHistorial(reportes) {
             <div class="reporte-integrantes">👷 ${r.integrantes.join(' · ')}</div>
             ${acts ? `<div style="font-size:11px;color:var(--muted);margin-top:2px;">${acts}</div>` : ''}
           </div>
-          <div style="color:var(--muted);font-size:18px;" id="arrow-${r.id}">▼</div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            ${fotos.length > 0 ? `<span style="font-size:11px;color:var(--muted);">📷 ${fotos.length}</span>` : ''}
+            <div style="color:var(--muted);font-size:18px;" id="arrow-${r.id}">▼</div>
+          </div>
         </div>
         <div class="reporte-body" id="body-${r.id}" style="display:none;">
           ${r.observaciones ? `<div class="obs-box">${r.observaciones}</div>` : ''}
@@ -134,7 +138,23 @@ function renderHistorial(reportes) {
             <thead><tr><th>Material</th><th>Cantidad</th><th>Unidad</th></tr></thead>
             <tbody>${r.materiales.map(m => `<tr><td>${m.material}</td><td class="cant">${m.cantidad}</td><td>${m.unidad}</td></tr>`).join('')}</tbody>
           </table>
-          <div class="reporte-actions">
+
+          <div style="margin-top:1rem;">
+            <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">📷 Fotos del trabajo</div>
+            <div id="fotos-${r.id}" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
+              ${fotos.map(f => `
+                <div style="position:relative;">
+                  <img src="${f.url}" style="width:100px;height:100px;object-fit:cover;border-radius:8px;border:1px solid var(--border);cursor:pointer;" onclick="verFoto('${f.url}')" />
+                  <button onclick="eliminarFoto(${r.id},'${f.public_id}')" style="position:absolute;top:3px;right:3px;background:rgba(0,0,0,0.6);border:none;color:#fff;border-radius:50%;width:20px;height:20px;font-size:11px;cursor:pointer;padding:0;">✕</button>
+                </div>`).join('')}
+            </div>
+            <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:6px 12px;">
+              <span>+ Agregar fotos</span>
+              <input type="file" accept="image/*" multiple style="display:none;" onchange="subirFotos(event,${r.id})" />
+            </label>
+          </div>
+
+          <div class="reporte-actions" style="margin-top:1rem;">
             <button onclick="exportarReporteExcel(${r.id})">↓ Excel</button>
             <button class="btn-danger" onclick="eliminarReporte(${r.id})">Eliminar</button>
           </div>
@@ -200,6 +220,41 @@ function exportarTodoExcel() {
   XLSX.utils.book_append_sheet(wb, ws, 'Historial');
   XLSX.writeFile(wb, `historial_${new Date().toISOString().slice(0,10)}.xlsx`);
   toast('✓ Historial exportado');
+}
+
+// ── Fotos ─────────────────────────────────────────────────
+async function subirFotos(event, reporteId) {
+  const files = event.target.files;
+  if (!files.length) return;
+  const formData = new FormData();
+  for (const file of files) formData.append('fotos', file);
+  toast('⏳ Subiendo fotos...');
+  try {
+    const res = await fetch(`/api/reportes/${reporteId}/fotos`, {
+      method: 'POST',
+      body: formData
+    });
+    const data = await res.json();
+    if (data.ok) { toast('✓ Fotos subidas correctamente'); await cargarHistorial(); }
+    else { toast('Error: ' + data.error); }
+  } catch(e) { toast('Error al subir fotos'); }
+}
+
+async function eliminarFoto(reporteId, publicId) {
+  if (!confirm('¿Eliminar esta foto?')) return;
+  try {
+    const res = await fetch(`/api/reportes/${reporteId}/fotos/${encodeURIComponent(publicId)}`, { method: 'DELETE' });
+    const data = await res.json();
+    if (data.ok) { toast('Foto eliminada'); await cargarHistorial(); }
+  } catch(e) { toast('Error al eliminar foto'); }
+}
+
+function verFoto(url) {
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.9);z-index:500;display:flex;align-items:center;justify-content:center;cursor:pointer;';
+  overlay.innerHTML = `<img src="${url}" style="max-width:90%;max-height:90%;border-radius:8px;" />`;
+  overlay.onclick = () => document.body.removeChild(overlay);
+  document.body.appendChild(overlay);
 }
 
 // ── Bodega ───────────────────────────────────────────────
@@ -495,18 +550,14 @@ function cargarIndicadores() {
     const numPersonas = integrantes.length || 5;
     const metaFibra = Math.round(2000 * numPersonas / 5);
     const metaCajas = Math.round(5 * numPersonas / 5);
-
     const fibra = getMat(reportes, 'Fibra Principal');
     const cajas = getMat(reportes, 'Cajas NAT');
-    const herrajesA = getMat(reportes, 'Herrajes A');
-    const herrajesU = getMat(reportes, 'Herrajes U');
 
     let badgeInfo = esSabado
       ? { badge: 'Extra', color: '#854F0B', bg: '#FAEEDA' }
       : calcularBadge(reportes, actividades, numPersonas);
 
     const observaciones = reportes.map(r => r.observaciones).filter(Boolean);
-
     const actsHTML = actividades.length > 0 ? `
       <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">
         ${actividades.map(a => ACTIVIDADES_INFO[a] ? `
@@ -516,9 +567,7 @@ function cargarIndicadores() {
       </div>` : '';
 
     const todosMat = MATERIALES.map(m => ({
-      label: m.label,
-      val: getMat(reportes, m.label),
-      unidad: m.unidad
+      label: m.label, val: getMat(reportes, m.label), unidad: m.unidad
     })).filter(m => m.val > 0);
 
     return `
@@ -545,7 +594,6 @@ function cargarIndicadores() {
               <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:3px;">📋 Observaciones</div>
               <div style="font-size:13px;line-height:1.5;">${observaciones.join(' | ')}</div>
             </div>` : ''}
-
           <div style="margin-bottom:12px;">
             <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">📊 Rendimiento del día${numPersonas < 5 ? ` (ajustado a ${numPersonas}/5 personas)` : ''}</div>
             ${actividades.includes('fibra') ? `
@@ -575,7 +623,6 @@ function cargarIndicadores() {
                 </div>
               </div>` : ''}
           </div>
-
           ${todosMat.length > 0 ? `
           <div>
             <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">📦 Materiales utilizados</div>
@@ -598,7 +645,6 @@ function cargarIndicadores() {
       </div>`;
   }).join('');
 
-  // Top materiales semana
   const contMat = document.getElementById('top-materiales');
   const totalesMat = {};
   diasSemana.forEach(fecha => {
@@ -622,7 +668,6 @@ function cargarIndicadores() {
 // ── Exportar informe semanal ──────────────────────────────
 function exportarInformeSemanal() {
   if (!semanaActual) { toast('⚠ Selecciona una semana'); return; }
-
   const inicio = new Date(semanaActual + 'T12:00:00');
   const diasSemana = [];
   for (let i = 0; i < 6; i++) {
@@ -630,16 +675,13 @@ function exportarInformeSemanal() {
     d.setDate(d.getDate() + i);
     diasSemana.push(d.toISOString().slice(0, 10));
   }
-
   const reportesPorFecha = {};
   todosLosReportes.forEach(r => {
     if (!reportesPorFecha[r.fecha]) reportesPorFecha[r.fecha] = [];
     reportesPorFecha[r.fecha].push(r);
   });
-
   const nombres = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
   const wb = XLSX.utils.book_new();
-
   const resumenFilas = [];
   diasSemana.forEach((fecha, i) => {
     const reportes = reportesPorFecha[fecha] || [];
@@ -652,27 +694,20 @@ function exportarInformeSemanal() {
     const herrajesA = getMat(reportes, 'Herrajes A');
     const herrajesU = getMat(reportes, 'Herrajes U');
     const obs = reportes.map(r => r.observaciones).filter(Boolean).join(' | ');
-
     resumenFilas.push({
-      'Día': nombres[i],
-      'Fecha': fecha,
-      'Estado': badge,
+      'Día': nombres[i], 'Fecha': fecha, 'Estado': badge,
       'Personas': numPersonas,
       'Actividades': actividades.map(a => ACTIVIDADES_INFO[a]?.label || a).join(', ') || '—',
       'Integrantes': integrantes.join(', ') || '—',
       'Fibra Principal (m)': fibra,
-      'Herrajes A': herrajesA,
-      'Herrajes U': herrajesU,
+      'Herrajes A': herrajesA, 'Herrajes U': herrajesU,
       'Herrajes total': herrajesA + herrajesU,
-      'Cajas NAT': cajas,
-      'Observaciones': obs || '—'
+      'Cajas NAT': cajas, 'Observaciones': obs || '—'
     });
   });
-
   const wsResumen = XLSX.utils.json_to_sheet(resumenFilas);
   wsResumen['!cols'] = [{wch:12},{wch:12},{wch:14},{wch:10},{wch:45},{wch:35},{wch:18},{wch:12},{wch:12},{wch:14},{wch:12},{wch:40}];
   XLSX.utils.book_append_sheet(wb, wsResumen, 'Resumen semanal');
-
   const matFilas = [];
   diasSemana.forEach((fecha, i) => {
     const reportes = reportesPorFecha[fecha] || [];
@@ -680,22 +715,17 @@ function exportarInformeSemanal() {
     reportes.forEach(r => {
       r.materiales.forEach(m => {
         matFilas.push({
-          'Día': nombres[i],
-          'Fecha': fecha,
+          'Día': nombres[i], 'Fecha': fecha,
           'Actividades': actividades.map(a => ACTIVIDADES_INFO[a]?.label || a).join(', ') || '—',
           'Integrantes': Array.isArray(r.integrantes) ? r.integrantes.join(', ') : r.integrantes,
-          'Material': m.material,
-          'Cantidad': m.cantidad,
-          'Unidad': m.unidad
+          'Material': m.material, 'Cantidad': m.cantidad, 'Unidad': m.unidad
         });
       });
     });
   });
-
   const wsMat = XLSX.utils.json_to_sheet(matFilas);
   wsMat['!cols'] = [{wch:12},{wch:12},{wch:45},{wch:35},{wch:28},{wch:12},{wch:8}];
   XLSX.utils.book_append_sheet(wb, wsMat, 'Detalle materiales');
-
   XLSX.writeFile(wb, `informe_semana_${semanaActual}.xlsx`);
   toast('✓ Informe semanal exportado');
 }

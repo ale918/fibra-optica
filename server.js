@@ -4,6 +4,9 @@ import { fileURLToPath } from 'url';
 import { mkdirSync } from 'fs';
 import { Low } from 'lowdb';
 import { JSONFileSync } from 'lowdb/node';
+import { v2 as cloudinary } from 'cloudinary';
+import multer from 'multer';
+import { CloudinaryStorage } from 'multer-storage-cloudinary';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -11,8 +14,20 @@ const __dirname = dirname(__filename);
 const DATA_DIR = process.env.RAILWAY_VOLUME_MOUNT_PATH || join(__dirname, 'data');
 try { mkdirSync(DATA_DIR, { recursive: true }); } catch(e) {}
 
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+const storage = new CloudinaryStorage({
+  cloudinary,
+  params: { folder: 'airnet-reportes', allowed_formats: ['jpg','jpeg','png','webp'] }
+});
+const upload = multer({ storage });
+
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 app.use(express.static(join(__dirname, 'público')));
 
 app.get('/', (req, res) => {
@@ -30,6 +45,7 @@ if (!db.data.bodega) db.data.bodega = [];
 if (!db.data.movimientos) db.data.movimientos = [];
 db.write();
 
+// ── Reportes ─────────────────────────────────────────────
 app.post('/api/reportes', (req, res) => {
   const { fecha, observaciones, integrantes, materiales, actividades } = req.body;
   if (!fecha || !integrantes || !materiales?.length) {
@@ -42,6 +58,7 @@ app.post('/api/reportes', (req, res) => {
     integrantes: Array.isArray(integrantes) ? integrantes : integrantes.split(',').map(i => i.trim()),
     materiales,
     actividades: actividades || [],
+    fotos: [],
     creado_en: new Date().toLocaleString('es-EC')
   };
   db.data.reportes.push(nuevoReporte);
@@ -53,7 +70,8 @@ app.get('/api/reportes', (req, res) => {
   const reportes = [...db.data.reportes].reverse().map(r => ({
     ...r,
     integrantes: Array.isArray(r.integrantes) ? r.integrantes : r.integrantes.split(',').map(i => i.trim()),
-    actividades: r.actividades || []
+    actividades: r.actividades || [],
+    fotos: r.fotos || []
   }));
   res.json(reportes);
 });
@@ -64,6 +82,34 @@ app.delete('/api/reportes/:id', (req, res) => {
   res.json({ ok: true });
 });
 
+// ── Fotos ─────────────────────────────────────────────────
+app.post('/api/reportes/:id/fotos', upload.array('fotos', 5), async (req, res) => {
+  const id = parseInt(req.params.id);
+  const reporte = db.data.reportes.find(r => r.id === id);
+  if (!reporte) return res.status(404).json({ error: 'Reporte no encontrado' });
+  if (!reporte.fotos) reporte.fotos = [];
+  const nuevasFotos = req.files.map(f => ({
+    url: f.path,
+    public_id: f.filename,
+    subida_en: new Date().toLocaleString('es-EC')
+  }));
+  reporte.fotos.push(...nuevasFotos);
+  db.write();
+  res.json({ ok: true, fotos: nuevasFotos });
+});
+
+app.delete('/api/reportes/:id/fotos/:public_id', async (req, res) => {
+  const id = parseInt(req.params.id);
+  const public_id = decodeURIComponent(req.params.public_id);
+  const reporte = db.data.reportes.find(r => r.id === id);
+  if (!reporte) return res.status(404).json({ error: 'Reporte no encontrado' });
+  await cloudinary.uploader.destroy(public_id);
+  reporte.fotos = (reporte.fotos || []).filter(f => f.public_id !== public_id);
+  db.write();
+  res.json({ ok: true });
+});
+
+// ── Bodega ───────────────────────────────────────────────
 app.get('/api/bodega', (req, res) => {
   res.json(db.data.bodega);
 });
@@ -74,11 +120,8 @@ app.post('/api/bodega/stock', (req, res) => {
     return res.status(400).json({ error: 'Faltan datos' });
   }
   const item = db.data.bodega.find(b => b.material === material);
-  if (item) {
-    item.cantidad = cantidad;
-  } else {
-    db.data.bodega.push({ material, cantidad });
-  }
+  if (item) { item.cantidad = cantidad; }
+  else { db.data.bodega.push({ material, cantidad }); }
   db.write();
   res.json({ ok: true });
 });
@@ -95,10 +138,8 @@ app.post('/api/bodega/movimiento', (req, res) => {
   }
   item.cantidad += tipo === 'entrada' || tipo === 'devolucion' ? cantidad : -cantidad;
   const movimiento = {
-    id: Date.now(),
-    tipo, material, cantidad, responsable,
-    nota: nota || '',
-    fecha: new Date().toLocaleString('es-EC')
+    id: Date.now(), tipo, material, cantidad, responsable,
+    nota: nota || '', fecha: new Date().toLocaleString('es-EC')
   };
   db.data.movimientos.push(movimiento);
   db.write();
@@ -115,9 +156,8 @@ app.delete('/api/bodega/movimientos/:id', (req, res) => {
   if (!movimiento) return res.status(404).json({ error: 'Movimiento no encontrado' });
   const item = db.data.bodega.find(b => b.material === movimiento.material);
   if (item) {
-    if (movimiento.tipo === 'salida') {
-      item.cantidad += movimiento.cantidad;
-    } else if (movimiento.tipo === 'entrada' || movimiento.tipo === 'devolucion') {
+    if (movimiento.tipo === 'salida') { item.cantidad += movimiento.cantidad; }
+    else if (movimiento.tipo === 'entrada' || movimiento.tipo === 'devolucion') {
       item.cantidad -= movimiento.cantidad;
       if (item.cantidad < 0) item.cantidad = 0;
     }
