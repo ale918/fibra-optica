@@ -380,20 +380,22 @@ function barMeta(valor, meta) {
     </div>`;
 }
 
-function calcularBadge(reportes, actividades) {
+function calcularBadge(reportes, actividades, numPersonas = 5) {
   if (reportes.length === 0) return { badge: 'Sin registro', color: 'var(--muted)', bg: 'var(--surface2)' };
   const fibra = getMat(reportes, 'Fibra Principal');
   const cajas = getMat(reportes, 'Cajas NAT');
+  const metaFibra = Math.round(2000 * numPersonas / 5);
+  const metaCajas = Math.round(5 * numPersonas / 5);
   let puntos = 0; let total = 0;
   if (actividades.includes('fibra')) {
     total++;
-    if (fibra >= 2000) puntos++;
-    else if (fibra >= 1000) puntos += 0.5;
+    if (fibra >= metaFibra) puntos++;
+    else if (fibra >= metaFibra / 2) puntos += 0.5;
   }
   if (actividades.includes('cajas')) {
     total++;
-    if (cajas >= 5) puntos++;
-    else if (cajas >= 3) puntos += 0.5;
+    if (cajas >= metaCajas) puntos++;
+    else if (cajas >= metaCajas / 2) puntos += 0.5;
   }
   if (actividades.includes('instalacion')) { total++; puntos++; }
   if (total === 0) return { badge: 'Sin actividad', color: 'var(--muted)', bg: 'var(--surface2)' };
@@ -451,7 +453,9 @@ function cargarIndicadores() {
   diasSemana.slice(0, 5).forEach(fecha => {
     const reportes = reportesPorFecha[fecha] || [];
     const actividades = [...new Set(reportes.flatMap(r => r.actividades || []))];
-    const { badge } = calcularBadge(reportes, actividades);
+    const integrantes = [...new Set(reportes.flatMap(r => Array.isArray(r.integrantes) ? r.integrantes : r.integrantes.split(',').map(x => x.trim())))];
+    const numPersonas = integrantes.length || 5;
+    const { badge } = calcularBadge(reportes, actividades, numPersonas);
     if (badge === 'Productivo') diasProductivos++;
     totalFibra += getMat(reportes, 'Fibra Principal');
     totalCajas += getMat(reportes, 'Cajas NAT');
@@ -482,24 +486,25 @@ function cargarIndicadores() {
       <div style="font-size:11px;color:var(--muted);">${tieneSabado ? '+ Sáb extra' : 'días con instalaciones'}</div>
     </div>`;
 
-  // Días de la semana
   const cont = document.getElementById('dias-semana');
   cont.innerHTML = diasSemana.map((fecha, i) => {
     const reportes = reportesPorFecha[fecha] || [];
     const esSabado = i === 5;
     const actividades = [...new Set(reportes.flatMap(r => r.actividades || []))];
+    const integrantes = [...new Set(reportes.flatMap(r => Array.isArray(r.integrantes) ? r.integrantes : r.integrantes.split(',').map(x => x.trim())))];
+    const numPersonas = integrantes.length || 5;
+    const metaFibra = Math.round(2000 * numPersonas / 5);
+    const metaCajas = Math.round(5 * numPersonas / 5);
+
     const fibra = getMat(reportes, 'Fibra Principal');
     const cajas = getMat(reportes, 'Cajas NAT');
     const herrajesA = getMat(reportes, 'Herrajes A');
     const herrajesU = getMat(reportes, 'Herrajes U');
-    const herrajes = herrajesA + herrajesU;
-    const herrajesEsperados = fibra > 0 ? Math.round(fibra / 50) : 0;
 
     let badgeInfo = esSabado
       ? { badge: 'Extra', color: '#854F0B', bg: '#FAEEDA' }
-      : calcularBadge(reportes, actividades);
+      : calcularBadge(reportes, actividades, numPersonas);
 
-    const integrantes = [...new Set(reportes.flatMap(r => Array.isArray(r.integrantes) ? r.integrantes : r.integrantes.split(',').map(x => x.trim())))];
     const observaciones = reportes.map(r => r.observaciones).filter(Boolean);
 
     const actsHTML = actividades.length > 0 ? `
@@ -510,12 +515,19 @@ function cargarIndicadores() {
           </span>` : '').join('')}
       </div>` : '';
 
+    const todosMat = MATERIALES.map(m => ({
+      label: m.label,
+      val: getMat(reportes, m.label),
+      unidad: m.unidad
+    })).filter(m => m.val > 0);
+
     return `
       <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:1rem;margin-bottom:10px;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
           <div>
             <span style="font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:600;color:var(--accent);">${nombres[i]}</span>
             <span style="font-size:12px;color:var(--muted);margin-left:8px;">${fecha}</span>
+            ${numPersonas < 5 && !esSabado && reportes.length > 0 ? `<span style="font-size:10px;background:#FAEEDA;color:#854F0B;padding:2px 7px;border-radius:10px;margin-left:6px;">👥 ${numPersonas}/5 personas</span>` : ''}
             ${esSabado ? '<span style="font-size:10px;background:var(--surface);border:1px solid var(--border);color:var(--muted);padding:2px 6px;border-radius:10px;margin-left:6px;">horas extra</span>' : ''}
           </div>
           <span style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;background:${badgeInfo.bg};color:${badgeInfo.color};">${badgeInfo.badge}</span>
@@ -533,36 +545,24 @@ function cargarIndicadores() {
               <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:3px;">📋 Observaciones</div>
               <div style="font-size:13px;line-height:1.5;">${observaciones.join(' | ')}</div>
             </div>` : ''}
-          <div style="margin-bottom:10px;">
-            <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">📊 Rendimiento del día</div>
+
+          <div style="margin-bottom:12px;">
+            <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">📊 Rendimiento del día${numPersonas < 5 ? ` (ajustado a ${numPersonas}/5 personas)` : ''}</div>
             ${actividades.includes('fibra') ? `
               <div style="margin-bottom:8px;">
                 <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
                   <span style="font-size:12px;color:var(--text);">📡 Fibra Principal</span>
-                  <span style="font-size:11px;color:var(--muted);">meta: 2000m</span>
+                  <span style="font-size:11px;color:var(--muted);">meta: ${metaFibra}m</span>
                 </div>
-                ${barMeta(fibra, 2000)}
-              </div>
-              ${herrajesEsperados > 0 ? `
-              <div style="margin-bottom:8px;">
-                <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
-                  <span style="font-size:12px;color:var(--text);">📡 Herrajes (A+U)</span>
-                  <span style="font-size:11px;color:var(--muted);">referencia: ${herrajesEsperados} (1 c/50m)</span>
-                </div>
-                <div style="display:flex;align-items:center;gap:8px;">
-                  <div style="flex:1;height:7px;background:var(--surface2);border-radius:4px;overflow:hidden;">
-                    <div style="width:${Math.min(Math.round(herrajes/herrajesEsperados*100),100)}%;height:100%;background:#378ADD;border-radius:4px;"></div>
-                  </div>
-                  <span style="font-size:11px;color:var(--muted);width:70px;text-align:right;">${herrajes} / ${herrajesEsperados}</span>
-                </div>
-              </div>` : ''}` : ''}
+                ${barMeta(fibra, metaFibra)}
+              </div>` : ''}
             ${actividades.includes('cajas') ? `
               <div style="margin-bottom:8px;">
                 <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
                   <span style="font-size:12px;color:var(--text);">📦 Cajas NAT</span>
-                  <span style="font-size:11px;color:var(--muted);">meta: 5</span>
+                  <span style="font-size:11px;color:var(--muted);">meta: ${metaCajas}</span>
                 </div>
-                ${barMeta(cajas, 5)}
+                ${barMeta(cajas, metaCajas)}
               </div>` : ''}
             ${actividades.includes('instalacion') ? `
               <div style="margin-bottom:8px;">
@@ -575,24 +575,30 @@ function cargarIndicadores() {
                 </div>
               </div>` : ''}
           </div>
+
+          ${todosMat.length > 0 ? `
           <div>
-            <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">📦 Materiales usados</div>
-            <div style="display:flex;flex-wrap:wrap;gap:6px;">
-              ${(() => {
-                const mat = {};
-                reportes.forEach(r => r.materiales.forEach(m => { mat[m.material] = (mat[m.material] || 0) + m.cantidad; }));
-                return Object.entries(mat).map(([m, c]) => `
-                  <span style="font-size:12px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:3px 8px;">
-                    ${m}: <strong>${c}</strong>
-                  </span>`).join('');
-              })()}
-            </div>
-          </div>
+            <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">📦 Materiales utilizados</div>
+            <table style="width:100%;border-collapse:collapse;">
+              <tbody>
+                ${todosMat.map(m => `
+                  <tr>
+                    <td style="font-size:12px;color:var(--text);padding:5px 8px 5px 0;width:150px;white-space:nowrap;">${m.label}</td>
+                    <td style="padding:5px 8px;">
+                      <div style="height:6px;background:var(--surface);border-radius:3px;overflow:hidden;">
+                        <div style="width:100%;height:100%;background:#1D9E75;border-radius:3px;"></div>
+                      </div>
+                    </td>
+                    <td style="font-size:12px;color:var(--muted);padding:5px 0;text-align:right;white-space:nowrap;width:80px;">${m.val} ${m.unidad}</td>
+                  </tr>`).join('')}
+              </tbody>
+            </table>
+          </div>` : ''}
         `}
       </div>`;
   }).join('');
 
-  // Top materiales
+  // Top materiales semana
   const contMat = document.getElementById('top-materiales');
   const totalesMat = {};
   diasSemana.forEach(fecha => {
@@ -609,7 +615,7 @@ function cargarIndicadores() {
       <div style="flex:1;height:6px;background:var(--surface2);border-radius:3px;overflow:hidden;">
         <div style="width:${Math.round(cant/max*100)}%;height:100%;background:var(--accent);border-radius:3px;"></div>
       </div>
-      <span style="font-size:12px;color:var(--muted);width:30px;text-align:right;">${cant}</span>
+      <span style="font-size:12px;color:var(--muted);width:40px;text-align:right;">${cant}</span>
     </div>`).join('');
 }
 
@@ -634,15 +640,13 @@ function exportarInformeSemanal() {
   const nombres = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
   const wb = XLSX.utils.book_new();
 
-  // Hoja 1 — Resumen semanal
   const resumenFilas = [];
   diasSemana.forEach((fecha, i) => {
     const reportes = reportesPorFecha[fecha] || [];
     const actividades = [...new Set(reportes.flatMap(r => r.actividades || []))];
-    const { badge } = i === 5
-      ? { badge: 'Extra' }
-      : calcularBadge(reportes, actividades);
     const integrantes = [...new Set(reportes.flatMap(r => Array.isArray(r.integrantes) ? r.integrantes : r.integrantes.split(',').map(x => x.trim())))];
+    const numPersonas = integrantes.length || 5;
+    const { badge } = i === 5 ? { badge: 'Extra' } : calcularBadge(reportes, actividades, numPersonas);
     const fibra = getMat(reportes, 'Fibra Principal');
     const cajas = getMat(reportes, 'Cajas NAT');
     const herrajesA = getMat(reportes, 'Herrajes A');
@@ -653,6 +657,7 @@ function exportarInformeSemanal() {
       'Día': nombres[i],
       'Fecha': fecha,
       'Estado': badge,
+      'Personas': numPersonas,
       'Actividades': actividades.map(a => ACTIVIDADES_INFO[a]?.label || a).join(', ') || '—',
       'Integrantes': integrantes.join(', ') || '—',
       'Fibra Principal (m)': fibra,
@@ -665,10 +670,9 @@ function exportarInformeSemanal() {
   });
 
   const wsResumen = XLSX.utils.json_to_sheet(resumenFilas);
-  wsResumen['!cols'] = [{wch:12},{wch:12},{wch:14},{wch:45},{wch:35},{wch:18},{wch:12},{wch:12},{wch:14},{wch:12},{wch:40}];
+  wsResumen['!cols'] = [{wch:12},{wch:12},{wch:14},{wch:10},{wch:45},{wch:35},{wch:18},{wch:12},{wch:12},{wch:14},{wch:12},{wch:40}];
   XLSX.utils.book_append_sheet(wb, wsResumen, 'Resumen semanal');
 
-  // Hoja 2 — Detalle de materiales
   const matFilas = [];
   diasSemana.forEach((fecha, i) => {
     const reportes = reportesPorFecha[fecha] || [];
@@ -692,8 +696,6 @@ function exportarInformeSemanal() {
   wsMat['!cols'] = [{wch:12},{wch:12},{wch:45},{wch:35},{wch:28},{wch:12},{wch:8}];
   XLSX.utils.book_append_sheet(wb, wsMat, 'Detalle materiales');
 
-  const sabado = new Date(inicio);
-  sabado.setDate(sabado.getDate() + 5);
   XLSX.writeFile(wb, `informe_semana_${semanaActual}.xlsx`);
   toast('✓ Informe semanal exportado');
 }
