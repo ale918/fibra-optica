@@ -33,10 +33,11 @@ app.use(session({
   secret: process.env.SESSION_SECRET || 'airnet_secret',
   resave: false,
   saveUninitialized: false,
-  cookie: { maxAge: 1000 * 60 * 60 * 12 } // 12 horas
+  cookie: { maxAge: 1000 * 60 * 60 * 12 }
 }));
 
-// ── Middleware de autenticación ───────────────────────────
+const sesionesActivas = new Map();
+
 function requireAuth(req, res, next) {
   if (req.session.loggedIn) return next();
   res.status(401).json({ error: 'No autorizado' });
@@ -53,10 +54,15 @@ app.get('/', (req, res) => {
 
 // ── Login / Logout ────────────────────────────────────────
 app.post('/api/login', (req, res) => {
-  const { usuario, password } = req.body;
-  if (usuario === process.env.ADMIN_USER && password === process.env.ADMIN_PASS) {
+  const { usuario, password, nombre } = req.body;
+  if (usuario === process.env.ADMIN_USER && password === process.env.ADMIN_PASS && nombre) {
     req.session.loggedIn = true;
     req.session.usuario = usuario;
+    req.session.nombre = nombre;
+    sesionesActivas.set(req.session.id, {
+      nombre,
+      desde: new Date().toLocaleString('es-EC')
+    });
     res.json({ ok: true });
   } else {
     res.status(401).json({ error: 'Usuario o contraseña incorrectos' });
@@ -64,16 +70,21 @@ app.post('/api/login', (req, res) => {
 });
 
 app.post('/api/logout', (req, res) => {
+  sesionesActivas.delete(req.session.id);
   req.session.destroy();
   res.json({ ok: true });
 });
 
 app.get('/api/me', (req, res) => {
   if (req.session.loggedIn) {
-    res.json({ loggedIn: true, usuario: req.session.usuario });
+    res.json({ loggedIn: true, usuario: req.session.usuario, nombre: req.session.nombre });
   } else {
     res.json({ loggedIn: false });
   }
+});
+
+app.get('/api/conectados', requireAuth, (req, res) => {
+  res.json([...sesionesActivas.values()]);
 });
 
 const adapter = new JSONFileSync(join(DATA_DIR, 'database.json'));

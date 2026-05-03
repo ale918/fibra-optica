@@ -413,3 +413,35 @@ button:hover { background: var(--surface); border-color: var(--muted); }
 
 .act-icon { font-size: 20px; }
 .act-label { font-size: 13px; font-weight: 500; color: var(--text); }
+
+/* Integrantes */
+.integrantes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 8px;
+}
+
+.integrante-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 8px 10px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.integrante-check:hover { border-color: var(--accent); }
+.integrante-check input[type="checkbox"] {
+  accent-color: var(--accent);
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}

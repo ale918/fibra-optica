@@ -30,6 +30,29 @@ let semanaActual = '';
 
 document.getElementById('fecha').valueAsDate = new Date();
 
+// ── Conectados ───────────────────────────────────────────
+async function cargarConectados() {
+  try {
+    const res = await fetch('/api/conectados');
+    const conectados = await res.json();
+    const texto = document.getElementById('conectados-texto');
+    const badge = document.getElementById('conectados-badge');
+    if (conectados.length === 0) {
+      texto.textContent = 'Solo tú';
+      badge.title = '';
+    } else if (conectados.length === 1) {
+      texto.textContent = conectados[0].nombre;
+      badge.title = `Conectado desde: ${conectados[0].desde}`;
+    } else {
+      texto.textContent = `${conectados.length} conectados`;
+      badge.title = conectados.map(c => `${c.nombre} (desde ${c.desde})`).join('\n');
+    }
+  } catch(e) {}
+}
+
+cargarConectados();
+setInterval(cargarConectados, 30000);
+
 function toast(msg) {
   const t = document.getElementById('toast');
   t.textContent = msg;
@@ -68,17 +91,20 @@ function mostrarTab(tab) {
 // ── Reportes ─────────────────────────────────────────────
 async function guardarReporte() {
   const fecha = document.getElementById('fecha').value;
-  const integrantes = document.getElementById('integrantes').value.trim();
   const observaciones = document.getElementById('observaciones').value.trim();
-  if (!fecha)       { toast('⚠ Selecciona la fecha'); return; }
-  if (!integrantes) { toast('⚠ Ingresa los integrantes'); return; }
+  if (!fecha) { toast('⚠ Selecciona la fecha'); return; }
   if (actividadesSeleccionadas.size === 0) { toast('⚠ Selecciona al menos una actividad'); return; }
+
+  const integrantes = [...document.querySelectorAll('.integrante-check input:checked')].map(i => i.value);
+  if (!integrantes.length) { toast('⚠ Selecciona al menos un integrante'); return; }
+
   const materiales = MATERIALES.map(m => ({
     material: m.label,
     cantidad: parseFloat(document.getElementById(m.id).value) || 0,
     unidad: m.unidad
   })).filter(m => m.cantidad > 0);
   if (!materiales.length) { toast('⚠ Ingresa al menos un material'); return; }
+
   try {
     const res = await fetch('/api/reportes', {
       method: 'POST',
@@ -92,10 +118,10 @@ async function guardarReporte() {
 }
 
 function limpiarFormulario() {
-  document.getElementById('integrantes').value = '';
   document.getElementById('observaciones').value = '';
   document.getElementById('fecha').valueAsDate = new Date();
   MATERIALES.forEach(m => { document.getElementById(m.id).value = ''; });
+  document.querySelectorAll('.integrante-check input').forEach(c => c.checked = false);
   actividadesSeleccionadas.clear();
   document.querySelectorAll('.actividad-btn').forEach(b => b.classList.remove('selected'));
 }
@@ -143,7 +169,6 @@ function renderHistorial(reportes) {
             <thead><tr><th>Material</th><th>Cantidad</th><th>Unidad</th></tr></thead>
             <tbody>${r.materiales.map(m => `<tr><td>${m.material}</td><td class="cant">${m.cantidad}</td><td>${m.unidad}</td></tr>`).join('')}</tbody>
           </table>
-
           <div style="margin-top:1rem;">
             <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">📷 Fotos del trabajo</div>
             <div id="fotos-${r.id}" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
@@ -158,7 +183,6 @@ function renderHistorial(reportes) {
               <input type="file" accept="image/*" multiple style="display:none;" onchange="subirFotos(event,${r.id})" />
             </label>
           </div>
-
           <div class="reporte-actions" style="margin-top:1rem;">
             <button onclick="exportarReporteExcel(${r.id})">↓ Excel</button>
             <button class="btn-danger" onclick="eliminarReporte(${r.id})">Eliminar</button>
@@ -235,12 +259,9 @@ async function subirFotos(event, reporteId) {
   for (const file of files) formData.append('fotos', file);
   toast('⏳ Subiendo fotos...');
   try {
-    const res = await fetch(`/api/reportes/${reporteId}/fotos`, {
-      method: 'POST',
-      body: formData
-    });
+    const res = await fetch(`/api/reportes/${reporteId}/fotos`, { method: 'POST', body: formData });
     const data = await res.json();
-    if (data.ok) { toast('✓ Fotos subidas correctamente'); await cargarHistorial(); }
+    if (data.ok) { toast('✓ Fotos subidas'); await cargarHistorial(); }
     else { toast('Error: ' + data.error); }
   } catch(e) { toast('Error al subir fotos'); }
 }

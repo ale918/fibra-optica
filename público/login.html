@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
@@ -52,7 +52,7 @@
       text-transform: uppercase;
       letter-spacing: 0.05em;
     }
-    input {
+    input, select {
       background: #1c2028;
       border: 1px solid #2a2f3a;
       border-radius: 8px;
@@ -62,9 +62,11 @@
       padding: 10px 12px;
       outline: none;
       transition: border-color 0.15s;
+      width: 100%;
     }
-    input:focus { border-color: #00d4aa; }
-    button {
+    input:focus, select:focus { border-color: #00d4aa; }
+    select option { background: #1c2028; }
+    button.btn-login {
       width: 100%;
       background: #00d4aa;
       color: #000;
@@ -78,7 +80,7 @@
       margin-top: 6px;
       transition: background 0.15s;
     }
-    button:hover { background: #00bfa0; }
+    button.btn-login:hover { background: #00bfa0; }
     .error {
       background: rgba(255,77,77,0.1);
       border: 1px solid rgba(255,77,77,0.3);
@@ -89,6 +91,21 @@
       margin-top: 12px;
       display: none;
       text-align: center;
+    }
+    .pass-wrap { position: relative; }
+    .pass-wrap input { padding-right: 40px; }
+    .pass-toggle {
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      color: #6b7280;
+      cursor: pointer;
+      font-size: 16px;
+      padding: 0;
+      width: auto;
     }
   </style>
 </head>
@@ -101,15 +118,26 @@
       <label>Usuario</label>
       <input type="text" id="usuario" placeholder="Ingresa tu usuario" autocomplete="username" />
     </div>
+
     <div class="form-group">
       <label>Contraseña</label>
-     <div style="position:relative;">
-  <input type="password" id="password" placeholder="Ingresa tu contraseña" autocomplete="current-password" style="width:100%;padding-right:40px;" />
-  <button onclick="togglePass()" type="button" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:#6b7280;cursor:pointer;font-size:16px;padding:0;width:auto;">👁</button>
-</div>
+      <div class="pass-wrap">
+        <input type="password" id="password" placeholder="Ingresa tu contraseña" autocomplete="current-password" />
+        <button class="pass-toggle" onclick="togglePass()" type="button">👁</button>
+      </div>
     </div>
 
-    <button onclick="login()">Iniciar sesión</button>
+    <div class="form-group">
+      <label>¿Quién eres?</label>
+      <select id="nombre-login">
+        <option value="">Selecciona tu nombre...</option>
+        <option value="Efrain">Efrain</option>
+        <option value="Alejandro">Alejandro</option>
+        <option value="David Garcia">David Garcia</option>
+      </select>
+    </div>
+
+    <button class="btn-login" onclick="login()">Iniciar sesión</button>
     <div class="error" id="error-msg">Usuario o contraseña incorrectos</div>
   </div>
 
@@ -118,31 +146,41 @@
       if (e.key === 'Enter') login();
     });
 
+    function togglePass() {
+      const input = document.getElementById('password');
+      input.type = input.type === 'password' ? 'text' : 'password';
+    }
+
     async function login() {
       const usuario = document.getElementById('usuario').value.trim();
       const password = document.getElementById('password').value;
-      if (!usuario || !password) return;
+      const nombre = document.getElementById('nombre-login').value;
+
+      if (!usuario || !password || !nombre) {
+        const err = document.getElementById('error-msg');
+        err.style.display = 'block';
+        err.textContent = 'Completa todos los campos';
+        return;
+      }
 
       try {
         const res = await fetch('/api/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ usuario, password })
+          body: JSON.stringify({ usuario, password, nombre })
         });
         const data = await res.json();
         if (data.ok) {
           window.location.href = '/';
         } else {
-          document.getElementById('error-msg').style.display = 'block';
+          const err = document.getElementById('error-msg');
+          err.style.display = 'block';
+          err.textContent = 'Usuario o contraseña incorrectos';
         }
       } catch(e) {
         document.getElementById('error-msg').style.display = 'block';
       }
     }
-    function togglePass() {
-  const input = document.getElementById('password');
-  input.type = input.type === 'password' ? 'text' : 'password';
-}
   </script>
 </body>
 </html>
