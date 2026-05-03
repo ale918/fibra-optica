@@ -37,6 +37,11 @@ function toast(msg) {
   setTimeout(() => t.classList.remove('show'), 2500);
 }
 
+async function cerrarSesion() {
+  await fetch('/api/logout', { method: 'POST' });
+  window.location.href = '/';
+}
+
 function toggleActividad(id) {
   const btn = document.getElementById('act-' + id);
   if (actividadesSeleccionadas.has(id)) {

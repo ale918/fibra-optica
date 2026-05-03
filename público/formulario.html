@@ -17,11 +17,14 @@
       <span class="logo">⬡ Airnet</span>
       <span class="logo-sub">Control de materiales</span>
     </div>
-    <div class="tabs">
-      <button class="tab active" onclick="mostrarTab('registro')">Nuevo registro</button>
-      <button class="tab" onclick="mostrarTab('historial')">Historial</button>
-      <button class="tab" onclick="mostrarTab('bodega')">Bodega</button>
-      <button class="tab" onclick="mostrarTab('indicadores')">Indicadores</button>
+    <div style="display:flex;align-items:center;gap:12px;">
+      <div class="tabs">
+        <button class="tab active" onclick="mostrarTab('registro')">Nuevo registro</button>
+        <button class="tab" onclick="mostrarTab('historial')">Historial</button>
+        <button class="tab" onclick="mostrarTab('bodega')">Bodega</button>
+        <button class="tab" onclick="mostrarTab('indicadores')">Indicadores</button>
+      </div>
+      <button onclick="cerrarSesion()" style="font-size:12px;padding:6px 12px;border-radius:7px;background:none;border:1px solid #2a2f3a;color:#6b7280;cursor:pointer;">Salir</button>
     </div>
   </div>
 </header>
