@@ -36,18 +36,38 @@ async function cargarConectados() {
     const res = await fetch('/api/conectados');
     const conectados = await res.json();
     const texto = document.getElementById('conectados-texto');
-    const badge = document.getElementById('conectados-badge');
+    const lista = document.getElementById('conectados-lista');
+
+    texto.textContent = `🟢 ${conectados.length}`;
 
     if (!conectados.length) {
-      texto.textContent = 'Solo tú';
-      badge.title = '';
+      lista.innerHTML = '<div style="font-size:12px;color:#6b7280;padding:4px 0;">Solo tú conectado</div>';
     } else {
-      const nombres = conectados.map(c => c.nombre).join(', ');
-      texto.textContent = nombres;
-      badge.title = conectados.map(c => `${c.nombre} — desde ${c.desde}`).join('\n');
+      lista.innerHTML = conectados.map(c => `
+        <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #2a2f3a;">
+          <span style="width:7px;height:7px;background:#00d4aa;border-radius:50%;flex-shrink:0;"></span>
+          <div>
+            <div style="font-size:13px;color:#e8eaf0;font-weight:500;">${c.nombre}</div>
+            <div style="font-size:11px;color:#6b7280;">desde ${c.desde}</div>
+          </div>
+        </div>`).join('');
     }
   } catch(e) {}
 }
+
+function toggleConectados() {
+  const popup = document.getElementById('conectados-popup');
+  popup.style.display = popup.style.display === 'none' ? 'block' : 'none';
+  if (popup.style.display === 'block') cargarConectados();
+}
+
+document.addEventListener('click', e => {
+  const badge = document.getElementById('conectados-badge');
+  const popup = document.getElementById('conectados-popup');
+  if (popup && badge && !badge.contains(e.target) && !popup.contains(e.target)) {
+    popup.style.display = 'none';
+  }
+});
 
 cargarConectados();
 setInterval(cargarConectados, 30000);
@@ -606,7 +626,6 @@ function cargarIndicadores() {
           </div>
           <span style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;background:${badgeInfo.bg};color:${badgeInfo.color};">${badgeInfo.badge}</span>
         </div>
-
         ${reportes.length === 0 ? '<p style="font-size:12px;color:var(--muted);text-align:center;padding:0.5rem 0;">Sin actividad registrada</p>' : `
           ${actsHTML}
           ${integrantes.length > 0 ? `
