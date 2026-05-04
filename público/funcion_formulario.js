@@ -37,15 +37,14 @@ async function cargarConectados() {
     const conectados = await res.json();
     const texto = document.getElementById('conectados-texto');
     const badge = document.getElementById('conectados-badge');
-    if (conectados.length === 0) {
+
+    if (!conectados.length) {
       texto.textContent = 'Solo tú';
       badge.title = '';
-    } else if (conectados.length === 1) {
-      texto.textContent = conectados[0].nombre;
-      badge.title = `Conectado desde: ${conectados[0].desde}`;
     } else {
-      texto.textContent = `${conectados.length} conectados`;
-      badge.title = conectados.map(c => `${c.nombre} (desde ${c.desde})`).join('\n');
+      const nombres = conectados.map(c => c.nombre).join(', ');
+      texto.textContent = nombres;
+      badge.title = conectados.map(c => `${c.nombre} — desde ${c.desde}`).join('\n');
     }
   } catch(e) {}
 }
