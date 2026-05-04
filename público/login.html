@@ -52,7 +52,7 @@
       text-transform: uppercase;
       letter-spacing: 0.05em;
     }
-    input, select {
+    input {
       background: #1c2028;
       border: 1px solid #2a2f3a;
       border-radius: 8px;
@@ -64,8 +64,7 @@
       transition: border-color 0.15s;
       width: 100%;
     }
-    input:focus, select:focus { border-color: #00d4aa; }
-    select option { background: #1c2028; }
+    input:focus { border-color: #00d4aa; }
     button.btn-login {
       width: 100%;
       background: #00d4aa;
@@ -127,16 +126,6 @@
       </div>
     </div>
 
-    <div class="form-group">
-      <label>¿Quién eres?</label>
-      <select id="nombre-login">
-        <option value="">Selecciona tu nombre...</option>
-        <option value="Efrain">Efrain</option>
-        <option value="Alejandro">Alejandro</option>
-        <option value="David Garcia">David Garcia</option>
-      </select>
-    </div>
-
     <button class="btn-login" onclick="login()">Iniciar sesión</button>
     <div class="error" id="error-msg">Usuario o contraseña incorrectos</div>
   </div>
@@ -154,9 +143,8 @@
     async function login() {
       const usuario = document.getElementById('usuario').value.trim();
       const password = document.getElementById('password').value;
-      const nombre = document.getElementById('nombre-login').value;
 
-      if (!usuario || !password || !nombre) {
+      if (!usuario || !password) {
         const err = document.getElementById('error-msg');
         err.style.display = 'block';
         err.textContent = 'Completa todos los campos';
@@ -167,7 +155,7 @@
         const res = await fetch('/api/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ usuario, password, nombre })
+          body: JSON.stringify({ usuario, password })
         });
         const data = await res.json();
         if (data.ok) {

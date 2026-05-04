@@ -36,6 +36,14 @@ app.use(session({
   cookie: { maxAge: 1000 * 60 * 60 * 12 }
 }));
 
+// Usuarios del sistema
+const USUARIOS = {
+  'Telecomadmin': { nombre: 'Administrador', pass: process.env.ADMIN_PASS },
+  'Efrain':       { nombre: 'Efrain',        pass: process.env.USER_EFRAIN_PASS },
+  'Alejandro':    { nombre: 'Alejandro',      pass: process.env.USER_ALEJANDRO_PASS },
+  'DavidG':       { nombre: 'David Garcia',   pass: process.env.USER_DAVIDG_PASS },
+};
+
 const sesionesActivas = new Map();
 
 function requireAuth(req, res, next) {
@@ -54,16 +62,18 @@ app.get('/', (req, res) => {
 
 // ── Login / Logout ────────────────────────────────────────
 app.post('/api/login', (req, res) => {
-  const { usuario, password, nombre } = req.body;
-  if (usuario === process.env.ADMIN_USER && password === process.env.ADMIN_PASS && nombre) {
+  const { usuario, password } = req.body;
+  const user = USUARIOS[usuario];
+  if (user && user.pass && password === user.pass) {
     req.session.loggedIn = true;
     req.session.usuario = usuario;
-    req.session.nombre = nombre;
+    req.session.nombre = user.nombre;
     sesionesActivas.set(req.session.id, {
-      nombre,
+      nombre: user.nombre,
+      usuario,
       desde: new Date().toLocaleString('es-EC')
     });
-    res.json({ ok: true });
+    res.json({ ok: true, nombre: user.nombre });
   } else {
     res.status(401).json({ error: 'Usuario o contraseña incorrectos' });
   }
