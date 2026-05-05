@@ -34,24 +34,33 @@ document.getElementById('fecha').valueAsDate = new Date();
 async function cargarConectados() {
   try {
     const res = await fetch('/api/conectados');
-    const conectados = await res.json();
+    const { conectados, desconectados } = await res.json();
     const texto = document.getElementById('conectados-texto');
     const lista = document.getElementById('conectados-lista');
 
     texto.textContent = `🟢 ${conectados.length}`;
 
-    if (!conectados.length) {
-      lista.innerHTML = '<div style="font-size:12px;color:#6b7280;padding:4px 0;">Solo tú conectado</div>';
-    } else {
-      lista.innerHTML = conectados.map(c => `
-        <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #2a2f3a;">
-          <span style="width:7px;height:7px;background:#00d4aa;border-radius:50%;flex-shrink:0;"></span>
-          <div>
-            <div style="font-size:13px;color:#e8eaf0;font-weight:500;">${c.nombre}</div>
-            <div style="font-size:11px;color:#6b7280;">desde ${c.desde}</div>
-          </div>
-        </div>`).join('');
-    }
+    const htmlConectados = conectados.map(c => `
+      <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #2a2f3a;">
+        <span style="width:7px;height:7px;background:#00d4aa;border-radius:50%;flex-shrink:0;"></span>
+        <div>
+          <div style="font-size:13px;color:#e8eaf0;font-weight:500;">${c.nombre}</div>
+          <div style="font-size:11px;color:#00d4aa;">En línea</div>
+        </div>
+      </div>`).join('');
+
+    const htmlDesconectados = [...desconectados].reverse().map(c => `
+      <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #2a2f3a;">
+        <span style="width:7px;height:7px;background:#6b7280;border-radius:50%;flex-shrink:0;"></span>
+        <div>
+          <div style="font-size:13px;color:#6b7280;">${c.nombre}</div>
+          <div style="font-size:11px;color:#6b7280;">Salió a las ${c.salio}</div>
+        </div>
+      </div>`).join('');
+
+    lista.innerHTML = (htmlConectados + htmlDesconectados) ||
+      '<div style="font-size:12px;color:#6b7280;padding:4px 0;">Nadie conectado</div>';
+
   } catch(e) {}
 }
 

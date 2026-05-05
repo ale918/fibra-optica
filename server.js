@@ -44,6 +44,7 @@ const USUARIOS = {
 };
 
 const sesionesActivas = new Map();
+const historialDesconexiones = [];
 
 function requireAuth(req, res, next) {
   if (req.session.loggedIn) return next();
@@ -64,7 +65,6 @@ app.post('/api/login', (req, res) => {
   const { usuario, password } = req.body;
   const user = USUARIOS[usuario];
   if (user && user.pass && password === user.pass) {
-    // Cerrar sesión anterior del mismo usuario si existe
     for (const [sessionId, sesion] of sesionesActivas.entries()) {
       if (sesion.usuario === usuario) {
         sesionesActivas.delete(sessionId);
@@ -85,7 +85,21 @@ app.post('/api/login', (req, res) => {
 });
 
 app.post('/api/logout', (req, res) => {
-  sesionesActivas.delete(req.session.id);
+  const sesion = sesionesActivas.get(req.session.id);
+  if (sesion) {
+    historialDesconexiones.push({
+      nombre: sesion.nombre,
+      usuario: sesion.usuario,
+      salio: new Date().toLocaleString('es-EC'),
+      salioTimestamp: Date.now()
+    });
+    // Mantener solo desconexiones de la última hora
+    const unaHoraAtras = Date.now() - 60 * 60 * 1000;
+    while (historialDesconexiones.length > 0 && historialDesconexiones[0].salioTimestamp < unaHoraAtras) {
+      historialDesconexiones.shift();
+    }
+    sesionesActivas.delete(req.session.id);
+  }
   req.session.destroy();
   res.json({ ok: true });
 });
@@ -99,7 +113,16 @@ app.get('/api/me', (req, res) => {
 });
 
 app.get('/api/conectados', requireAuth, (req, res) => {
-  res.json([...sesionesActivas.values()]);
+  const conectados = [...sesionesActivas.values()].map(s => ({
+    nombre: s.nombre,
+    estado: 'online'
+  }));
+  const desconectados = historialDesconexiones.slice(-5).map(h => ({
+    nombre: h.nombre,
+    estado: 'offline',
+    salio: h.salio
+  }));
+  res.json({ conectados, desconectados });
 });
 
 const adapter = new JSONFileSync(join(DATA_DIR, 'database.json'));
