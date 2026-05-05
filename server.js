@@ -36,7 +36,6 @@ app.use(session({
   cookie: { maxAge: 1000 * 60 * 60 * 12 }
 }));
 
-// Usuarios del sistema
 const USUARIOS = {
   'Telecomadmin': { nombre: 'Administrador', pass: process.env.ADMIN_PASS },
   'Efrain':       { nombre: 'Efrain',        pass: process.env.USER_EFRAIN_PASS },
@@ -65,6 +64,12 @@ app.post('/api/login', (req, res) => {
   const { usuario, password } = req.body;
   const user = USUARIOS[usuario];
   if (user && user.pass && password === user.pass) {
+    // Cerrar sesión anterior del mismo usuario si existe
+    for (const [sessionId, sesion] of sesionesActivas.entries()) {
+      if (sesion.usuario === usuario) {
+        sesionesActivas.delete(sessionId);
+      }
+    }
     req.session.loggedIn = true;
     req.session.usuario = usuario;
     req.session.nombre = user.nombre;
