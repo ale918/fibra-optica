@@ -18,11 +18,12 @@
       <span class="logo-sub">Control de materiales</span>
     </div>
     <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-      <div class="tabs">
+      <div class="tabs" id="nav-tabs">
         <button class="tab active" onclick="mostrarTab('registro')">Nuevo registro</button>
         <button class="tab" onclick="mostrarTab('historial')">Historial</button>
         <button class="tab" onclick="mostrarTab('bodega')">Bodega</button>
         <button class="tab" onclick="mostrarTab('indicadores')">Indicadores</button>
+        <button class="tab tab-admin" id="tab-cuadrillas-btn" onclick="mostrarTab('cuadrillas')" style="display:none;">Cuadrillas</button>
       </div>
       <div style="position:relative;">
         <div id="conectados-badge" onclick="toggleConectados()" style="font-size:12px;color:#6b7280;display:flex;align-items:center;gap:6px;cursor:pointer;padding:5px 10px;border-radius:7px;border:1px solid #2a2f3a;">
@@ -49,6 +50,12 @@
         <div class="form-group">
           <label>Fecha</label>
           <input type="date" id="fecha" />
+        </div>
+        <div class="form-group">
+          <label>Cuadrilla asignada <span class="hint">(opcional)</span></label>
+          <select id="cuadrilla-select" onchange="cargarIntegrantesDeCuadrilla()">
+            <option value="">Seleccionar cuadrilla...</option>
+          </select>
         </div>
       </div>
       <div class="form-group" style="margin-top:12px;">
@@ -86,6 +93,44 @@
           <span class="act-icon">🔌</span>
           <span class="act-label">Instalación cliente final</span>
         </div>
+        <div class="actividad-btn" id="act-mudanza" onclick="toggleActividad('mudanza')">
+          <span class="act-icon">🔄</span>
+          <span class="act-label">Mudar clientes radio a fibra</span>
+        </div>
+        <div class="actividad-btn" id="act-odf" onclick="toggleActividad('odf')">
+          <span class="act-icon">🗄️</span>
+          <span class="act-label">Armado de ODF</span>
+        </div>
+        <div class="actividad-btn" id="act-mangas" onclick="toggleActividad('mangas')">
+          <span class="act-icon">🔧</span>
+          <span class="act-label">Armado de mangas</span>
+        </div>
+        <div class="actividad-btn" id="act-incidencias" onclick="toggleActividad('incidencias')">
+          <span class="act-icon">⚠️</span>
+          <span class="act-label">Incidencias</span>
+        </div>
+      </div>
+
+      <!-- Sub-opciones de incidencias -->
+      <div id="incidencias-panel" style="display:none;margin-top:1rem;background:var(--surface2);border-radius:8px;padding:1rem;">
+        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;">Tipo de incidencias</div>
+        <div class="actividades-grid">
+          <label class="integrante-check"><input type="checkbox" value="reparaciones" /> 🔨 Reparaciones</label>
+          <label class="integrante-check"><input type="checkbox" value="focos_rojos" /> 🔴 Focos rojos</label>
+          <label class="integrante-check"><input type="checkbox" value="actualizaciones" /> 🔄 Actualizaciones</label>
+          <label class="integrante-check"><input type="checkbox" value="cambio_domicilio" /> 🏠 Cambio de domicilio</label>
+        </div>
+        <div class="form-group" style="margin-top:10px;">
+          <label>Cantidad de incidencias atendidas</label>
+          <input type="number" min="0" id="num-incidencias" placeholder="0" style="max-width:120px;" />
+        </div>
+      </div>
+
+      <!-- IPs de clientes -->
+      <div id="ips-panel" style="display:none;margin-top:1rem;background:var(--surface2);border-radius:8px;padding:1rem;">
+        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;">IPs de clientes atendidos</div>
+        <div id="ips-lista"></div>
+        <button onclick="agregarIP()" style="margin-top:8px;font-size:12px;padding:6px 12px;">+ Agregar IP</button>
       </div>
     </div>
 
@@ -159,7 +204,6 @@
         <button onclick="exportarBodegaExcel()">↓ Exportar a Excel</button>
       </div>
     </div>
-
     <div class="card">
       <h3>Registrar movimiento</h3>
       <p class="card-sub">Registra una salida, entrada o devolución de material.</p>
@@ -212,12 +256,10 @@
         <button class="btn-primary" onclick="registrarMovimiento()">Registrar movimiento</button>
       </div>
     </div>
-
     <div class="card">
       <h3>Historial de movimientos</h3>
       <div id="tabla-movimientos"><p class="empty">Cargando...</p></div>
     </div>
-
     <div id="modal-stock" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:200;align-items:center;justify-content:center;">
       <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:2rem;width:90%;max-width:500px;max-height:80vh;overflow-y:auto;">
         <h3 style="color:var(--accent);font-family:'IBM Plex Mono',monospace;font-size:13px;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:1rem;">Actualizar stock</h3>
@@ -245,6 +287,45 @@
     <div class="card">
       <h3>Materiales más usados</h3>
       <div id="top-materiales"></div>
+    </div>
+  </section>
+
+  <!-- ═══ TAB: CUADRILLAS (solo admin) ═══ -->
+  <section id="tab-cuadrillas" style="display:none;">
+    <div class="card">
+      <h3>Nueva cuadrilla</h3>
+      <p class="card-sub">Crea y asigna una cuadrilla para un día específico.</p>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Nombre de la cuadrilla</label>
+          <input type="text" id="cuadrilla-nombre" placeholder="Ej. Grupo A, Cuadrilla Norte..." />
+        </div>
+        <div class="form-group">
+          <label>Fecha asignada</label>
+          <input type="date" id="cuadrilla-fecha" />
+        </div>
+      </div>
+      <div class="form-group" style="margin-top:12px;">
+        <label>Integrantes</label>
+        <div class="integrantes-grid">
+          <label class="integrante-check"><input type="checkbox" class="cuadrilla-int" value="David Garcia" /> David Garcia</label>
+          <label class="integrante-check"><input type="checkbox" class="cuadrilla-int" value="Efrain Velez" /> Efrain Velez</label>
+          <label class="integrante-check"><input type="checkbox" class="cuadrilla-int" value="Fernando Pilligua" /> Fernando Pilligua</label>
+          <label class="integrante-check"><input type="checkbox" class="cuadrilla-int" value="Bryan Fuentes" /> Bryan Fuentes</label>
+          <label class="integrante-check"><input type="checkbox" class="cuadrilla-int" value="Jilmar Zamora" /> Jilmar Zamora</label>
+          <label class="integrante-check"><input type="checkbox" class="cuadrilla-int" value="Luis Macias" /> Luis Macias</label>
+          <label class="integrante-check"><input type="checkbox" class="cuadrilla-int" value="Alejandro Rivas" /> Alejandro Rivas</label>
+          <label class="integrante-check"><input type="checkbox" class="cuadrilla-int" value="David Mora" /> David Mora</label>
+        </div>
+      </div>
+      <div class="btn-row" style="margin-top:1rem;">
+        <button class="btn-primary" onclick="crearCuadrilla()">Crear cuadrilla</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Cuadrillas creadas</h3>
+      <div id="lista-cuadrillas"><p class="empty">Cargando...</p></div>
     </div>
   </section>
 

@@ -18,49 +18,66 @@ const MATERIALES = [
 ];
 
 const ACTIVIDADES_INFO = {
-  fibra:       { label: 'Pasado de fibra principal', icon: '📡' },
-  cajas:       { label: 'Armado de cajas NAT',       icon: '📦' },
-  instalacion: { label: 'Instalación cliente final', icon: '🔌' },
+  fibra:       { label: 'Pasado de fibra principal',    icon: '📡' },
+  cajas:       { label: 'Armado de cajas NAT',          icon: '📦' },
+  instalacion: { label: 'Instalación cliente final',    icon: '🔌' },
+  mudanza:     { label: 'Mudar clientes radio a fibra', icon: '🔄' },
+  odf:         { label: 'Armado de ODF',                icon: '🗄️' },
+  mangas:      { label: 'Armado de mangas',             icon: '🔧' },
+  incidencias: { label: 'Incidencias',                  icon: '⚠️' },
+};
+
+const INCIDENCIAS_INFO = {
+  reparaciones:     { label: 'Reparaciones',       icon: '🔨' },
+  focos_rojos:      { label: 'Focos rojos',         icon: '🔴' },
+  actualizaciones:  { label: 'Actualizaciones',     icon: '🔄' },
+  cambio_domicilio: { label: 'Cambio de domicilio', icon: '🏠' },
 };
 
 let actividadesSeleccionadas = new Set();
 let todosLosReportes = [];
+let todasLasCuadrillas = [];
 let stockActual = [];
 let semanaActual = '';
+let rolActual = '';
+let ipCounter = 0;
 
 document.getElementById('fecha').valueAsDate = new Date();
+document.getElementById('cuadrilla-fecha') && (document.getElementById('cuadrilla-fecha').valueAsDate = new Date());
+
+// ── Init ─────────────────────────────────────────────────
+async function init() {
+  const res = await fetch('/api/me');
+  const data = await res.json();
+  if (!data.loggedIn) { window.location.href = '/'; return; }
+  rolActual = data.rol;
+  if (rolActual === 'admin') {
+    document.getElementById('tab-cuadrillas-btn').style.display = 'inline-flex';
+  }
+  cargarConectados();
+  setInterval(cargarConectados, 30000);
+  cargarCuadrillasSelect();
+}
+init();
 
 // ── Conectados ───────────────────────────────────────────
 async function cargarConectados() {
   try {
     const res = await fetch('/api/conectados');
-    const { conectados, desconectados } = await res.json();
+    const conectados = await res.json();
     const texto = document.getElementById('conectados-texto');
     const lista = document.getElementById('conectados-lista');
-
     texto.textContent = `🟢 ${conectados.length}`;
-
-    const htmlConectados = conectados.map(c => `
-      <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #2a2f3a;">
-        <span style="width:7px;height:7px;background:#00d4aa;border-radius:50%;flex-shrink:0;"></span>
-        <div>
-          <div style="font-size:13px;color:#e8eaf0;font-weight:500;">${c.nombre}</div>
-          <div style="font-size:11px;color:#00d4aa;">En línea</div>
-        </div>
-      </div>`).join('');
-
-    const htmlDesconectados = [...desconectados].reverse().map(c => `
-      <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #2a2f3a;">
-        <span style="width:7px;height:7px;background:#6b7280;border-radius:50%;flex-shrink:0;"></span>
-        <div>
-          <div style="font-size:13px;color:#6b7280;">${c.nombre}</div>
-          <div style="font-size:11px;color:#6b7280;">Salió a las ${c.salio}</div>
-        </div>
-      </div>`).join('');
-
-    lista.innerHTML = (htmlConectados + htmlDesconectados) ||
-      '<div style="font-size:12px;color:#6b7280;padding:4px 0;">Nadie conectado</div>';
-
+    lista.innerHTML = conectados.length === 0
+      ? '<div style="font-size:12px;color:#6b7280;padding:4px 0;">Nadie conectado</div>'
+      : conectados.map(c => `
+          <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #2a2f3a;">
+            <span style="width:7px;height:7px;background:#00d4aa;border-radius:50%;flex-shrink:0;"></span>
+            <div>
+              <div style="font-size:13px;color:#e8eaf0;font-weight:500;">${c.nombre}</div>
+              <div style="font-size:11px;color:#00d4aa;">En línea</div>
+            </div>
+          </div>`).join('');
   } catch(e) {}
 }
 
@@ -78,9 +95,6 @@ document.addEventListener('click', e => {
   }
 });
 
-cargarConectados();
-setInterval(cargarConectados, 30000);
-
 function toast(msg) {
   const t = document.getElementById('toast');
   t.textContent = msg;
@@ -93,6 +107,23 @@ async function cerrarSesion() {
   window.location.href = '/';
 }
 
+function mostrarTab(tab) {
+  ['registro','historial','bodega','indicadores','cuadrillas'].forEach(t => {
+    document.getElementById('tab-' + t).style.display = t === tab ? 'block' : 'none';
+  });
+  document.querySelectorAll('.tab').forEach((btn, i) => {
+    btn.classList.remove('active');
+  });
+  const tabs = ['registro','historial','bodega','indicadores','cuadrillas'];
+  const idx = tabs.indexOf(tab);
+  document.querySelectorAll('.tab')[idx]?.classList.add('active');
+  if (tab === 'historial') cargarHistorial();
+  if (tab === 'bodega') cargarBodega();
+  if (tab === 'indicadores') iniciarIndicadores();
+  if (tab === 'cuadrillas') cargarCuadrillas();
+}
+
+// ── Actividades ──────────────────────────────────────────
 function toggleActividad(id) {
   const btn = document.getElementById('act-' + id);
   if (actividadesSeleccionadas.has(id)) {
@@ -102,18 +133,104 @@ function toggleActividad(id) {
     actividadesSeleccionadas.add(id);
     btn.classList.add('selected');
   }
+  // Mostrar panel incidencias
+  const panelInc = document.getElementById('incidencias-panel');
+  panelInc.style.display = actividadesSeleccionadas.has('incidencias') ? 'block' : 'none';
+  // Mostrar panel IPs
+  const needsIp = ['instalacion','mudanza','incidencias'].some(a => actividadesSeleccionadas.has(a));
+  document.getElementById('ips-panel').style.display = needsIp ? 'block' : 'none';
 }
 
-function mostrarTab(tab) {
-  ['registro','historial','bodega','indicadores'].forEach(t => {
-    document.getElementById('tab-' + t).style.display = t === tab ? 'block' : 'none';
+// ── IPs ──────────────────────────────────────────────────
+function agregarIP() {
+  ipCounter++;
+  const lista = document.getElementById('ips-lista');
+  const div = document.createElement('div');
+  div.id = `ip-row-${ipCounter}`;
+  div.style.cssText = 'display:flex;gap:8px;margin-bottom:6px;align-items:center;';
+  div.innerHTML = `
+    <input type="text" placeholder="Ej. 192.168.1.100" id="ip-${ipCounter}"
+      style="flex:1;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;padding:7px 10px;outline:none;" />
+    <button onclick="document.getElementById('ip-row-${ipCounter}').remove()"
+      style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;">✕</button>`;
+  lista.appendChild(div);
+}
+
+function getIPs() {
+  return [...document.querySelectorAll('[id^="ip-"]')]
+    .map(el => el.value.trim())
+    .filter(Boolean);
+}
+
+// ── Cuadrillas ───────────────────────────────────────────
+async function cargarCuadrillasSelect() {
+  try {
+    const res = await fetch('/api/cuadrillas');
+    todasLasCuadrillas = await res.json();
+    const sel = document.getElementById('cuadrilla-select');
+    sel.innerHTML = '<option value="">Seleccionar cuadrilla...</option>' +
+      todasLasCuadrillas.map(c => `<option value="${c.id}">${c.nombre} — ${c.fecha}</option>`).join('');
+  } catch(e) {}
+}
+
+function cargarIntegrantesDeCuadrilla() {
+  const id = parseInt(document.getElementById('cuadrilla-select').value);
+  const cuadrilla = todasLasCuadrillas.find(c => c.id === id);
+  document.querySelectorAll('.integrante-check input').forEach(cb => {
+    cb.checked = cuadrilla ? cuadrilla.integrantes.includes(cb.value) : false;
   });
-  document.querySelectorAll('.tab').forEach((btn, i) => {
-    btn.classList.toggle('active', i === ['registro','historial','bodega','indicadores'].indexOf(tab));
-  });
-  if (tab === 'historial') cargarHistorial();
-  if (tab === 'bodega') cargarBodega();
-  if (tab === 'indicadores') iniciarIndicadores();
+}
+
+async function cargarCuadrillas() {
+  try {
+    const res = await fetch('/api/cuadrillas');
+    todasLasCuadrillas = await res.json();
+    const cont = document.getElementById('lista-cuadrillas');
+    if (!todasLasCuadrillas.length) {
+      cont.innerHTML = '<p class="empty">No hay cuadrillas creadas.</p>';
+      return;
+    }
+    cont.innerHTML = todasLasCuadrillas.map(c => `
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:1rem;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <div style="font-weight:600;color:var(--accent);font-size:14px;">${c.nombre}</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px;">📅 ${c.fecha} · 👷 ${c.integrantes.join(', ')}</div>
+        </div>
+        <button class="btn-danger" onclick="eliminarCuadrilla(${c.id})" style="font-size:12px;padding:5px 10px;">Eliminar</button>
+      </div>`).join('');
+  } catch(e) {}
+}
+
+async function crearCuadrilla() {
+  const nombre = document.getElementById('cuadrilla-nombre').value.trim();
+  const fecha = document.getElementById('cuadrilla-fecha').value;
+  const integrantes = [...document.querySelectorAll('.cuadrilla-int:checked')].map(i => i.value);
+  if (!nombre) { toast('⚠ Ingresa un nombre para la cuadrilla'); return; }
+  if (!fecha) { toast('⚠ Selecciona la fecha'); return; }
+  if (!integrantes.length) { toast('⚠ Selecciona al menos un integrante'); return; }
+  try {
+    const res = await fetch('/api/cuadrillas', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nombre, fecha, integrantes })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      toast('✓ Cuadrilla creada');
+      document.getElementById('cuadrilla-nombre').value = '';
+      document.querySelectorAll('.cuadrilla-int').forEach(c => c.checked = false);
+      await cargarCuadrillas();
+      await cargarCuadrillasSelect();
+    }
+  } catch(e) { toast('Error al crear cuadrilla'); }
+}
+
+async function eliminarCuadrilla(id) {
+  if (!confirm('¿Eliminar esta cuadrilla?')) return;
+  await fetch('/api/cuadrillas/' + id, { method: 'DELETE' });
+  toast('Cuadrilla eliminada');
+  await cargarCuadrillas();
+  await cargarCuadrillasSelect();
 }
 
 // ── Reportes ─────────────────────────────────────────────
@@ -133,11 +250,23 @@ async function guardarReporte() {
   })).filter(m => m.cantidad > 0);
   if (!materiales.length) { toast('⚠ Ingresa al menos un material'); return; }
 
+  const incidencias = [...document.querySelectorAll('.integrante-check input[value]:checked')]
+    .filter(el => Object.keys(INCIDENCIAS_INFO).includes(el.value))
+    .map(el => el.value);
+
+  const numIncidencias = parseInt(document.getElementById('num-incidencias')?.value) || 0;
+  const ips = getIPs();
+  const cuadrillaId = parseInt(document.getElementById('cuadrilla-select').value) || null;
+
   try {
     const res = await fetch('/api/reportes', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fecha, integrantes, observaciones, materiales, actividades: [...actividadesSeleccionadas] })
+      body: JSON.stringify({
+        fecha, integrantes, observaciones, materiales,
+        actividades: [...actividadesSeleccionadas],
+        incidencias, numIncidencias, ips, cuadrillaId
+      })
     });
     const data = await res.json();
     if (data.ok) { toast('✓ Reporte guardado'); limpiarFormulario(); }
@@ -148,10 +277,16 @@ async function guardarReporte() {
 function limpiarFormulario() {
   document.getElementById('observaciones').value = '';
   document.getElementById('fecha').valueAsDate = new Date();
+  document.getElementById('cuadrilla-select').value = '';
   MATERIALES.forEach(m => { document.getElementById(m.id).value = ''; });
   document.querySelectorAll('.integrante-check input').forEach(c => c.checked = false);
   actividadesSeleccionadas.clear();
   document.querySelectorAll('.actividad-btn').forEach(b => b.classList.remove('selected'));
+  document.getElementById('incidencias-panel').style.display = 'none';
+  document.getElementById('ips-panel').style.display = 'none';
+  document.getElementById('ips-lista').innerHTML = '';
+  document.getElementById('num-incidencias').value = '';
+  ipCounter = 0;
 }
 
 async function cargarHistorial() {
@@ -178,6 +313,8 @@ function renderHistorial(reportes) {
     const dia = dias[d.getDay()];
     const acts = (r.actividades || []).map(a => ACTIVIDADES_INFO[a] ? `${ACTIVIDADES_INFO[a].icon} ${ACTIVIDADES_INFO[a].label}` : a).join(' · ');
     const fotos = r.fotos || [];
+    const ips = r.ips || [];
+    const incidencias = r.incidencias || [];
     return `
       <div class="reporte-card">
         <div class="reporte-header" onclick="toggleReporte(${r.id})">
@@ -193,10 +330,32 @@ function renderHistorial(reportes) {
         </div>
         <div class="reporte-body" id="body-${r.id}" style="display:none;">
           ${r.observaciones ? `<div class="obs-box">${r.observaciones}</div>` : ''}
+
+          ${incidencias.length > 0 ? `
+            <div style="margin-bottom:10px;">
+              <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px;">⚠️ Incidencias</div>
+              <div style="display:flex;flex-wrap:wrap;gap:6px;">
+                ${incidencias.map(i => INCIDENCIAS_INFO[i] ? `
+                  <span style="font-size:12px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:3px 8px;">
+                    ${INCIDENCIAS_INFO[i].icon} ${INCIDENCIAS_INFO[i].label}
+                  </span>` : '').join('')}
+              </div>
+              ${r.numIncidencias ? `<div style="font-size:12px;color:var(--muted);margin-top:4px;">Total atendidas: <strong>${r.numIncidencias}</strong></div>` : ''}
+            </div>` : ''}
+
+          ${ips.length > 0 ? `
+            <div style="margin-bottom:10px;">
+              <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px;">🌐 IPs de clientes</div>
+              <div style="display:flex;flex-wrap:wrap;gap:6px;">
+                ${ips.map(ip => `<span style="font-size:12px;font-family:'IBM Plex Mono',monospace;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:3px 8px;">${ip}</span>`).join('')}
+              </div>
+            </div>` : ''}
+
           <table class="mat-table">
             <thead><tr><th>Material</th><th>Cantidad</th><th>Unidad</th></tr></thead>
             <tbody>${r.materiales.map(m => `<tr><td>${m.material}</td><td class="cant">${m.cantidad}</td><td>${m.unidad}</td></tr>`).join('')}</tbody>
           </table>
+
           <div style="margin-top:1rem;">
             <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">📷 Fotos del trabajo</div>
             <div id="fotos-${r.id}" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
@@ -211,8 +370,10 @@ function renderHistorial(reportes) {
               <input type="file" accept="image/*" multiple style="display:none;" onchange="subirFotos(event,${r.id})" />
             </label>
           </div>
+
           <div class="reporte-actions" style="margin-top:1rem;">
             <button onclick="exportarReporteExcel(${r.id})">↓ Excel</button>
+            <button onclick="editarReporte(${r.id})">✏️ Editar</button>
             <button class="btn-danger" onclick="eliminarReporte(${r.id})">Eliminar</button>
           </div>
         </div>
@@ -235,6 +396,51 @@ async function eliminarReporte(id) {
   cargarHistorial();
 }
 
+function editarReporte(id) {
+  const r = todosLosReportes.find(x => x.id === id);
+  if (!r) return;
+
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);z-index:500;display:flex;align-items:center;justify-content:center;padding:1rem;';
+
+  overlay.innerHTML = `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.5rem;width:100%;max-width:500px;max-height:90vh;overflow-y:auto;">
+      <h3 style="color:var(--accent);font-size:14px;margin-bottom:1rem;font-family:'IBM Plex Mono',monospace;">✏️ Editar reporte</h3>
+      <div style="display:flex;flex-direction:column;gap:5px;margin-bottom:12px;">
+        <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;">Fecha</label>
+        <input type="date" id="edit-fecha" value="${r.fecha}" style="background:var(--surface2);border:1px solid var(--border);border-radius:7px;color:var(--text);font-size:13px;padding:8px 10px;outline:none;" />
+      </div>
+      <div style="display:flex;flex-direction:column;gap:5px;margin-bottom:12px;">
+        <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;">Observaciones</label>
+        <textarea id="edit-obs" style="background:var(--surface2);border:1px solid var(--border);border-radius:7px;color:var(--text);font-size:13px;padding:8px 10px;outline:none;min-height:80px;resize:vertical;">${r.observaciones || ''}</textarea>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:1rem;">
+        <button onclick="guardarEdicion(${id})" style="flex:1;background:var(--accent);color:#000;border:none;border-radius:8px;font-size:13px;font-weight:600;padding:10px;cursor:pointer;">Guardar</button>
+        <button onclick="this.closest('[style*=fixed]').remove()" style="flex:1;background:none;border:1px solid var(--border);border-radius:8px;font-size:13px;color:var(--text);padding:10px;cursor:pointer;">Cancelar</button>
+      </div>
+    </div>`;
+
+  document.body.appendChild(overlay);
+}
+
+async function guardarEdicion(id) {
+  const fecha = document.getElementById('edit-fecha').value;
+  const observaciones = document.getElementById('edit-obs').value.trim();
+  try {
+    const res = await fetch('/api/reportes/' + id, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fecha, observaciones })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      toast('✓ Reporte editado');
+      document.querySelector('[style*=fixed]')?.remove();
+      await cargarHistorial();
+    }
+  } catch(e) { toast('Error al editar'); }
+}
+
 function exportarReporteExcel(id) {
   const r = todosLosReportes.find(x => x.id === id);
   if (!r) return;
@@ -245,10 +451,11 @@ function exportarReporteExcel(id) {
     'Fecha': r.fecha, 'Día': dias[d.getDay()], 'Actividades': acts,
     'Integrantes': r.integrantes.join(', '),
     'Material': m.material, 'Cantidad': m.cantidad,
-    'Unidad': m.unidad, 'Observaciones': r.observaciones || ''
+    'Unidad': m.unidad, 'Observaciones': r.observaciones || '',
+    'IPs': (r.ips || []).join(', ')
   }));
   const ws = XLSX.utils.json_to_sheet(datos);
-  ws['!cols'] = [{wch:12},{wch:12},{wch:40},{wch:35},{wch:25},{wch:10},{wch:8},{wch:40}];
+  ws['!cols'] = [{wch:12},{wch:12},{wch:40},{wch:35},{wch:25},{wch:10},{wch:8},{wch:40},{wch:30}];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Reporte');
   XLSX.writeFile(wb, `reporte_${r.fecha}.xlsx`);
@@ -267,12 +474,13 @@ function exportarTodoExcel() {
         'Fecha': r.fecha, 'Día': dias[d.getDay()], 'Actividades': acts,
         'Integrantes': r.integrantes.join(', '),
         'Material': m.material, 'Cantidad': m.cantidad,
-        'Unidad': m.unidad, 'Observaciones': r.observaciones || ''
+        'Unidad': m.unidad, 'Observaciones': r.observaciones || '',
+        'IPs': (r.ips || []).join(', ')
       });
     });
   });
   const ws = XLSX.utils.json_to_sheet(filas);
-  ws['!cols'] = [{wch:12},{wch:12},{wch:40},{wch:35},{wch:25},{wch:10},{wch:8},{wch:40}];
+  ws['!cols'] = [{wch:12},{wch:12},{wch:40},{wch:35},{wch:25},{wch:10},{wch:8},{wch:40},{wch:30}];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Historial');
   XLSX.writeFile(wb, `historial_${new Date().toISOString().slice(0,10)}.xlsx`);
@@ -305,7 +513,7 @@ async function eliminarFoto(reporteId, publicId) {
 
 function verFoto(url) {
   const overlay = document.createElement('div');
-  overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.9);z-index:500;display:flex;align-items:center;justify-content:center;cursor:pointer;';
+  overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.9);z-index:600;display:flex;align-items:center;justify-content:center;cursor:pointer;';
   overlay.innerHTML = `<img src="${url}" style="max-width:90%;max-height:90%;border-radius:8px;" />`;
   overlay.onclick = () => document.body.removeChild(overlay);
   document.body.appendChild(overlay);
@@ -327,7 +535,7 @@ async function cargarBodega() {
 function renderStock() {
   const cont = document.getElementById('tabla-stock');
   if (!stockActual.length) {
-    cont.innerHTML = '<p class="empty">No hay stock registrado. Usa "Actualizar stock" para agregar.</p>';
+    cont.innerHTML = '<p class="empty">No hay stock registrado.</p>';
     return;
   }
   cont.innerHTML = `
@@ -491,26 +699,35 @@ function barMeta(valor, meta) {
 
 function calcularBadge(reportes, actividades, numPersonas = 5) {
   if (reportes.length === 0) return { badge: 'Sin registro', color: 'var(--muted)', bg: 'var(--surface2)' };
+
   const fibra = getMat(reportes, 'Fibra Principal');
   const cajas = getMat(reportes, 'Cajas NAT');
-  const metaFibra = Math.round(2000 * numPersonas / 5);
-  const metaCajas = Math.round(5 * numPersonas / 5);
-  let puntos = 0; let total = 0;
-  if (actividades.includes('fibra')) {
-    total++;
-    if (fibra >= metaFibra) puntos++;
-    else if (fibra >= metaFibra / 2) puntos += 0.5;
-  }
-  if (actividades.includes('cajas')) {
-    total++;
-    if (cajas >= metaCajas) puntos++;
-    else if (cajas >= metaCajas / 2) puntos += 0.5;
-  }
-  if (actividades.includes('instalacion')) { total++; puntos++; }
-  if (total === 0) return { badge: 'Sin actividad', color: 'var(--muted)', bg: 'var(--surface2)' };
-  const ratio = puntos / total;
-  if (ratio >= 0.8) return { badge: 'Productivo', color: '#3B6D11', bg: '#EAF3DE' };
-  if (ratio >= 0.4) return { badge: 'Parcial', color: '#854F0B', bg: '#FAEEDA' };
+  const numIncidencias = reportes.reduce((s, r) => s + (r.numIncidencias || 0), 0);
+  const acts = new Set(actividades);
+
+  // Condiciones por casos específicos
+  // 5 personas pasan 2km → productivo
+  if (numPersonas >= 5 && fibra >= 2000 && acts.has('fibra')) return { badge: 'Productivo', color: '#3B6D11', bg: '#EAF3DE' };
+  // 3 personas pasan 1.5km → productivo
+  if (numPersonas === 3 && fibra >= 1500 && acts.has('fibra')) return { badge: 'Productivo', color: '#3B6D11', bg: '#EAF3DE' };
+  // 5 personas pasan 500m + cajas + (instalacion o mudanza) → productivo
+  if (numPersonas >= 5 && fibra >= 500 && acts.has('fibra') && acts.has('cajas') && (acts.has('instalacion') || acts.has('mudanza'))) return { badge: 'Productivo', color: '#3B6D11', bg: '#EAF3DE' };
+  // 2 personas arman 5 cajas → productivo
+  if (numPersonas <= 2 && cajas >= 5 && acts.has('cajas')) return { badge: 'Productivo', color: '#3B6D11', bg: '#EAF3DE' };
+  // 2 personas armado ODF → productivo
+  if (numPersonas <= 2 && acts.has('odf')) return { badge: 'Productivo', color: '#3B6D11', bg: '#EAF3DE' };
+  // 2 personas armado mangas → productivo
+  if (numPersonas <= 2 && acts.has('mangas')) return { badge: 'Productivo', color: '#3B6D11', bg: '#EAF3DE' };
+  // 2 personas más de 6 incidencias → productivo
+  if (numPersonas <= 2 && numIncidencias > 6 && acts.has('incidencias')) return { badge: 'Productivo', color: '#3B6D11', bg: '#EAF3DE' };
+  // Instalación cliente = siempre productivo
+  if (acts.has('instalacion')) return { badge: 'Productivo', color: '#3B6D11', bg: '#EAF3DE' };
+  // Mudanza = productivo
+  if (acts.has('mudanza')) return { badge: 'Productivo', color: '#3B6D11', bg: '#EAF3DE' };
+
+  // Parcial — algo se hizo pero no cumple meta completa
+  if (fibra > 0 || cajas > 0 || numIncidencias > 0) return { badge: 'Parcial', color: '#854F0B', bg: '#FAEEDA' };
+
   return { badge: 'Bajo', color: '#A32D2D', bg: '#FCEBEB' };
 }
 
@@ -582,17 +799,17 @@ function cargarIndicadores() {
     <div style="background:var(--surface2);border-radius:8px;padding:1rem;">
       <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Fibra tendida</div>
       <div style="font-size:22px;font-weight:600;">${totalFibra}m</div>
-      <div style="font-size:11px;color:var(--muted);">meta: 10,000m semana</div>
+      <div style="font-size:11px;color:var(--muted);">semana</div>
     </div>
     <div style="background:var(--surface2);border-radius:8px;padding:1rem;">
       <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Cajas armadas</div>
       <div style="font-size:22px;font-weight:600;">${totalCajas}</div>
-      <div style="font-size:11px;color:var(--muted);">meta: 25 semana</div>
+      <div style="font-size:11px;color:var(--muted);">semana</div>
     </div>
     <div style="background:var(--surface2);border-radius:8px;padding:1rem;">
       <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Instalaciones</div>
       <div style="font-size:22px;font-weight:600;color:var(--accent);">${totalInstalaciones}</div>
-      <div style="font-size:11px;color:var(--muted);">${tieneSabado ? '+ Sáb extra' : 'días con instalaciones'}</div>
+      <div style="font-size:11px;color:var(--muted);">${tieneSabado ? '+ Sáb extra' : 'días'}</div>
     </div>`;
 
   const cont = document.getElementById('dias-semana');
@@ -602,16 +819,19 @@ function cargarIndicadores() {
     const actividades = [...new Set(reportes.flatMap(r => r.actividades || []))];
     const integrantes = [...new Set(reportes.flatMap(r => Array.isArray(r.integrantes) ? r.integrantes : r.integrantes.split(',').map(x => x.trim())))];
     const numPersonas = integrantes.length || 5;
-    const metaFibra = Math.round(2000 * numPersonas / 5);
-    const metaCajas = Math.round(5 * numPersonas / 5);
+    const metaFibra = numPersonas >= 5 ? 2000 : numPersonas === 3 ? 1500 : Math.round(2000 * numPersonas / 5);
     const fibra = getMat(reportes, 'Fibra Principal');
     const cajas = getMat(reportes, 'Cajas NAT');
+    const numIncidencias = reportes.reduce((s, r) => s + (r.numIncidencias || 0), 0);
 
     let badgeInfo = esSabado
       ? { badge: 'Extra', color: '#854F0B', bg: '#FAEEDA' }
       : calcularBadge(reportes, actividades, numPersonas);
 
     const observaciones = reportes.map(r => r.observaciones).filter(Boolean);
+    const ips = [...new Set(reportes.flatMap(r => r.ips || []))];
+    const incidencias = [...new Set(reportes.flatMap(r => r.incidencias || []))];
+
     const actsHTML = actividades.length > 0 ? `
       <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">
         ${actividades.map(a => ACTIVIDADES_INFO[a] ? `
@@ -635,6 +855,7 @@ function cargarIndicadores() {
           </div>
           <span style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;background:${badgeInfo.bg};color:${badgeInfo.color};">${badgeInfo.badge}</span>
         </div>
+
         ${reportes.length === 0 ? '<p style="font-size:12px;color:var(--muted);text-align:center;padding:0.5rem 0;">Sin actividad registrada</p>' : `
           ${actsHTML}
           ${integrantes.length > 0 ? `
@@ -647,8 +868,28 @@ function cargarIndicadores() {
               <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:3px;">📋 Observaciones</div>
               <div style="font-size:13px;line-height:1.5;">${observaciones.join(' | ')}</div>
             </div>` : ''}
+
+          ${incidencias.length > 0 || numIncidencias > 0 ? `
+            <div style="margin-bottom:10px;">
+              <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px;">⚠️ Incidencias${numIncidencias > 0 ? ` (${numIncidencias} atendidas)` : ''}</div>
+              <div style="display:flex;flex-wrap:wrap;gap:6px;">
+                ${incidencias.map(i => INCIDENCIAS_INFO[i] ? `
+                  <span style="font-size:12px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:3px 8px;">
+                    ${INCIDENCIAS_INFO[i].icon} ${INCIDENCIAS_INFO[i].label}
+                  </span>` : '').join('')}
+              </div>
+            </div>` : ''}
+
+          ${ips.length > 0 ? `
+            <div style="margin-bottom:10px;">
+              <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px;">🌐 IPs atendidas</div>
+              <div style="display:flex;flex-wrap:wrap;gap:6px;">
+                ${ips.map(ip => `<span style="font-size:12px;font-family:'IBM Plex Mono',monospace;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:3px 8px;">${ip}</span>`).join('')}
+              </div>
+            </div>` : ''}
+
           <div style="margin-bottom:12px;">
-            <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">📊 Rendimiento del día${numPersonas < 5 ? ` (ajustado a ${numPersonas}/5 personas)` : ''}</div>
+            <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">📊 Rendimiento del día</div>
             ${actividades.includes('fibra') ? `
               <div style="margin-bottom:8px;">
                 <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
@@ -661,21 +902,60 @@ function cargarIndicadores() {
               <div style="margin-bottom:8px;">
                 <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
                   <span style="font-size:12px;color:var(--text);">📦 Cajas NAT</span>
-                  <span style="font-size:11px;color:var(--muted);">meta: ${metaCajas}</span>
+                  <span style="font-size:11px;color:var(--muted);">meta: 5</span>
                 </div>
-                ${barMeta(cajas, metaCajas)}
+                ${barMeta(cajas, 5)}
+              </div>` : ''}
+            ${actividades.includes('incidencias') ? `
+              <div style="margin-bottom:8px;">
+                <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
+                  <span style="font-size:12px;color:var(--text);">⚠️ Incidencias</span>
+                  <span style="font-size:11px;color:var(--muted);">meta: 6</span>
+                </div>
+                ${barMeta(numIncidencias, 6)}
               </div>` : ''}
             ${actividades.includes('instalacion') ? `
               <div style="margin-bottom:8px;">
                 <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
                   <span style="font-size:12px;color:var(--text);">🔌 Instalación cliente</span>
-                  <span style="font-size:11px;color:var(--accent);">✓ Día productivo</span>
+                  <span style="font-size:11px;color:var(--accent);">✓ Productivo</span>
+                </div>
+                <div style="height:7px;background:#EAF3DE;border-radius:4px;">
+                  <div style="width:100%;height:100%;background:#1D9E75;border-radius:4px;"></div>
+                </div>
+              </div>` : ''}
+            ${actividades.includes('mudanza') ? `
+              <div style="margin-bottom:8px;">
+                <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
+                  <span style="font-size:12px;color:var(--text);">🔄 Mudanza radio a fibra</span>
+                  <span style="font-size:11px;color:var(--accent);">✓ Productivo</span>
+                </div>
+                <div style="height:7px;background:#EAF3DE;border-radius:4px;">
+                  <div style="width:100%;height:100%;background:#1D9E75;border-radius:4px;"></div>
+                </div>
+              </div>` : ''}
+            ${actividades.includes('odf') ? `
+              <div style="margin-bottom:8px;">
+                <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
+                  <span style="font-size:12px;color:var(--text);">🗄️ Armado ODF</span>
+                  <span style="font-size:11px;color:var(--accent);">✓ Productivo</span>
+                </div>
+                <div style="height:7px;background:#EAF3DE;border-radius:4px;">
+                  <div style="width:100%;height:100%;background:#1D9E75;border-radius:4px;"></div>
+                </div>
+              </div>` : ''}
+            ${actividades.includes('mangas') ? `
+              <div style="margin-bottom:8px;">
+                <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
+                  <span style="font-size:12px;color:var(--text);">🔧 Armado mangas</span>
+                  <span style="font-size:11px;color:var(--accent);">✓ Productivo</span>
                 </div>
                 <div style="height:7px;background:#EAF3DE;border-radius:4px;">
                   <div style="width:100%;height:100%;background:#1D9E75;border-radius:4px;"></div>
                 </div>
               </div>` : ''}
           </div>
+
           ${todosMat.length > 0 ? `
           <div>
             <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">📦 Materiales utilizados</div>
@@ -746,6 +1026,8 @@ function exportarInformeSemanal() {
     const cajas = getMat(reportes, 'Cajas NAT');
     const herrajesA = getMat(reportes, 'Herrajes A');
     const herrajesU = getMat(reportes, 'Herrajes U');
+    const numIncidencias = reportes.reduce((s, r) => s + (r.numIncidencias || 0), 0);
+    const ips = [...new Set(reportes.flatMap(r => r.ips || []))];
     const obs = reportes.map(r => r.observaciones).filter(Boolean).join(' | ');
     resumenFilas.push({
       'Día': nombres[i], 'Fecha': fecha, 'Estado': badge,
@@ -755,11 +1037,14 @@ function exportarInformeSemanal() {
       'Fibra Principal (m)': fibra,
       'Herrajes A': herrajesA, 'Herrajes U': herrajesU,
       'Herrajes total': herrajesA + herrajesU,
-      'Cajas NAT': cajas, 'Observaciones': obs || '—'
+      'Cajas NAT': cajas,
+      'Incidencias': numIncidencias,
+      'IPs': ips.join(', ') || '—',
+      'Observaciones': obs || '—'
     });
   });
   const wsResumen = XLSX.utils.json_to_sheet(resumenFilas);
-  wsResumen['!cols'] = [{wch:12},{wch:12},{wch:14},{wch:10},{wch:45},{wch:35},{wch:18},{wch:12},{wch:12},{wch:14},{wch:12},{wch:40}];
+  wsResumen['!cols'] = [{wch:12},{wch:12},{wch:14},{wch:10},{wch:45},{wch:35},{wch:18},{wch:12},{wch:12},{wch:14},{wch:12},{wch:12},{wch:30},{wch:40}];
   XLSX.utils.book_append_sheet(wb, wsResumen, 'Resumen semanal');
   const matFilas = [];
   diasSemana.forEach((fecha, i) => {

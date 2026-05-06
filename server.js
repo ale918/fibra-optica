@@ -37,18 +37,22 @@ app.use(session({
 }));
 
 const USUARIOS = {
-  'Telecomadmin': { nombre: 'Administrador', pass: process.env.ADMIN_PASS },
-  'Efrain':       { nombre: 'Efrain',        pass: process.env.USER_EFRAIN_PASS },
-  'Alejandro':    { nombre: 'Alejandro',      pass: process.env.USER_ALEJANDRO_PASS },
-  'DavidG':       { nombre: 'David Garcia',   pass: process.env.USER_DAVIDG_PASS },
+  'Telecomadmin': { nombre: 'Administrador', pass: process.env.ADMIN_PASS, rol: 'admin' },
+  'Efrain':       { nombre: 'Efrain',        pass: process.env.USER_EFRAIN_PASS, rol: 'trabajador' },
+  'Alejandro':    { nombre: 'Alejandro',      pass: process.env.USER_ALEJANDRO_PASS, rol: 'trabajador' },
+  'DavidG':       { nombre: 'David Garcia',   pass: process.env.USER_DAVIDG_PASS, rol: 'trabajador' },
 };
 
 const sesionesActivas = new Map();
-const historialDesconexiones = [];
 
 function requireAuth(req, res, next) {
   if (req.session.loggedIn) return next();
   res.status(401).json({ error: 'No autorizado' });
+}
+
+function requireAdmin(req, res, next) {
+  if (req.session.loggedIn && req.session.rol === 'admin') return next();
+  res.status(403).json({ error: 'Solo el administrador puede hacer esto' });
 }
 
 app.use(express.static(join(__dirname, 'público')));
@@ -73,72 +77,79 @@ app.post('/api/login', (req, res) => {
     req.session.loggedIn = true;
     req.session.usuario = usuario;
     req.session.nombre = user.nombre;
+    req.session.rol = user.rol;
     sesionesActivas.set(req.session.id, {
       nombre: user.nombre,
       usuario,
-      desde: new Date().toLocaleString('es-EC')
+      rol: user.rol
     });
-    res.json({ ok: true, nombre: user.nombre });
+    res.json({ ok: true, nombre: user.nombre, rol: user.rol });
   } else {
     res.status(401).json({ error: 'Usuario o contraseña incorrectos' });
   }
 });
 
 app.post('/api/logout', (req, res) => {
-  const sesion = sesionesActivas.get(req.session.id);
-  if (sesion) {
-    historialDesconexiones.push({
-      nombre: sesion.nombre,
-      usuario: sesion.usuario,
-      salio: new Date().toLocaleString('es-EC'),
-      salioTimestamp: Date.now()
-    });
-    // Mantener solo desconexiones de la última hora
-    const unaHoraAtras = Date.now() - 60 * 60 * 1000;
-    while (historialDesconexiones.length > 0 && historialDesconexiones[0].salioTimestamp < unaHoraAtras) {
-      historialDesconexiones.shift();
-    }
-    sesionesActivas.delete(req.session.id);
-  }
+  sesionesActivas.delete(req.session.id);
   req.session.destroy();
   res.json({ ok: true });
 });
 
 app.get('/api/me', (req, res) => {
   if (req.session.loggedIn) {
-    res.json({ loggedIn: true, usuario: req.session.usuario, nombre: req.session.nombre });
+    res.json({ loggedIn: true, usuario: req.session.usuario, nombre: req.session.nombre, rol: req.session.rol });
   } else {
     res.json({ loggedIn: false });
   }
 });
 
 app.get('/api/conectados', requireAuth, (req, res) => {
-  const conectados = [...sesionesActivas.values()].map(s => ({
-    nombre: s.nombre,
-    estado: 'online'
-  }));
-  const desconectados = historialDesconexiones.slice(-5).map(h => ({
-    nombre: h.nombre,
-    estado: 'offline',
-    salio: h.salio
-  }));
-  res.json({ conectados, desconectados });
+  res.json([...sesionesActivas.values()].map(s => ({ nombre: s.nombre, rol: s.rol })));
 });
 
 const adapter = new JSONFileSync(join(DATA_DIR, 'database.json'));
-const defaultData = { reportes: [], bodega: [], movimientos: [] };
+const defaultData = { reportes: [], bodega: [], movimientos: [], cuadrillas: [] };
 const db = new Low(adapter, defaultData);
 db.read();
 
-if (!db.data) db.data = { reportes: [], bodega: [], movimientos: [] };
+if (!db.data) db.data = { reportes: [], bodega: [], movimientos: [], cuadrillas: [] };
 if (!db.data.reportes) db.data.reportes = [];
 if (!db.data.bodega) db.data.bodega = [];
 if (!db.data.movimientos) db.data.movimientos = [];
+if (!db.data.cuadrillas) db.data.cuadrillas = [];
 db.write();
+
+// ── Cuadrillas ────────────────────────────────────────────
+app.get('/api/cuadrillas', requireAuth, (req, res) => {
+  res.json(db.data.cuadrillas);
+});
+
+app.post('/api/cuadrillas', requireAdmin, (req, res) => {
+  const { nombre, integrantes, fecha } = req.body;
+  if (!nombre || !integrantes?.length || !fecha) {
+    return res.status(400).json({ error: 'Faltan datos' });
+  }
+  const nueva = {
+    id: Date.now(),
+    nombre,
+    integrantes,
+    fecha,
+    creado_en: new Date().toLocaleString('es-EC')
+  };
+  db.data.cuadrillas.push(nueva);
+  db.write();
+  res.json({ ok: true, id: nueva.id });
+});
+
+app.delete('/api/cuadrillas/:id', requireAdmin, (req, res) => {
+  db.data.cuadrillas = db.data.cuadrillas.filter(c => c.id !== parseInt(req.params.id));
+  db.write();
+  res.json({ ok: true });
+});
 
 // ── Reportes ─────────────────────────────────────────────
 app.post('/api/reportes', requireAuth, (req, res) => {
-  const { fecha, observaciones, integrantes, materiales, actividades } = req.body;
+  const { fecha, observaciones, integrantes, materiales, actividades, incidencias, ips, cuadrillaId } = req.body;
   if (!fecha || !integrantes || !materiales?.length) {
     return res.status(400).json({ error: 'Faltan datos obligatorios' });
   }
@@ -149,6 +160,9 @@ app.post('/api/reportes', requireAuth, (req, res) => {
     integrantes: Array.isArray(integrantes) ? integrantes : integrantes.split(',').map(i => i.trim()),
     materiales,
     actividades: actividades || [],
+    incidencias: incidencias || [],
+    ips: ips || [],
+    cuadrillaId: cuadrillaId || null,
     fotos: [],
     creado_en: new Date().toLocaleString('es-EC')
   };
@@ -162,9 +176,28 @@ app.get('/api/reportes', requireAuth, (req, res) => {
     ...r,
     integrantes: Array.isArray(r.integrantes) ? r.integrantes : r.integrantes.split(',').map(i => i.trim()),
     actividades: r.actividades || [],
+    incidencias: r.incidencias || [],
+    ips: r.ips || [],
     fotos: r.fotos || []
   }));
   res.json(reportes);
+});
+
+app.put('/api/reportes/:id', requireAuth, (req, res) => {
+  const id = parseInt(req.params.id);
+  const reporte = db.data.reportes.find(r => r.id === id);
+  if (!reporte) return res.status(404).json({ error: 'Reporte no encontrado' });
+  const { fecha, observaciones, integrantes, materiales, actividades, incidencias, ips } = req.body;
+  if (fecha) reporte.fecha = fecha;
+  if (observaciones !== undefined) reporte.observaciones = observaciones;
+  if (integrantes) reporte.integrantes = Array.isArray(integrantes) ? integrantes : integrantes.split(',').map(i => i.trim());
+  if (materiales) reporte.materiales = materiales;
+  if (actividades) reporte.actividades = actividades;
+  if (incidencias) reporte.incidencias = incidencias;
+  if (ips) reporte.ips = ips;
+  reporte.editado_en = new Date().toLocaleString('es-EC');
+  db.write();
+  res.json({ ok: true });
 });
 
 app.delete('/api/reportes/:id', requireAuth, (req, res) => {
@@ -207,9 +240,7 @@ app.get('/api/bodega', requireAuth, (req, res) => {
 
 app.post('/api/bodega/stock', requireAuth, (req, res) => {
   const { material, cantidad } = req.body;
-  if (!material || cantidad === undefined) {
-    return res.status(400).json({ error: 'Faltan datos' });
-  }
+  if (!material || cantidad === undefined) return res.status(400).json({ error: 'Faltan datos' });
   const item = db.data.bodega.find(b => b.material === material);
   if (item) { item.cantidad = cantidad; }
   else { db.data.bodega.push({ material, cantidad }); }
@@ -219,14 +250,10 @@ app.post('/api/bodega/stock', requireAuth, (req, res) => {
 
 app.post('/api/bodega/movimiento', requireAuth, (req, res) => {
   const { tipo, material, cantidad, responsable, nota } = req.body;
-  if (!tipo || !material || !cantidad || !responsable) {
-    return res.status(400).json({ error: 'Faltan datos' });
-  }
+  if (!tipo || !material || !cantidad || !responsable) return res.status(400).json({ error: 'Faltan datos' });
   const item = db.data.bodega.find(b => b.material === material);
   if (!item) return res.status(400).json({ error: 'Material no encontrado en bodega' });
-  if (tipo === 'salida' && item.cantidad < cantidad) {
-    return res.status(400).json({ error: 'Stock insuficiente' });
-  }
+  if (tipo === 'salida' && item.cantidad < cantidad) return res.status(400).json({ error: 'Stock insuficiente' });
   item.cantidad += tipo === 'entrada' || tipo === 'devolucion' ? cantidad : -cantidad;
   const movimiento = {
     id: Date.now(), tipo, material, cantidad, responsable,
