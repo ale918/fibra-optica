@@ -64,15 +64,12 @@ app.get('/', (req, res) => {
   res.sendFile(join(__dirname, 'público', 'formulario.html'));
 });
 
-// ── Login / Logout ────────────────────────────────────────
 app.post('/api/login', (req, res) => {
   const { usuario, password } = req.body;
   const user = USUARIOS[usuario];
   if (user && user.pass && password === user.pass) {
     for (const [sessionId, sesion] of sesionesActivas.entries()) {
-      if (sesion.usuario === usuario) {
-        sesionesActivas.delete(sessionId);
-      }
+      if (sesion.usuario === usuario) sesionesActivas.delete(sessionId);
     }
     req.session.loggedIn = true;
     req.session.usuario = usuario;
@@ -149,18 +146,19 @@ app.delete('/api/cuadrillas/:id', requireAdmin, (req, res) => {
 
 // ── Reportes ─────────────────────────────────────────────
 app.post('/api/reportes', requireAuth, (req, res) => {
-  const { fecha, observaciones, integrantes, materiales, actividades, incidencias, ips, cuadrillaId } = req.body;
-  if (!fecha || !integrantes || !materiales?.length) {
+  const { fecha, observaciones, integrantes, materiales, actividades, incidencias, numIncidencias, ips, cuadrillaId } = req.body;
+  if (!fecha || !actividades?.length) {
     return res.status(400).json({ error: 'Faltan datos obligatorios' });
   }
   const nuevoReporte = {
     id: Date.now(),
     fecha,
-    observaciones,
-    integrantes: Array.isArray(integrantes) ? integrantes : integrantes.split(',').map(i => i.trim()),
-    materiales,
+    observaciones: observaciones || '',
+    integrantes: integrantes || [],
+    materiales: materiales || [],
     actividades: actividades || [],
     incidencias: incidencias || [],
+    numIncidencias: numIncidencias || 0,
     ips: ips || [],
     cuadrillaId: cuadrillaId || null,
     fotos: [],
@@ -174,7 +172,7 @@ app.post('/api/reportes', requireAuth, (req, res) => {
 app.get('/api/reportes', requireAuth, (req, res) => {
   const reportes = [...db.data.reportes].reverse().map(r => ({
     ...r,
-    integrantes: Array.isArray(r.integrantes) ? r.integrantes : r.integrantes.split(',').map(i => i.trim()),
+    integrantes: Array.isArray(r.integrantes) ? r.integrantes : (r.integrantes || '').split(',').map(i => i.trim()),
     actividades: r.actividades || [],
     incidencias: r.incidencias || [],
     ips: r.ips || [],
@@ -187,14 +185,9 @@ app.put('/api/reportes/:id', requireAuth, (req, res) => {
   const id = parseInt(req.params.id);
   const reporte = db.data.reportes.find(r => r.id === id);
   if (!reporte) return res.status(404).json({ error: 'Reporte no encontrado' });
-  const { fecha, observaciones, integrantes, materiales, actividades, incidencias, ips } = req.body;
+  const { fecha, observaciones } = req.body;
   if (fecha) reporte.fecha = fecha;
   if (observaciones !== undefined) reporte.observaciones = observaciones;
-  if (integrantes) reporte.integrantes = Array.isArray(integrantes) ? integrantes : integrantes.split(',').map(i => i.trim());
-  if (materiales) reporte.materiales = materiales;
-  if (actividades) reporte.actividades = actividades;
-  if (incidencias) reporte.incidencias = incidencias;
-  if (ips) reporte.ips = ips;
   reporte.editado_en = new Date().toLocaleString('es-EC');
   db.write();
   res.json({ ok: true });
@@ -213,8 +206,7 @@ app.post('/api/reportes/:id/fotos', requireAuth, upload.array('fotos', 5), async
   if (!reporte) return res.status(404).json({ error: 'Reporte no encontrado' });
   if (!reporte.fotos) reporte.fotos = [];
   const nuevasFotos = req.files.map(f => ({
-    url: f.path,
-    public_id: f.filename,
+    url: f.path, public_id: f.filename,
     subida_en: new Date().toLocaleString('es-EC')
   }));
   reporte.fotos.push(...nuevasFotos);
@@ -234,16 +226,13 @@ app.delete('/api/reportes/:id/fotos/:public_id', requireAuth, async (req, res) =
 });
 
 // ── Bodega ───────────────────────────────────────────────
-app.get('/api/bodega', requireAuth, (req, res) => {
-  res.json(db.data.bodega);
-});
+app.get('/api/bodega', requireAuth, (req, res) => { res.json(db.data.bodega); });
 
 app.post('/api/bodega/stock', requireAuth, (req, res) => {
   const { material, cantidad } = req.body;
   if (!material || cantidad === undefined) return res.status(400).json({ error: 'Faltan datos' });
   const item = db.data.bodega.find(b => b.material === material);
-  if (item) { item.cantidad = cantidad; }
-  else { db.data.bodega.push({ material, cantidad }); }
+  if (item) { item.cantidad = cantidad; } else { db.data.bodega.push({ material, cantidad }); }
   db.write();
   res.json({ ok: true });
 });
@@ -255,30 +244,21 @@ app.post('/api/bodega/movimiento', requireAuth, (req, res) => {
   if (!item) return res.status(400).json({ error: 'Material no encontrado en bodega' });
   if (tipo === 'salida' && item.cantidad < cantidad) return res.status(400).json({ error: 'Stock insuficiente' });
   item.cantidad += tipo === 'entrada' || tipo === 'devolucion' ? cantidad : -cantidad;
-  const movimiento = {
-    id: Date.now(), tipo, material, cantidad, responsable,
-    nota: nota || '', fecha: new Date().toLocaleString('es-EC')
-  };
-  db.data.movimientos.push(movimiento);
+  db.data.movimientos.push({ id: Date.now(), tipo, material, cantidad, responsable, nota: nota || '', fecha: new Date().toLocaleString('es-EC') });
   db.write();
   res.json({ ok: true });
 });
 
-app.get('/api/bodega/movimientos', requireAuth, (req, res) => {
-  res.json([...db.data.movimientos].reverse());
-});
+app.get('/api/bodega/movimientos', requireAuth, (req, res) => { res.json([...db.data.movimientos].reverse()); });
 
 app.delete('/api/bodega/movimientos/:id', requireAuth, (req, res) => {
   const id = parseInt(req.params.id);
   const movimiento = db.data.movimientos.find(m => m.id === id);
-  if (!movimiento) return res.status(404).json({ error: 'Movimiento no encontrado' });
+  if (!movimiento) return res.status(404).json({ error: 'No encontrado' });
   const item = db.data.bodega.find(b => b.material === movimiento.material);
   if (item) {
     if (movimiento.tipo === 'salida') { item.cantidad += movimiento.cantidad; }
-    else if (movimiento.tipo === 'entrada' || movimiento.tipo === 'devolucion') {
-      item.cantidad -= movimiento.cantidad;
-      if (item.cantidad < 0) item.cantidad = 0;
-    }
+    else { item.cantidad -= movimiento.cantidad; if (item.cantidad < 0) item.cantidad = 0; }
   }
   db.data.movimientos = db.data.movimientos.filter(m => m.id !== id);
   db.write();
@@ -286,6 +266,4 @@ app.delete('/api/bodega/movimientos/:id', requireAuth, (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`✅ Servidor corriendo en http://localhost:${PORT}`);
-});
+app.listen(PORT, () => console.log(`✅ Servidor corriendo en http://localhost:${PORT}`));

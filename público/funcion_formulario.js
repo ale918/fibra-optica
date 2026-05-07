@@ -41,34 +41,115 @@ let stockActual = [];
 let semanaActual = '';
 let rolActual = '';
 let ipCounter = 0;
-
-document.getElementById('fecha').valueAsDate = new Date();
-document.getElementById('cuadrilla-fecha') && (document.getElementById('cuadrilla-fecha').valueAsDate = new Date());
+let cuadrillaSeleccionadaId = null;
 
 // ── Init ─────────────────────────────────────────────────
 async function init() {
-  const res = await fetch('/api/me');
-  const data = await res.json();
-  if (!data.loggedIn) { window.location.href = '/'; return; }
-  rolActual = data.rol;
-  if (rolActual === 'admin') {
-    document.getElementById('tab-cuadrillas-btn').style.display = 'inline-flex';
-  }
-  cargarConectados();
-  setInterval(cargarConectados, 30000);
-  cargarCuadrillasSelect();
+  try {
+    const res = await fetch('/api/me');
+    const data = await res.json();
+    if (!data.loggedIn) { window.location.href = '/'; return; }
+    rolActual = data.rol;
+
+    if (rolActual === 'admin') {
+      document.getElementById('tab-cuadrillas-btn').style.display = 'inline-flex';
+      document.getElementById('admin-cuadrilla-selector').style.display = 'block';
+      document.getElementById('trabajador-fecha-box').style.display = 'none';
+      await cargarCuadrillasSelect();
+    } else {
+      document.getElementById('admin-cuadrilla-selector').style.display = 'none';
+      document.getElementById('trabajador-fecha-box').style.display = 'block';
+      document.getElementById('fecha-trabajador').valueAsDate = new Date();
+      await cargarCuadrillaHoy();
+    }
+
+    document.getElementById('fecha') && (document.getElementById('fecha').valueAsDate = new Date());
+    document.getElementById('cuadrilla-fecha') && (document.getElementById('cuadrilla-fecha').valueAsDate = new Date());
+
+    cargarConectados();
+    setInterval(cargarConectados, 30000);
+  } catch(e) { console.error(e); }
 }
 init();
+
+// ── Cuadrilla del día para trabajadores ──────────────────
+async function cargarCuadrillaHoy() {
+  try {
+    const res = await fetch('/api/cuadrillas');
+    todasLasCuadrillas = await res.json();
+    const hoy = new Date().toISOString().slice(0, 10);
+    const cuadrilla = todasLasCuadrillas.find(c => c.fecha === hoy);
+    const box = document.getElementById('cuadrilla-asignada-box');
+    if (cuadrilla) {
+      cuadrillaSeleccionadaId = cuadrilla.id;
+      box.style.display = 'block';
+      box.innerHTML = `
+        <div style="background:linear-gradient(135deg,rgba(0,212,170,0.1),rgba(0,153,255,0.05));border:1px solid var(--accent);border-radius:12px;padding:1.25rem;margin-bottom:1.25rem;">
+          <div style="font-size:10px;color:var(--accent);text-transform:uppercase;letter-spacing:0.08em;font-family:'IBM Plex Mono',monospace;margin-bottom:8px;">Cuadrilla asignada hoy</div>
+          <div style="font-size:18px;font-weight:600;color:var(--text);margin-bottom:8px;">${cuadrilla.nombre}</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;">
+            ${cuadrilla.integrantes.map(i => `
+              <span style="font-size:12px;background:rgba(0,212,170,0.15);border:1px solid rgba(0,212,170,0.3);border-radius:20px;padding:3px 10px;color:var(--accent);">
+                👷 ${i}
+              </span>`).join('')}
+          </div>
+        </div>`;
+    } else {
+      box.style.display = 'none';
+      cuadrillaSeleccionadaId = null;
+    }
+  } catch(e) {}
+}
+
+// ── Cuadrillas select para admin ─────────────────────────
+async function cargarCuadrillasSelect() {
+  try {
+    const res = await fetch('/api/cuadrillas');
+    todasLasCuadrillas = await res.json();
+    const sel = document.getElementById('cuadrilla-select');
+    if (!sel) return;
+    sel.innerHTML = '<option value="">Sin cuadrilla asignada</option>' +
+      todasLasCuadrillas.map(c => `<option value="${c.id}">${c.nombre} — ${c.fecha}</option>`).join('');
+  } catch(e) {}
+}
+
+function seleccionarCuadrilla() {
+  const id = parseInt(document.getElementById('cuadrilla-select').value);
+  cuadrillaSeleccionadaId = id || null;
+  const cuadrilla = todasLasCuadrillas.find(c => c.id === id);
+
+  // Mostrar cuadro de cuadrilla para admin también
+  const box = document.getElementById('cuadrilla-asignada-box');
+  if (cuadrilla) {
+    box.style.display = 'block';
+    box.innerHTML = `
+      <div style="background:linear-gradient(135deg,rgba(0,212,170,0.1),rgba(0,153,255,0.05));border:1px solid var(--accent);border-radius:12px;padding:1.25rem;margin-bottom:1.25rem;">
+        <div style="font-size:10px;color:var(--accent);text-transform:uppercase;letter-spacing:0.08em;font-family:'IBM Plex Mono',monospace;margin-bottom:8px;">Cuadrilla seleccionada</div>
+        <div style="font-size:18px;font-weight:600;color:var(--text);margin-bottom:8px;">${cuadrilla.nombre}</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;">
+          ${cuadrilla.integrantes.map(i => `
+            <span style="font-size:12px;background:rgba(0,212,170,0.15);border:1px solid rgba(0,212,170,0.3);border-radius:20px;padding:3px 10px;color:var(--accent);">
+              👷 ${i}
+            </span>`).join('')}
+        </div>
+      </div>`;
+    // Auto-marcar integrantes
+    document.querySelectorAll('.integrante-check input').forEach(cb => {
+      cb.checked = cuadrilla.integrantes.includes(cb.value);
+    });
+  } else {
+    box.style.display = 'none';
+    document.querySelectorAll('.integrante-check input').forEach(cb => cb.checked = false);
+  }
+}
 
 // ── Conectados ───────────────────────────────────────────
 async function cargarConectados() {
   try {
     const res = await fetch('/api/conectados');
     const conectados = await res.json();
-    const texto = document.getElementById('conectados-texto');
-    const lista = document.getElementById('conectados-lista');
-    texto.textContent = `🟢 ${conectados.length}`;
-    lista.innerHTML = conectados.length === 0
+    document.getElementById('conectados-texto').textContent = `🟢 ${conectados.length}`;
+    document.getElementById('conectados-lista').innerHTML = conectados.length === 0
       ? '<div style="font-size:12px;color:#6b7280;padding:4px 0;">Nadie conectado</div>'
       : conectados.map(c => `
           <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #2a2f3a;">
@@ -109,14 +190,12 @@ async function cerrarSesion() {
 
 function mostrarTab(tab) {
   ['registro','historial','bodega','indicadores','cuadrillas'].forEach(t => {
-    document.getElementById('tab-' + t).style.display = t === tab ? 'block' : 'none';
+    const el = document.getElementById('tab-' + t);
+    if (el) el.style.display = t === tab ? 'block' : 'none';
   });
-  document.querySelectorAll('.tab').forEach((btn, i) => {
-    btn.classList.remove('active');
-  });
+  document.querySelectorAll('.tab').forEach(btn => btn.classList.remove('active'));
   const tabs = ['registro','historial','bodega','indicadores','cuadrillas'];
-  const idx = tabs.indexOf(tab);
-  document.querySelectorAll('.tab')[idx]?.classList.add('active');
+  document.querySelectorAll('.tab')[tabs.indexOf(tab)]?.classList.add('active');
   if (tab === 'historial') cargarHistorial();
   if (tab === 'bodega') cargarBodega();
   if (tab === 'indicadores') iniciarIndicadores();
@@ -133,10 +212,8 @@ function toggleActividad(id) {
     actividadesSeleccionadas.add(id);
     btn.classList.add('selected');
   }
-  // Mostrar panel incidencias
-  const panelInc = document.getElementById('incidencias-panel');
-  panelInc.style.display = actividadesSeleccionadas.has('incidencias') ? 'block' : 'none';
-  // Mostrar panel IPs
+  document.getElementById('incidencias-panel').style.display =
+    actividadesSeleccionadas.has('incidencias') ? 'block' : 'none';
   const needsIp = ['instalacion','mudanza','incidencias'].some(a => actividadesSeleccionadas.has(a));
   document.getElementById('ips-panel').style.display = needsIp ? 'block' : 'none';
 }
@@ -158,105 +235,42 @@ function agregarIP() {
 
 function getIPs() {
   return [...document.querySelectorAll('[id^="ip-"]')]
+    .filter(el => el.tagName === 'INPUT')
     .map(el => el.value.trim())
     .filter(Boolean);
 }
 
-// ── Cuadrillas ───────────────────────────────────────────
-async function cargarCuadrillasSelect() {
-  try {
-    const res = await fetch('/api/cuadrillas');
-    todasLasCuadrillas = await res.json();
-    const sel = document.getElementById('cuadrilla-select');
-    sel.innerHTML = '<option value="">Seleccionar cuadrilla...</option>' +
-      todasLasCuadrillas.map(c => `<option value="${c.id}">${c.nombre} — ${c.fecha}</option>`).join('');
-  } catch(e) {}
-}
-
-function cargarIntegrantesDeCuadrilla() {
-  const id = parseInt(document.getElementById('cuadrilla-select').value);
-  const cuadrilla = todasLasCuadrillas.find(c => c.id === id);
-  document.querySelectorAll('.integrante-check input').forEach(cb => {
-    cb.checked = cuadrilla ? cuadrilla.integrantes.includes(cb.value) : false;
-  });
-}
-
-async function cargarCuadrillas() {
-  try {
-    const res = await fetch('/api/cuadrillas');
-    todasLasCuadrillas = await res.json();
-    const cont = document.getElementById('lista-cuadrillas');
-    if (!todasLasCuadrillas.length) {
-      cont.innerHTML = '<p class="empty">No hay cuadrillas creadas.</p>';
-      return;
-    }
-    cont.innerHTML = todasLasCuadrillas.map(c => `
-      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:1rem;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
-        <div>
-          <div style="font-weight:600;color:var(--accent);font-size:14px;">${c.nombre}</div>
-          <div style="font-size:12px;color:var(--muted);margin-top:2px;">📅 ${c.fecha} · 👷 ${c.integrantes.join(', ')}</div>
-        </div>
-        <button class="btn-danger" onclick="eliminarCuadrilla(${c.id})" style="font-size:12px;padding:5px 10px;">Eliminar</button>
-      </div>`).join('');
-  } catch(e) {}
-}
-
-async function crearCuadrilla() {
-  const nombre = document.getElementById('cuadrilla-nombre').value.trim();
-  const fecha = document.getElementById('cuadrilla-fecha').value;
-  const integrantes = [...document.querySelectorAll('.cuadrilla-int:checked')].map(i => i.value);
-  if (!nombre) { toast('⚠ Ingresa un nombre para la cuadrilla'); return; }
-  if (!fecha) { toast('⚠ Selecciona la fecha'); return; }
-  if (!integrantes.length) { toast('⚠ Selecciona al menos un integrante'); return; }
-  try {
-    const res = await fetch('/api/cuadrillas', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nombre, fecha, integrantes })
-    });
-    const data = await res.json();
-    if (data.ok) {
-      toast('✓ Cuadrilla creada');
-      document.getElementById('cuadrilla-nombre').value = '';
-      document.querySelectorAll('.cuadrilla-int').forEach(c => c.checked = false);
-      await cargarCuadrillas();
-      await cargarCuadrillasSelect();
-    }
-  } catch(e) { toast('Error al crear cuadrilla'); }
-}
-
-async function eliminarCuadrilla(id) {
-  if (!confirm('¿Eliminar esta cuadrilla?')) return;
-  await fetch('/api/cuadrillas/' + id, { method: 'DELETE' });
-  toast('Cuadrilla eliminada');
-  await cargarCuadrillas();
-  await cargarCuadrillasSelect();
-}
-
-// ── Reportes ─────────────────────────────────────────────
+// ── Guardar Reporte ──────────────────────────────────────
 async function guardarReporte() {
-  const fecha = document.getElementById('fecha').value;
-  const observaciones = document.getElementById('observaciones').value.trim();
+  const esAdmin = rolActual === 'admin';
+  const fecha = esAdmin
+    ? document.getElementById('fecha').value
+    : document.getElementById('fecha-trabajador').value;
+
   if (!fecha) { toast('⚠ Selecciona la fecha'); return; }
   if (actividadesSeleccionadas.size === 0) { toast('⚠ Selecciona al menos una actividad'); return; }
 
-  const integrantes = [...document.querySelectorAll('.integrante-check input:checked')].map(i => i.value);
-  if (!integrantes.length) { toast('⚠ Selecciona al menos un integrante'); return; }
+  const observaciones = document.getElementById('observaciones').value.trim();
+
+  // Integrantes: admin los elige, trabajador usa la cuadrilla
+  let integrantes = [];
+  if (esAdmin) {
+    integrantes = [...document.querySelectorAll('.integrante-check input:checked')].map(i => i.value);
+    if (!integrantes.length) { toast('⚠ Selecciona al menos un integrante'); return; }
+  } else {
+    const cuadrilla = todasLasCuadrillas.find(c => c.id === cuadrillaSeleccionadaId);
+    integrantes = cuadrilla ? cuadrilla.integrantes : [];
+  }
 
   const materiales = MATERIALES.map(m => ({
     material: m.label,
-    cantidad: parseFloat(document.getElementById(m.id).value) || 0,
+    cantidad: parseFloat(document.getElementById(m.id)?.value) || 0,
     unidad: m.unidad
   })).filter(m => m.cantidad > 0);
-  if (!materiales.length) { toast('⚠ Ingresa al menos un material'); return; }
 
-  const incidencias = [...document.querySelectorAll('.integrante-check input[value]:checked')]
-    .filter(el => Object.keys(INCIDENCIAS_INFO).includes(el.value))
-    .map(el => el.value);
-
+  const incidencias = [...document.querySelectorAll('.inc-check:checked')].map(el => el.value);
   const numIncidencias = parseInt(document.getElementById('num-incidencias')?.value) || 0;
   const ips = getIPs();
-  const cuadrillaId = parseInt(document.getElementById('cuadrilla-select').value) || null;
 
   try {
     const res = await fetch('/api/reportes', {
@@ -265,30 +279,40 @@ async function guardarReporte() {
       body: JSON.stringify({
         fecha, integrantes, observaciones, materiales,
         actividades: [...actividadesSeleccionadas],
-        incidencias, numIncidencias, ips, cuadrillaId
+        incidencias, numIncidencias, ips,
+        cuadrillaId: cuadrillaSeleccionadaId
       })
     });
     const data = await res.json();
     if (data.ok) { toast('✓ Reporte guardado'); limpiarFormulario(); }
     else toast('Error: ' + data.error);
-  } catch(e) { toast('Error de conexión'); }
+  } catch(e) { toast('Error de conexión: ' + e.message); }
 }
 
 function limpiarFormulario() {
   document.getElementById('observaciones').value = '';
-  document.getElementById('fecha').valueAsDate = new Date();
-  document.getElementById('cuadrilla-select').value = '';
-  MATERIALES.forEach(m => { document.getElementById(m.id).value = ''; });
-  document.querySelectorAll('.integrante-check input').forEach(c => c.checked = false);
+  if (rolActual === 'admin') {
+    document.getElementById('fecha').valueAsDate = new Date();
+    document.getElementById('cuadrilla-select').value = '';
+    document.querySelectorAll('.integrante-check input').forEach(c => c.checked = false);
+    document.getElementById('cuadrilla-asignada-box').style.display = 'none';
+  } else {
+    document.getElementById('fecha-trabajador').valueAsDate = new Date();
+  }
+  MATERIALES.forEach(m => { const el = document.getElementById(m.id); if(el) el.value = ''; });
   actividadesSeleccionadas.clear();
   document.querySelectorAll('.actividad-btn').forEach(b => b.classList.remove('selected'));
   document.getElementById('incidencias-panel').style.display = 'none';
   document.getElementById('ips-panel').style.display = 'none';
   document.getElementById('ips-lista').innerHTML = '';
-  document.getElementById('num-incidencias').value = '';
+  const ni = document.getElementById('num-incidencias');
+  if (ni) ni.value = '';
+  document.querySelectorAll('.inc-check').forEach(c => c.checked = false);
   ipCounter = 0;
+  cuadrillaSeleccionadaId = null;
 }
 
+// ── Historial ────────────────────────────────────────────
 async function cargarHistorial() {
   try {
     const res = await fetch('/api/reportes');
@@ -315,11 +339,13 @@ function renderHistorial(reportes) {
     const fotos = r.fotos || [];
     const ips = r.ips || [];
     const incidencias = r.incidencias || [];
+    const cuadrilla = todasLasCuadrillas.find(c => c.id === r.cuadrillaId);
     return `
       <div class="reporte-card">
         <div class="reporte-header" onclick="toggleReporte(${r.id})">
           <div>
             <div class="reporte-fecha">${dia}, ${r.fecha}</div>
+            ${cuadrilla ? `<div style="font-size:11px;color:var(--accent);margin-top:2px;">🏷️ ${cuadrilla.nombre}</div>` : ''}
             <div class="reporte-integrantes">👷 ${r.integrantes.join(' · ')}</div>
             ${acts ? `<div style="font-size:11px;color:var(--muted);margin-top:2px;">${acts}</div>` : ''}
           </div>
@@ -329,18 +355,23 @@ function renderHistorial(reportes) {
           </div>
         </div>
         <div class="reporte-body" id="body-${r.id}" style="display:none;">
+          ${cuadrilla ? `
+            <div style="background:linear-gradient(135deg,rgba(0,212,170,0.08),rgba(0,153,255,0.03));border:1px solid rgba(0,212,170,0.3);border-radius:10px;padding:1rem;margin-bottom:10px;">
+              <div style="font-size:10px;color:var(--accent);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;">Cuadrilla</div>
+              <div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:6px;">${cuadrilla.nombre}</div>
+              <div style="display:flex;flex-wrap:wrap;gap:5px;">
+                ${cuadrilla.integrantes.map(i => `<span style="font-size:11px;background:rgba(0,212,170,0.15);border:1px solid rgba(0,212,170,0.3);border-radius:20px;padding:2px 8px;color:var(--accent);">👷 ${i}</span>`).join('')}
+              </div>
+            </div>` : ''}
+
           ${r.observaciones ? `<div class="obs-box">${r.observaciones}</div>` : ''}
 
           ${incidencias.length > 0 ? `
             <div style="margin-bottom:10px;">
-              <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px;">⚠️ Incidencias</div>
+              <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px;">⚠️ Incidencias${r.numIncidencias ? ` (${r.numIncidencias} atendidas)` : ''}</div>
               <div style="display:flex;flex-wrap:wrap;gap:6px;">
-                ${incidencias.map(i => INCIDENCIAS_INFO[i] ? `
-                  <span style="font-size:12px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:3px 8px;">
-                    ${INCIDENCIAS_INFO[i].icon} ${INCIDENCIAS_INFO[i].label}
-                  </span>` : '').join('')}
+                ${incidencias.map(i => INCIDENCIAS_INFO[i] ? `<span style="font-size:12px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:3px 8px;">${INCIDENCIAS_INFO[i].icon} ${INCIDENCIAS_INFO[i].label}</span>` : '').join('')}
               </div>
-              ${r.numIncidencias ? `<div style="font-size:12px;color:var(--muted);margin-top:4px;">Total atendidas: <strong>${r.numIncidencias}</strong></div>` : ''}
             </div>` : ''}
 
           ${ips.length > 0 ? `
@@ -358,7 +389,7 @@ function renderHistorial(reportes) {
 
           <div style="margin-top:1rem;">
             <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">📷 Fotos del trabajo</div>
-            <div id="fotos-${r.id}" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
+            <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
               ${fotos.map(f => `
                 <div style="position:relative;">
                   <img src="${f.url}" style="width:100px;height:100px;object-fit:cover;border-radius:8px;border:1px solid var(--border);cursor:pointer;" onclick="verFoto('${f.url}')" />
@@ -399,10 +430,8 @@ async function eliminarReporte(id) {
 function editarReporte(id) {
   const r = todosLosReportes.find(x => x.id === id);
   if (!r) return;
-
   const overlay = document.createElement('div');
   overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);z-index:500;display:flex;align-items:center;justify-content:center;padding:1rem;';
-
   overlay.innerHTML = `
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.5rem;width:100%;max-width:500px;max-height:90vh;overflow-y:auto;">
       <h3 style="color:var(--accent);font-size:14px;margin-bottom:1rem;font-family:'IBM Plex Mono',monospace;">✏️ Editar reporte</h3>
@@ -416,10 +445,9 @@ function editarReporte(id) {
       </div>
       <div style="display:flex;gap:8px;margin-top:1rem;">
         <button onclick="guardarEdicion(${id})" style="flex:1;background:var(--accent);color:#000;border:none;border-radius:8px;font-size:13px;font-weight:600;padding:10px;cursor:pointer;">Guardar</button>
-        <button onclick="this.closest('[style*=fixed]').remove()" style="flex:1;background:none;border:1px solid var(--border);border-radius:8px;font-size:13px;color:var(--text);padding:10px;cursor:pointer;">Cancelar</button>
+        <button onclick="this.closest('div[style*=fixed]').remove()" style="flex:1;background:none;border:1px solid var(--border);border-radius:8px;font-size:13px;color:var(--text);padding:10px;cursor:pointer;">Cancelar</button>
       </div>
     </div>`;
-
   document.body.appendChild(overlay);
 }
 
@@ -435,7 +463,7 @@ async function guardarEdicion(id) {
     const data = await res.json();
     if (data.ok) {
       toast('✓ Reporte editado');
-      document.querySelector('[style*=fixed]')?.remove();
+      document.querySelector('div[style*="position:fixed"]')?.remove();
       await cargarHistorial();
     }
   } catch(e) { toast('Error al editar'); }
@@ -455,7 +483,6 @@ function exportarReporteExcel(id) {
     'IPs': (r.ips || []).join(', ')
   }));
   const ws = XLSX.utils.json_to_sheet(datos);
-  ws['!cols'] = [{wch:12},{wch:12},{wch:40},{wch:35},{wch:25},{wch:10},{wch:8},{wch:40},{wch:30}];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Reporte');
   XLSX.writeFile(wb, `reporte_${r.fecha}.xlsx`);
@@ -480,7 +507,6 @@ function exportarTodoExcel() {
     });
   });
   const ws = XLSX.utils.json_to_sheet(filas);
-  ws['!cols'] = [{wch:12},{wch:12},{wch:40},{wch:35},{wch:25},{wch:10},{wch:8},{wch:40},{wch:30}];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Historial');
   XLSX.writeFile(wb, `historial_${new Date().toISOString().slice(0,10)}.xlsx`);
@@ -519,6 +545,64 @@ function verFoto(url) {
   document.body.appendChild(overlay);
 }
 
+// ── Cuadrillas (admin) ───────────────────────────────────
+async function cargarCuadrillas() {
+  try {
+    const res = await fetch('/api/cuadrillas');
+    todasLasCuadrillas = await res.json();
+    const cont = document.getElementById('lista-cuadrillas');
+    if (!todasLasCuadrillas.length) {
+      cont.innerHTML = '<p class="empty">No hay cuadrillas creadas.</p>';
+      return;
+    }
+    cont.innerHTML = todasLasCuadrillas.map(c => `
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:1rem;margin-bottom:8px;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
+          <div>
+            <div style="font-weight:600;color:var(--accent);font-size:15px;">${c.nombre}</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:2px;">📅 ${c.fecha}</div>
+          </div>
+          <button class="btn-danger" onclick="eliminarCuadrilla(${c.id})" style="font-size:12px;padding:5px 10px;">Eliminar</button>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:5px;">
+          ${c.integrantes.map(i => `<span style="font-size:12px;background:rgba(0,212,170,0.1);border:1px solid rgba(0,212,170,0.3);border-radius:20px;padding:3px 10px;color:var(--accent);">👷 ${i}</span>`).join('')}
+        </div>
+      </div>`).join('');
+  } catch(e) {}
+}
+
+async function crearCuadrilla() {
+  const nombre = document.getElementById('cuadrilla-nombre').value.trim();
+  const fecha = document.getElementById('cuadrilla-fecha').value;
+  const integrantes = [...document.querySelectorAll('.cuadrilla-int:checked')].map(i => i.value);
+  if (!nombre) { toast('⚠ Ingresa un nombre'); return; }
+  if (!fecha) { toast('⚠ Selecciona la fecha'); return; }
+  if (!integrantes.length) { toast('⚠ Selecciona al menos un integrante'); return; }
+  try {
+    const res = await fetch('/api/cuadrillas', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nombre, fecha, integrantes })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      toast('✓ Cuadrilla creada');
+      document.getElementById('cuadrilla-nombre').value = '';
+      document.querySelectorAll('.cuadrilla-int').forEach(c => c.checked = false);
+      await cargarCuadrillas();
+      await cargarCuadrillasSelect();
+    }
+  } catch(e) { toast('Error al crear cuadrilla'); }
+}
+
+async function eliminarCuadrilla(id) {
+  if (!confirm('¿Eliminar esta cuadrilla?')) return;
+  await fetch('/api/cuadrillas/' + id, { method: 'DELETE' });
+  toast('Cuadrilla eliminada');
+  await cargarCuadrillas();
+  await cargarCuadrillasSelect();
+}
+
 // ── Bodega ───────────────────────────────────────────────
 async function cargarBodega() {
   try {
@@ -534,10 +618,7 @@ async function cargarBodega() {
 
 function renderStock() {
   const cont = document.getElementById('tabla-stock');
-  if (!stockActual.length) {
-    cont.innerHTML = '<p class="empty">No hay stock registrado.</p>';
-    return;
-  }
+  if (!stockActual.length) { cont.innerHTML = '<p class="empty">No hay stock registrado.</p>'; return; }
   cont.innerHTML = `
     <table class="mat-table">
       <thead><tr><th>Material</th><th>Stock disponible</th><th>Estado</th></tr></thead>
@@ -626,10 +707,7 @@ async function cargarMovimientos() {
     const res = await fetch('/api/bodega/movimientos');
     const movimientos = await res.json();
     const cont = document.getElementById('tabla-movimientos');
-    if (!movimientos.length) {
-      cont.innerHTML = '<p class="empty">No hay movimientos registrados.</p>';
-      return;
-    }
+    if (!movimientos.length) { cont.innerHTML = '<p class="empty">No hay movimientos registrados.</p>'; return; }
     const colores = { salida: 'var(--danger)', entrada: 'var(--accent)', devolucion: '#f59e0b' };
     cont.innerHTML = `
       <table class="mat-table">
@@ -662,7 +740,6 @@ function exportarBodegaExcel() {
   if (!stockActual.length) { toast('⚠ No hay stock para exportar'); return; }
   const datos = stockActual.map(s => ({ 'Material': s.material, 'Stock disponible': s.cantidad }));
   const ws = XLSX.utils.json_to_sheet(datos);
-  ws['!cols'] = [{wch:30},{wch:20}];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Stock');
   XLSX.writeFile(wb, `bodega_${new Date().toISOString().slice(0,10)}.xlsx`);
@@ -699,35 +776,21 @@ function barMeta(valor, meta) {
 
 function calcularBadge(reportes, actividades, numPersonas = 5) {
   if (reportes.length === 0) return { badge: 'Sin registro', color: 'var(--muted)', bg: 'var(--surface2)' };
-
   const fibra = getMat(reportes, 'Fibra Principal');
   const cajas = getMat(reportes, 'Cajas NAT');
   const numIncidencias = reportes.reduce((s, r) => s + (r.numIncidencias || 0), 0);
   const acts = new Set(actividades);
 
-  // Condiciones por casos específicos
-  // 5 personas pasan 2km → productivo
   if (numPersonas >= 5 && fibra >= 2000 && acts.has('fibra')) return { badge: 'Productivo', color: '#3B6D11', bg: '#EAF3DE' };
-  // 3 personas pasan 1.5km → productivo
   if (numPersonas === 3 && fibra >= 1500 && acts.has('fibra')) return { badge: 'Productivo', color: '#3B6D11', bg: '#EAF3DE' };
-  // 5 personas pasan 500m + cajas + (instalacion o mudanza) → productivo
   if (numPersonas >= 5 && fibra >= 500 && acts.has('fibra') && acts.has('cajas') && (acts.has('instalacion') || acts.has('mudanza'))) return { badge: 'Productivo', color: '#3B6D11', bg: '#EAF3DE' };
-  // 2 personas arman 5 cajas → productivo
   if (numPersonas <= 2 && cajas >= 5 && acts.has('cajas')) return { badge: 'Productivo', color: '#3B6D11', bg: '#EAF3DE' };
-  // 2 personas armado ODF → productivo
   if (numPersonas <= 2 && acts.has('odf')) return { badge: 'Productivo', color: '#3B6D11', bg: '#EAF3DE' };
-  // 2 personas armado mangas → productivo
   if (numPersonas <= 2 && acts.has('mangas')) return { badge: 'Productivo', color: '#3B6D11', bg: '#EAF3DE' };
-  // 2 personas más de 6 incidencias → productivo
   if (numPersonas <= 2 && numIncidencias > 6 && acts.has('incidencias')) return { badge: 'Productivo', color: '#3B6D11', bg: '#EAF3DE' };
-  // Instalación cliente = siempre productivo
   if (acts.has('instalacion')) return { badge: 'Productivo', color: '#3B6D11', bg: '#EAF3DE' };
-  // Mudanza = productivo
   if (acts.has('mudanza')) return { badge: 'Productivo', color: '#3B6D11', bg: '#EAF3DE' };
-
-  // Parcial — algo se hizo pero no cumple meta completa
   if (fibra > 0 || cajas > 0 || numIncidencias > 0) return { badge: 'Parcial', color: '#854F0B', bg: '#FAEEDA' };
-
   return { badge: 'Bajo', color: '#A32D2D', bg: '#FCEBEB' };
 }
 
@@ -755,7 +818,6 @@ async function iniciarIndicadores() {
 function cargarIndicadores() {
   semanaActual = document.getElementById('semana-select').value;
   if (!semanaActual) return;
-
   const inicio = new Date(semanaActual + 'T12:00:00');
   const diasSemana = [];
   for (let i = 0; i < 6; i++) {
@@ -763,23 +825,18 @@ function cargarIndicadores() {
     d.setDate(d.getDate() + i);
     diasSemana.push(d.toISOString().slice(0, 10));
   }
-
   const reportesPorFecha = {};
   todosLosReportes.forEach(r => {
     if (!reportesPorFecha[r.fecha]) reportesPorFecha[r.fecha] = [];
     reportesPorFecha[r.fecha].push(r);
   });
-
   const nombres = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
-  let diasProductivos = 0;
-  let totalFibra = 0;
-  let totalCajas = 0;
-  let totalInstalaciones = 0;
+  let diasProductivos = 0, totalFibra = 0, totalCajas = 0, totalInstalaciones = 0;
 
   diasSemana.slice(0, 5).forEach(fecha => {
     const reportes = reportesPorFecha[fecha] || [];
     const actividades = [...new Set(reportes.flatMap(r => r.actividades || []))];
-    const integrantes = [...new Set(reportes.flatMap(r => Array.isArray(r.integrantes) ? r.integrantes : r.integrantes.split(',').map(x => x.trim())))];
+    const integrantes = [...new Set(reportes.flatMap(r => Array.isArray(r.integrantes) ? r.integrantes : []))];
     const numPersonas = integrantes.length || 5;
     const { badge } = calcularBadge(reportes, actividades, numPersonas);
     if (badge === 'Productivo') diasProductivos++;
@@ -817,21 +874,21 @@ function cargarIndicadores() {
     const reportes = reportesPorFecha[fecha] || [];
     const esSabado = i === 5;
     const actividades = [...new Set(reportes.flatMap(r => r.actividades || []))];
-    const integrantes = [...new Set(reportes.flatMap(r => Array.isArray(r.integrantes) ? r.integrantes : r.integrantes.split(',').map(x => x.trim())))];
+    const integrantes = [...new Set(reportes.flatMap(r => Array.isArray(r.integrantes) ? r.integrantes : []))];
     const numPersonas = integrantes.length || 5;
     const metaFibra = numPersonas >= 5 ? 2000 : numPersonas === 3 ? 1500 : Math.round(2000 * numPersonas / 5);
     const fibra = getMat(reportes, 'Fibra Principal');
     const cajas = getMat(reportes, 'Cajas NAT');
     const numIncidencias = reportes.reduce((s, r) => s + (r.numIncidencias || 0), 0);
+    const ips = [...new Set(reportes.flatMap(r => r.ips || []))];
+    const incidencias = [...new Set(reportes.flatMap(r => r.incidencias || []))];
+    const cuadrilla = todasLasCuadrillas.find(c => reportes.some(r => r.cuadrillaId === c.id));
 
     let badgeInfo = esSabado
       ? { badge: 'Extra', color: '#854F0B', bg: '#FAEEDA' }
       : calcularBadge(reportes, actividades, numPersonas);
 
     const observaciones = reportes.map(r => r.observaciones).filter(Boolean);
-    const ips = [...new Set(reportes.flatMap(r => r.ips || []))];
-    const incidencias = [...new Set(reportes.flatMap(r => r.incidencias || []))];
-
     const actsHTML = actividades.length > 0 ? `
       <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">
         ${actividades.map(a => ACTIVIDADES_INFO[a] ? `
@@ -850,13 +907,14 @@ function cargarIndicadores() {
           <div>
             <span style="font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:600;color:var(--accent);">${nombres[i]}</span>
             <span style="font-size:12px;color:var(--muted);margin-left:8px;">${fecha}</span>
-            ${numPersonas < 5 && !esSabado && reportes.length > 0 ? `<span style="font-size:10px;background:#FAEEDA;color:#854F0B;padding:2px 7px;border-radius:10px;margin-left:6px;">👥 ${numPersonas}/5 personas</span>` : ''}
+            ${numPersonas < 5 && !esSabado && reportes.length > 0 ? `<span style="font-size:10px;background:#FAEEDA;color:#854F0B;padding:2px 7px;border-radius:10px;margin-left:6px;">👥 ${numPersonas}/5</span>` : ''}
             ${esSabado ? '<span style="font-size:10px;background:var(--surface);border:1px solid var(--border);color:var(--muted);padding:2px 6px;border-radius:10px;margin-left:6px;">horas extra</span>' : ''}
           </div>
           <span style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;background:${badgeInfo.bg};color:${badgeInfo.color};">${badgeInfo.badge}</span>
         </div>
 
         ${reportes.length === 0 ? '<p style="font-size:12px;color:var(--muted);text-align:center;padding:0.5rem 0;">Sin actividad registrada</p>' : `
+          ${cuadrilla ? `<div style="font-size:12px;color:var(--accent);margin-bottom:8px;">🏷️ ${cuadrilla.nombre}</div>` : ''}
           ${actsHTML}
           ${integrantes.length > 0 ? `
             <div style="margin-bottom:10px;">
@@ -868,18 +926,13 @@ function cargarIndicadores() {
               <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:3px;">📋 Observaciones</div>
               <div style="font-size:13px;line-height:1.5;">${observaciones.join(' | ')}</div>
             </div>` : ''}
-
           ${incidencias.length > 0 || numIncidencias > 0 ? `
             <div style="margin-bottom:10px;">
               <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px;">⚠️ Incidencias${numIncidencias > 0 ? ` (${numIncidencias} atendidas)` : ''}</div>
               <div style="display:flex;flex-wrap:wrap;gap:6px;">
-                ${incidencias.map(i => INCIDENCIAS_INFO[i] ? `
-                  <span style="font-size:12px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:3px 8px;">
-                    ${INCIDENCIAS_INFO[i].icon} ${INCIDENCIAS_INFO[i].label}
-                  </span>` : '').join('')}
+                ${incidencias.map(i => INCIDENCIAS_INFO[i] ? `<span style="font-size:12px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:3px 8px;">${INCIDENCIAS_INFO[i].icon} ${INCIDENCIAS_INFO[i].label}</span>` : '').join('')}
               </div>
             </div>` : ''}
-
           ${ips.length > 0 ? `
             <div style="margin-bottom:10px;">
               <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px;">🌐 IPs atendidas</div>
@@ -887,7 +940,6 @@ function cargarIndicadores() {
                 ${ips.map(ip => `<span style="font-size:12px;font-family:'IBM Plex Mono',monospace;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:3px 8px;">${ip}</span>`).join('')}
               </div>
             </div>` : ''}
-
           <div style="margin-bottom:12px;">
             <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">📊 Rendimiento del día</div>
             ${actividades.includes('fibra') ? `
@@ -914,48 +966,17 @@ function cargarIndicadores() {
                 </div>
                 ${barMeta(numIncidencias, 6)}
               </div>` : ''}
-            ${actividades.includes('instalacion') ? `
+            ${['instalacion','mudanza','odf','mangas'].filter(a => actividades.includes(a)).map(a => `
               <div style="margin-bottom:8px;">
                 <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
-                  <span style="font-size:12px;color:var(--text);">🔌 Instalación cliente</span>
+                  <span style="font-size:12px;color:var(--text);">${ACTIVIDADES_INFO[a].icon} ${ACTIVIDADES_INFO[a].label}</span>
                   <span style="font-size:11px;color:var(--accent);">✓ Productivo</span>
                 </div>
                 <div style="height:7px;background:#EAF3DE;border-radius:4px;">
                   <div style="width:100%;height:100%;background:#1D9E75;border-radius:4px;"></div>
                 </div>
-              </div>` : ''}
-            ${actividades.includes('mudanza') ? `
-              <div style="margin-bottom:8px;">
-                <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
-                  <span style="font-size:12px;color:var(--text);">🔄 Mudanza radio a fibra</span>
-                  <span style="font-size:11px;color:var(--accent);">✓ Productivo</span>
-                </div>
-                <div style="height:7px;background:#EAF3DE;border-radius:4px;">
-                  <div style="width:100%;height:100%;background:#1D9E75;border-radius:4px;"></div>
-                </div>
-              </div>` : ''}
-            ${actividades.includes('odf') ? `
-              <div style="margin-bottom:8px;">
-                <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
-                  <span style="font-size:12px;color:var(--text);">🗄️ Armado ODF</span>
-                  <span style="font-size:11px;color:var(--accent);">✓ Productivo</span>
-                </div>
-                <div style="height:7px;background:#EAF3DE;border-radius:4px;">
-                  <div style="width:100%;height:100%;background:#1D9E75;border-radius:4px;"></div>
-                </div>
-              </div>` : ''}
-            ${actividades.includes('mangas') ? `
-              <div style="margin-bottom:8px;">
-                <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
-                  <span style="font-size:12px;color:var(--text);">🔧 Armado mangas</span>
-                  <span style="font-size:11px;color:var(--accent);">✓ Productivo</span>
-                </div>
-                <div style="height:7px;background:#EAF3DE;border-radius:4px;">
-                  <div style="width:100%;height:100%;background:#1D9E75;border-radius:4px;"></div>
-                </div>
-              </div>` : ''}
+              </div>`).join('')}
           </div>
-
           ${todosMat.length > 0 ? `
           <div>
             <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">📦 Materiales utilizados</div>
@@ -964,11 +985,7 @@ function cargarIndicadores() {
                 ${todosMat.map(m => `
                   <tr>
                     <td style="font-size:12px;color:var(--text);padding:5px 8px 5px 0;width:150px;white-space:nowrap;">${m.label}</td>
-                    <td style="padding:5px 8px;">
-                      <div style="height:6px;background:var(--surface);border-radius:3px;overflow:hidden;">
-                        <div style="width:100%;height:100%;background:#1D9E75;border-radius:3px;"></div>
-                      </div>
-                    </td>
+                    <td style="padding:5px 8px;"><div style="height:6px;background:var(--surface);border-radius:3px;overflow:hidden;"><div style="width:100%;height:100%;background:#1D9E75;border-radius:3px;"></div></div></td>
                     <td style="font-size:12px;color:var(--muted);padding:5px 0;text-align:right;white-space:nowrap;width:80px;">${m.val} ${m.unidad}</td>
                   </tr>`).join('')}
               </tbody>
@@ -998,7 +1015,6 @@ function cargarIndicadores() {
     </div>`).join('');
 }
 
-// ── Exportar informe semanal ──────────────────────────────
 function exportarInformeSemanal() {
   if (!semanaActual) { toast('⚠ Selecciona una semana'); return; }
   const inicio = new Date(semanaActual + 'T12:00:00');
@@ -1019,7 +1035,7 @@ function exportarInformeSemanal() {
   diasSemana.forEach((fecha, i) => {
     const reportes = reportesPorFecha[fecha] || [];
     const actividades = [...new Set(reportes.flatMap(r => r.actividades || []))];
-    const integrantes = [...new Set(reportes.flatMap(r => Array.isArray(r.integrantes) ? r.integrantes : r.integrantes.split(',').map(x => x.trim())))];
+    const integrantes = [...new Set(reportes.flatMap(r => Array.isArray(r.integrantes) ? r.integrantes : []))];
     const numPersonas = integrantes.length || 5;
     const { badge } = i === 5 ? { badge: 'Extra' } : calcularBadge(reportes, actividades, numPersonas);
     const fibra = getMat(reportes, 'Fibra Principal');
@@ -1029,22 +1045,21 @@ function exportarInformeSemanal() {
     const numIncidencias = reportes.reduce((s, r) => s + (r.numIncidencias || 0), 0);
     const ips = [...new Set(reportes.flatMap(r => r.ips || []))];
     const obs = reportes.map(r => r.observaciones).filter(Boolean).join(' | ');
+    const cuadrilla = todasLasCuadrillas.find(c => reportes.some(r => r.cuadrillaId === c.id));
     resumenFilas.push({
       'Día': nombres[i], 'Fecha': fecha, 'Estado': badge,
+      'Cuadrilla': cuadrilla ? cuadrilla.nombre : '—',
       'Personas': numPersonas,
       'Actividades': actividades.map(a => ACTIVIDADES_INFO[a]?.label || a).join(', ') || '—',
       'Integrantes': integrantes.join(', ') || '—',
       'Fibra Principal (m)': fibra,
       'Herrajes A': herrajesA, 'Herrajes U': herrajesU,
-      'Herrajes total': herrajesA + herrajesU,
-      'Cajas NAT': cajas,
-      'Incidencias': numIncidencias,
+      'Cajas NAT': cajas, 'Incidencias': numIncidencias,
       'IPs': ips.join(', ') || '—',
       'Observaciones': obs || '—'
     });
   });
   const wsResumen = XLSX.utils.json_to_sheet(resumenFilas);
-  wsResumen['!cols'] = [{wch:12},{wch:12},{wch:14},{wch:10},{wch:45},{wch:35},{wch:18},{wch:12},{wch:12},{wch:14},{wch:12},{wch:12},{wch:30},{wch:40}];
   XLSX.utils.book_append_sheet(wb, wsResumen, 'Resumen semanal');
   const matFilas = [];
   diasSemana.forEach((fecha, i) => {
@@ -1055,14 +1070,13 @@ function exportarInformeSemanal() {
         matFilas.push({
           'Día': nombres[i], 'Fecha': fecha,
           'Actividades': actividades.map(a => ACTIVIDADES_INFO[a]?.label || a).join(', ') || '—',
-          'Integrantes': Array.isArray(r.integrantes) ? r.integrantes.join(', ') : r.integrantes,
+          'Integrantes': Array.isArray(r.integrantes) ? r.integrantes.join(', ') : '',
           'Material': m.material, 'Cantidad': m.cantidad, 'Unidad': m.unidad
         });
       });
     });
   });
   const wsMat = XLSX.utils.json_to_sheet(matFilas);
-  wsMat['!cols'] = [{wch:12},{wch:12},{wch:45},{wch:35},{wch:28},{wch:12},{wch:8}];
   XLSX.utils.book_append_sheet(wb, wsMat, 'Detalle materiales');
   XLSX.writeFile(wb, `informe_semana_${semanaActual}.xlsx`);
   toast('✓ Informe semanal exportado');
