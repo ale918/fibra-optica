@@ -40,8 +40,8 @@ let todasLasCuadrillas = [];
 let stockActual = [];
 let semanaActual = '';
 let rolActual = '';
+let cuadrillaHoyId = null;
 let ipCounter = 0;
-let cuadrillaSeleccionadaId = null;
 
 // ── Init ─────────────────────────────────────────────────
 async function init() {
@@ -51,96 +51,156 @@ async function init() {
     if (!data.loggedIn) { window.location.href = '/'; return; }
     rolActual = data.rol;
 
-    if (rolActual === 'admin') {
-      document.getElementById('tab-cuadrillas-btn').style.display = 'inline-flex';
-      document.getElementById('admin-cuadrilla-selector').style.display = 'block';
-      document.getElementById('trabajador-fecha-box').style.display = 'none';
-      await cargarCuadrillasSelect();
-    } else {
-      document.getElementById('admin-cuadrilla-selector').style.display = 'none';
-      document.getElementById('trabajador-fecha-box').style.display = 'block';
-      document.getElementById('fecha-trabajador').valueAsDate = new Date();
-      await cargarCuadrillaHoy();
-    }
+    // Cargar cuadrillas siempre
+    await cargarTodasLasCuadrillas();
 
-    document.getElementById('fecha') && (document.getElementById('fecha').valueAsDate = new Date());
-    document.getElementById('cuadrilla-fecha') && (document.getElementById('cuadrilla-fecha').valueAsDate = new Date());
+    // Generar tabs según rol
+    const tabsContainer = document.getElementById('nav-tabs');
+    if (rolActual === 'admin') {
+      tabsContainer.innerHTML = `
+        <button class="tab active" onclick="mostrarTab('historial')">Historial</button>
+        <button class="tab" onclick="mostrarTab('bodega')">Bodega</button>
+        <button class="tab" onclick="mostrarTab('indicadores')">Indicadores</button>
+        <button class="tab" onclick="mostrarTab('cuadrillas')">Cuadrillas</button>`;
+      mostrarTab('historial');
+    } else {
+      tabsContainer.innerHTML = `
+        <button class="tab active" onclick="mostrarTab('registro')">Nuevo registro</button>
+        <button class="tab" onclick="mostrarTab('historial')">Historial</button>`;
+      document.getElementById('fecha').valueAsDate = new Date();
+      document.getElementById('cuadrilla-fecha') && (document.getElementById('cuadrilla-fecha').valueAsDate = new Date());
+      await cargarCuadrillaHoy();
+      mostrarTab('registro');
+    }
 
     cargarConectados();
     setInterval(cargarConectados, 30000);
-  } catch(e) { console.error(e); }
+  } catch(e) { console.error('Init error:', e); }
 }
 init();
 
-// ── Cuadrilla del día para trabajadores ──────────────────
+// ── Cuadrillas ───────────────────────────────────────────
+async function cargarTodasLasCuadrillas() {
+  try {
+    const res = await fetch('/api/cuadrillas');
+    if (!res.ok) throw new Error('Error ' + res.status);
+    todasLasCuadrillas = await res.json();
+  } catch(e) {
+    console.error('Error cargando cuadrillas:', e);
+    todasLasCuadrillas = [];
+  }
+}
+
 async function cargarCuadrillaHoy() {
-  try {
-    const res = await fetch('/api/cuadrillas');
-    todasLasCuadrillas = await res.json();
-    const hoy = new Date().toISOString().slice(0, 10);
-    const cuadrilla = todasLasCuadrillas.find(c => c.fecha === hoy);
-    const box = document.getElementById('cuadrilla-asignada-box');
-    if (cuadrilla) {
-      cuadrillaSeleccionadaId = cuadrilla.id;
-      box.style.display = 'block';
-      box.innerHTML = `
-        <div style="background:linear-gradient(135deg,rgba(0,212,170,0.1),rgba(0,153,255,0.05));border:1px solid var(--accent);border-radius:12px;padding:1.25rem;margin-bottom:1.25rem;">
-          <div style="font-size:10px;color:var(--accent);text-transform:uppercase;letter-spacing:0.08em;font-family:'IBM Plex Mono',monospace;margin-bottom:8px;">Cuadrilla asignada hoy</div>
-          <div style="font-size:18px;font-weight:600;color:var(--text);margin-bottom:8px;">${cuadrilla.nombre}</div>
-          <div style="display:flex;flex-wrap:wrap;gap:6px;">
-            ${cuadrilla.integrantes.map(i => `
-              <span style="font-size:12px;background:rgba(0,212,170,0.15);border:1px solid rgba(0,212,170,0.3);border-radius:20px;padding:3px 10px;color:var(--accent);">
-                👷 ${i}
-              </span>`).join('')}
-          </div>
-        </div>`;
-    } else {
-      box.style.display = 'none';
-      cuadrillaSeleccionadaId = null;
-    }
-  } catch(e) {}
-}
+  const hoy = new Date().toISOString().slice(0, 10);
+  const cuadrilla = todasLasCuadrillas.find(c => c.fecha === hoy);
+  const box = document.getElementById('cuadrilla-hoy-box');
+  if (!box) return;
 
-// ── Cuadrillas select para admin ─────────────────────────
-async function cargarCuadrillasSelect() {
-  try {
-    const res = await fetch('/api/cuadrillas');
-    todasLasCuadrillas = await res.json();
-    const sel = document.getElementById('cuadrilla-select');
-    if (!sel) return;
-    sel.innerHTML = '<option value="">Sin cuadrilla asignada</option>' +
-      todasLasCuadrillas.map(c => `<option value="${c.id}">${c.nombre} — ${c.fecha}</option>`).join('');
-  } catch(e) {}
-}
-
-function seleccionarCuadrilla() {
-  const id = parseInt(document.getElementById('cuadrilla-select').value);
-  cuadrillaSeleccionadaId = id || null;
-  const cuadrilla = todasLasCuadrillas.find(c => c.id === id);
-
-  // Mostrar cuadro de cuadrilla para admin también
-  const box = document.getElementById('cuadrilla-asignada-box');
   if (cuadrilla) {
-    box.style.display = 'block';
+    cuadrillaHoyId = cuadrilla.id;
     box.innerHTML = `
       <div style="background:linear-gradient(135deg,rgba(0,212,170,0.1),rgba(0,153,255,0.05));border:1px solid var(--accent);border-radius:12px;padding:1.25rem;margin-bottom:1.25rem;">
-        <div style="font-size:10px;color:var(--accent);text-transform:uppercase;letter-spacing:0.08em;font-family:'IBM Plex Mono',monospace;margin-bottom:8px;">Cuadrilla seleccionada</div>
-        <div style="font-size:18px;font-weight:600;color:var(--text);margin-bottom:8px;">${cuadrilla.nombre}</div>
+        <div style="font-size:10px;color:var(--accent);text-transform:uppercase;letter-spacing:0.08em;font-family:'IBM Plex Mono',monospace;margin-bottom:6px;">Tu cuadrilla de hoy</div>
+        <div style="font-size:18px;font-weight:600;color:var(--text);margin-bottom:10px;">${cuadrilla.nombre}</div>
         <div style="display:flex;flex-wrap:wrap;gap:6px;">
           ${cuadrilla.integrantes.map(i => `
-            <span style="font-size:12px;background:rgba(0,212,170,0.15);border:1px solid rgba(0,212,170,0.3);border-radius:20px;padding:3px 10px;color:var(--accent);">
+            <span style="font-size:12px;background:rgba(0,212,170,0.15);border:1px solid rgba(0,212,170,0.3);border-radius:20px;padding:4px 12px;color:var(--accent);">
               👷 ${i}
             </span>`).join('')}
         </div>
       </div>`;
-    // Auto-marcar integrantes
-    document.querySelectorAll('.integrante-check input').forEach(cb => {
-      cb.checked = cuadrilla.integrantes.includes(cb.value);
-    });
   } else {
-    box.style.display = 'none';
-    document.querySelectorAll('.integrante-check input').forEach(cb => cb.checked = false);
+    cuadrillaHoyId = null;
+    box.innerHTML = `
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:1rem;margin-bottom:1.25rem;text-align:center;">
+        <div style="font-size:13px;color:var(--muted);">No hay cuadrilla asignada para hoy</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:4px;">El administrador aún no ha creado la cuadrilla del día</div>
+      </div>`;
   }
+}
+
+async function cargarCuadrillas() {
+  await cargarTodasLasCuadrillas();
+  const cont = document.getElementById('lista-cuadrillas');
+  if (!cont) return;
+  if (!todasLasCuadrillas.length) {
+    cont.innerHTML = '<p class="empty">No hay cuadrillas creadas.</p>';
+    return;
+  }
+  cont.innerHTML = todasLasCuadrillas.map(c => `
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:1rem;margin-bottom:8px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
+        <div>
+          <div style="font-weight:600;color:var(--accent);font-size:15px;">${c.nombre}</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px;">📅 ${c.fecha}</div>
+        </div>
+        <button class="btn-danger" onclick="eliminarCuadrilla(${c.id})" style="font-size:12px;padding:5px 10px;">Eliminar</button>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:5px;">
+        ${c.integrantes.map(i => `
+          <span style="font-size:12px;background:rgba(0,212,170,0.1);border:1px solid rgba(0,212,170,0.3);border-radius:20px;padding:3px 10px;color:var(--accent);">
+            👷 ${i}
+          </span>`).join('')}
+      </div>
+    </div>`).join('');
+}
+
+async function crearCuadrilla() {
+  const nombre = document.getElementById('cuadrilla-nombre').value.trim();
+  const fecha = document.getElementById('cuadrilla-fecha').value;
+  const integrantes = [...document.querySelectorAll('.cuadrilla-int:checked')].map(i => i.value);
+
+  if (!nombre) { toast('⚠ Ingresa un nombre para la cuadrilla'); return; }
+  if (!fecha) { toast('⚠ Selecciona la fecha'); return; }
+  if (!integrantes.length) { toast('⚠ Selecciona al menos un integrante'); return; }
+
+  try {
+    const res = await fetch('/api/cuadrillas', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nombre, fecha, integrantes })
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      toast('Error: ' + err.error);
+      return;
+    }
+    const data = await res.json();
+    if (data.ok) {
+      toast('✓ Cuadrilla creada correctamente');
+      document.getElementById('cuadrilla-nombre').value = '';
+      document.querySelectorAll('.cuadrilla-int').forEach(c => c.checked = false);
+      await cargarCuadrillas();
+    }
+  } catch(e) {
+    toast('Error al crear cuadrilla: ' + e.message);
+  }
+}
+
+async function eliminarCuadrilla(id) {
+  if (!confirm('¿Eliminar esta cuadrilla?')) return;
+  try {
+    await fetch('/api/cuadrillas/' + id, { method: 'DELETE' });
+    toast('Cuadrilla eliminada');
+    await cargarCuadrillas();
+  } catch(e) { toast('Error al eliminar'); }
+}
+
+// ── Tabs ─────────────────────────────────────────────────
+function mostrarTab(tab) {
+  ['registro','historial','bodega','indicadores','cuadrillas'].forEach(t => {
+    const el = document.getElementById('tab-' + t);
+    if (el) el.style.display = t === tab ? 'block' : 'none';
+  });
+  document.querySelectorAll('.tab').forEach(btn => btn.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(btn => {
+    if (btn.getAttribute('onclick')?.includes(`'${tab}'`)) btn.classList.add('active');
+  });
+  if (tab === 'historial') cargarHistorial();
+  if (tab === 'bodega') cargarBodega();
+  if (tab === 'indicadores') iniciarIndicadores();
+  if (tab === 'cuadrillas') cargarCuadrillas();
 }
 
 // ── Conectados ───────────────────────────────────────────
@@ -188,20 +248,6 @@ async function cerrarSesion() {
   window.location.href = '/';
 }
 
-function mostrarTab(tab) {
-  ['registro','historial','bodega','indicadores','cuadrillas'].forEach(t => {
-    const el = document.getElementById('tab-' + t);
-    if (el) el.style.display = t === tab ? 'block' : 'none';
-  });
-  document.querySelectorAll('.tab').forEach(btn => btn.classList.remove('active'));
-  const tabs = ['registro','historial','bodega','indicadores','cuadrillas'];
-  document.querySelectorAll('.tab')[tabs.indexOf(tab)]?.classList.add('active');
-  if (tab === 'historial') cargarHistorial();
-  if (tab === 'bodega') cargarBodega();
-  if (tab === 'indicadores') iniciarIndicadores();
-  if (tab === 'cuadrillas') cargarCuadrillas();
-}
-
 // ── Actividades ──────────────────────────────────────────
 function toggleActividad(id) {
   const btn = document.getElementById('act-' + id);
@@ -242,25 +288,13 @@ function getIPs() {
 
 // ── Guardar Reporte ──────────────────────────────────────
 async function guardarReporte() {
-  const esAdmin = rolActual === 'admin';
-  const fecha = esAdmin
-    ? document.getElementById('fecha').value
-    : document.getElementById('fecha-trabajador').value;
-
+  const fecha = document.getElementById('fecha').value;
   if (!fecha) { toast('⚠ Selecciona la fecha'); return; }
   if (actividadesSeleccionadas.size === 0) { toast('⚠ Selecciona al menos una actividad'); return; }
 
   const observaciones = document.getElementById('observaciones').value.trim();
-
-  // Integrantes: admin los elige, trabajador usa la cuadrilla
-  let integrantes = [];
-  if (esAdmin) {
-    integrantes = [...document.querySelectorAll('.integrante-check input:checked')].map(i => i.value);
-    if (!integrantes.length) { toast('⚠ Selecciona al menos un integrante'); return; }
-  } else {
-    const cuadrilla = todasLasCuadrillas.find(c => c.id === cuadrillaSeleccionadaId);
-    integrantes = cuadrilla ? cuadrilla.integrantes : [];
-  }
+  const cuadrilla = todasLasCuadrillas.find(c => c.id === cuadrillaHoyId);
+  const integrantes = cuadrilla ? cuadrilla.integrantes : [];
 
   const materiales = MATERIALES.map(m => ({
     material: m.label,
@@ -280,7 +314,7 @@ async function guardarReporte() {
         fecha, integrantes, observaciones, materiales,
         actividades: [...actividadesSeleccionadas],
         incidencias, numIncidencias, ips,
-        cuadrillaId: cuadrillaSeleccionadaId
+        cuadrillaId: cuadrillaHoyId
       })
     });
     const data = await res.json();
@@ -291,14 +325,7 @@ async function guardarReporte() {
 
 function limpiarFormulario() {
   document.getElementById('observaciones').value = '';
-  if (rolActual === 'admin') {
-    document.getElementById('fecha').valueAsDate = new Date();
-    document.getElementById('cuadrilla-select').value = '';
-    document.querySelectorAll('.integrante-check input').forEach(c => c.checked = false);
-    document.getElementById('cuadrilla-asignada-box').style.display = 'none';
-  } else {
-    document.getElementById('fecha-trabajador').valueAsDate = new Date();
-  }
+  document.getElementById('fecha').valueAsDate = new Date();
   MATERIALES.forEach(m => { const el = document.getElementById(m.id); if(el) el.value = ''; });
   actividadesSeleccionadas.clear();
   document.querySelectorAll('.actividad-btn').forEach(b => b.classList.remove('selected'));
@@ -309,7 +336,6 @@ function limpiarFormulario() {
   if (ni) ni.value = '';
   document.querySelectorAll('.inc-check').forEach(c => c.checked = false);
   ipCounter = 0;
-  cuadrillaSeleccionadaId = null;
 }
 
 // ── Historial ────────────────────────────────────────────
@@ -346,7 +372,7 @@ function renderHistorial(reportes) {
           <div>
             <div class="reporte-fecha">${dia}, ${r.fecha}</div>
             ${cuadrilla ? `<div style="font-size:11px;color:var(--accent);margin-top:2px;">🏷️ ${cuadrilla.nombre}</div>` : ''}
-            <div class="reporte-integrantes">👷 ${r.integrantes.join(' · ')}</div>
+            <div class="reporte-integrantes">👷 ${(r.integrantes || []).join(' · ') || '—'}</div>
             ${acts ? `<div style="font-size:11px;color:var(--muted);margin-top:2px;">${acts}</div>` : ''}
           </div>
           <div style="display:flex;align-items:center;gap:8px;">
@@ -363,9 +389,7 @@ function renderHistorial(reportes) {
                 ${cuadrilla.integrantes.map(i => `<span style="font-size:11px;background:rgba(0,212,170,0.15);border:1px solid rgba(0,212,170,0.3);border-radius:20px;padding:2px 8px;color:var(--accent);">👷 ${i}</span>`).join('')}
               </div>
             </div>` : ''}
-
           ${r.observaciones ? `<div class="obs-box">${r.observaciones}</div>` : ''}
-
           ${incidencias.length > 0 ? `
             <div style="margin-bottom:10px;">
               <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px;">⚠️ Incidencias${r.numIncidencias ? ` (${r.numIncidencias} atendidas)` : ''}</div>
@@ -373,7 +397,6 @@ function renderHistorial(reportes) {
                 ${incidencias.map(i => INCIDENCIAS_INFO[i] ? `<span style="font-size:12px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:3px 8px;">${INCIDENCIAS_INFO[i].icon} ${INCIDENCIAS_INFO[i].label}</span>` : '').join('')}
               </div>
             </div>` : ''}
-
           ${ips.length > 0 ? `
             <div style="margin-bottom:10px;">
               <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px;">🌐 IPs de clientes</div>
@@ -381,12 +404,10 @@ function renderHistorial(reportes) {
                 ${ips.map(ip => `<span style="font-size:12px;font-family:'IBM Plex Mono',monospace;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:3px 8px;">${ip}</span>`).join('')}
               </div>
             </div>` : ''}
-
           <table class="mat-table">
             <thead><tr><th>Material</th><th>Cantidad</th><th>Unidad</th></tr></thead>
-            <tbody>${r.materiales.map(m => `<tr><td>${m.material}</td><td class="cant">${m.cantidad}</td><td>${m.unidad}</td></tr>`).join('')}</tbody>
+            <tbody>${(r.materiales || []).map(m => `<tr><td>${m.material}</td><td class="cant">${m.cantidad}</td><td>${m.unidad}</td></tr>`).join('')}</tbody>
           </table>
-
           <div style="margin-top:1rem;">
             <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">📷 Fotos del trabajo</div>
             <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
@@ -401,7 +422,6 @@ function renderHistorial(reportes) {
               <input type="file" accept="image/*" multiple style="display:none;" onchange="subirFotos(event,${r.id})" />
             </label>
           </div>
-
           <div class="reporte-actions" style="margin-top:1rem;">
             <button onclick="exportarReporteExcel(${r.id})">↓ Excel</button>
             <button onclick="editarReporte(${r.id})">✏️ Editar</button>
@@ -436,11 +456,11 @@ function editarReporte(id) {
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.5rem;width:100%;max-width:500px;max-height:90vh;overflow-y:auto;">
       <h3 style="color:var(--accent);font-size:14px;margin-bottom:1rem;font-family:'IBM Plex Mono',monospace;">✏️ Editar reporte</h3>
       <div style="display:flex;flex-direction:column;gap:5px;margin-bottom:12px;">
-        <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;">Fecha</label>
+        <label style="font-size:11px;color:var(--muted);text-transform:uppercase;">Fecha</label>
         <input type="date" id="edit-fecha" value="${r.fecha}" style="background:var(--surface2);border:1px solid var(--border);border-radius:7px;color:var(--text);font-size:13px;padding:8px 10px;outline:none;" />
       </div>
       <div style="display:flex;flex-direction:column;gap:5px;margin-bottom:12px;">
-        <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;">Observaciones</label>
+        <label style="font-size:11px;color:var(--muted);text-transform:uppercase;">Observaciones</label>
         <textarea id="edit-obs" style="background:var(--surface2);border:1px solid var(--border);border-radius:7px;color:var(--text);font-size:13px;padding:8px 10px;outline:none;min-height:80px;resize:vertical;">${r.observaciones || ''}</textarea>
       </div>
       <div style="display:flex;gap:8px;margin-top:1rem;">
@@ -475,9 +495,9 @@ function exportarReporteExcel(id) {
   const dias = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
   const d = new Date(r.fecha + 'T12:00:00');
   const acts = (r.actividades || []).map(a => ACTIVIDADES_INFO[a]?.label || a).join(', ');
-  const datos = r.materiales.map(m => ({
+  const datos = (r.materiales || []).map(m => ({
     'Fecha': r.fecha, 'Día': dias[d.getDay()], 'Actividades': acts,
-    'Integrantes': r.integrantes.join(', '),
+    'Integrantes': (r.integrantes || []).join(', '),
     'Material': m.material, 'Cantidad': m.cantidad,
     'Unidad': m.unidad, 'Observaciones': r.observaciones || '',
     'IPs': (r.ips || []).join(', ')
@@ -496,10 +516,10 @@ function exportarTodoExcel() {
   todosLosReportes.forEach(r => {
     const d = new Date(r.fecha + 'T12:00:00');
     const acts = (r.actividades || []).map(a => ACTIVIDADES_INFO[a]?.label || a).join(', ');
-    r.materiales.forEach(m => {
+    (r.materiales || []).forEach(m => {
       filas.push({
         'Fecha': r.fecha, 'Día': dias[d.getDay()], 'Actividades': acts,
-        'Integrantes': r.integrantes.join(', '),
+        'Integrantes': (r.integrantes || []).join(', '),
         'Material': m.material, 'Cantidad': m.cantidad,
         'Unidad': m.unidad, 'Observaciones': r.observaciones || '',
         'IPs': (r.ips || []).join(', ')
@@ -543,64 +563,6 @@ function verFoto(url) {
   overlay.innerHTML = `<img src="${url}" style="max-width:90%;max-height:90%;border-radius:8px;" />`;
   overlay.onclick = () => document.body.removeChild(overlay);
   document.body.appendChild(overlay);
-}
-
-// ── Cuadrillas (admin) ───────────────────────────────────
-async function cargarCuadrillas() {
-  try {
-    const res = await fetch('/api/cuadrillas');
-    todasLasCuadrillas = await res.json();
-    const cont = document.getElementById('lista-cuadrillas');
-    if (!todasLasCuadrillas.length) {
-      cont.innerHTML = '<p class="empty">No hay cuadrillas creadas.</p>';
-      return;
-    }
-    cont.innerHTML = todasLasCuadrillas.map(c => `
-      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:1rem;margin-bottom:8px;">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
-          <div>
-            <div style="font-weight:600;color:var(--accent);font-size:15px;">${c.nombre}</div>
-            <div style="font-size:12px;color:var(--muted);margin-top:2px;">📅 ${c.fecha}</div>
-          </div>
-          <button class="btn-danger" onclick="eliminarCuadrilla(${c.id})" style="font-size:12px;padding:5px 10px;">Eliminar</button>
-        </div>
-        <div style="display:flex;flex-wrap:wrap;gap:5px;">
-          ${c.integrantes.map(i => `<span style="font-size:12px;background:rgba(0,212,170,0.1);border:1px solid rgba(0,212,170,0.3);border-radius:20px;padding:3px 10px;color:var(--accent);">👷 ${i}</span>`).join('')}
-        </div>
-      </div>`).join('');
-  } catch(e) {}
-}
-
-async function crearCuadrilla() {
-  const nombre = document.getElementById('cuadrilla-nombre').value.trim();
-  const fecha = document.getElementById('cuadrilla-fecha').value;
-  const integrantes = [...document.querySelectorAll('.cuadrilla-int:checked')].map(i => i.value);
-  if (!nombre) { toast('⚠ Ingresa un nombre'); return; }
-  if (!fecha) { toast('⚠ Selecciona la fecha'); return; }
-  if (!integrantes.length) { toast('⚠ Selecciona al menos un integrante'); return; }
-  try {
-    const res = await fetch('/api/cuadrillas', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nombre, fecha, integrantes })
-    });
-    const data = await res.json();
-    if (data.ok) {
-      toast('✓ Cuadrilla creada');
-      document.getElementById('cuadrilla-nombre').value = '';
-      document.querySelectorAll('.cuadrilla-int').forEach(c => c.checked = false);
-      await cargarCuadrillas();
-      await cargarCuadrillasSelect();
-    }
-  } catch(e) { toast('Error al crear cuadrilla'); }
-}
-
-async function eliminarCuadrilla(id) {
-  if (!confirm('¿Eliminar esta cuadrilla?')) return;
-  await fetch('/api/cuadrillas/' + id, { method: 'DELETE' });
-  toast('Cuadrilla eliminada');
-  await cargarCuadrillas();
-  await cargarCuadrillasSelect();
 }
 
 // ── Bodega ───────────────────────────────────────────────
@@ -757,7 +719,7 @@ function getLunes(fecha) {
 
 function getMat(reportes, label) {
   return reportes.reduce((s, r) => {
-    const m = r.materiales.find(m => m.material === label);
+    const m = (r.materiales || []).find(m => m.material === label);
     return s + (m ? m.cantidad : 0);
   }, 0);
 }
@@ -836,7 +798,7 @@ function cargarIndicadores() {
   diasSemana.slice(0, 5).forEach(fecha => {
     const reportes = reportesPorFecha[fecha] || [];
     const actividades = [...new Set(reportes.flatMap(r => r.actividades || []))];
-    const integrantes = [...new Set(reportes.flatMap(r => Array.isArray(r.integrantes) ? r.integrantes : []))];
+    const integrantes = [...new Set(reportes.flatMap(r => r.integrantes || []))];
     const numPersonas = integrantes.length || 5;
     const { badge } = calcularBadge(reportes, actividades, numPersonas);
     if (badge === 'Productivo') diasProductivos++;
@@ -874,7 +836,7 @@ function cargarIndicadores() {
     const reportes = reportesPorFecha[fecha] || [];
     const esSabado = i === 5;
     const actividades = [...new Set(reportes.flatMap(r => r.actividades || []))];
-    const integrantes = [...new Set(reportes.flatMap(r => Array.isArray(r.integrantes) ? r.integrantes : []))];
+    const integrantes = [...new Set(reportes.flatMap(r => r.integrantes || []))];
     const numPersonas = integrantes.length || 5;
     const metaFibra = numPersonas >= 5 ? 2000 : numPersonas === 3 ? 1500 : Math.round(2000 * numPersonas / 5);
     const fibra = getMat(reportes, 'Fibra Principal');
@@ -912,7 +874,6 @@ function cargarIndicadores() {
           </div>
           <span style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;background:${badgeInfo.bg};color:${badgeInfo.color};">${badgeInfo.badge}</span>
         </div>
-
         ${reportes.length === 0 ? '<p style="font-size:12px;color:var(--muted);text-align:center;padding:0.5rem 0;">Sin actividad registrada</p>' : `
           ${cuadrilla ? `<div style="font-size:12px;color:var(--accent);margin-bottom:8px;">🏷️ ${cuadrilla.nombre}</div>` : ''}
           ${actsHTML}
@@ -999,7 +960,7 @@ function cargarIndicadores() {
   const totalesMat = {};
   diasSemana.forEach(fecha => {
     (reportesPorFecha[fecha] || []).forEach(r => {
-      r.materiales.forEach(m => { totalesMat[m.material] = (totalesMat[m.material] || 0) + m.cantidad; });
+      (r.materiales || []).forEach(m => { totalesMat[m.material] = (totalesMat[m.material] || 0) + m.cantidad; });
     });
   });
   const sorted = Object.entries(totalesMat).sort((a, b) => b[1] - a[1]);
@@ -1035,16 +996,9 @@ function exportarInformeSemanal() {
   diasSemana.forEach((fecha, i) => {
     const reportes = reportesPorFecha[fecha] || [];
     const actividades = [...new Set(reportes.flatMap(r => r.actividades || []))];
-    const integrantes = [...new Set(reportes.flatMap(r => Array.isArray(r.integrantes) ? r.integrantes : []))];
+    const integrantes = [...new Set(reportes.flatMap(r => r.integrantes || []))];
     const numPersonas = integrantes.length || 5;
     const { badge } = i === 5 ? { badge: 'Extra' } : calcularBadge(reportes, actividades, numPersonas);
-    const fibra = getMat(reportes, 'Fibra Principal');
-    const cajas = getMat(reportes, 'Cajas NAT');
-    const herrajesA = getMat(reportes, 'Herrajes A');
-    const herrajesU = getMat(reportes, 'Herrajes U');
-    const numIncidencias = reportes.reduce((s, r) => s + (r.numIncidencias || 0), 0);
-    const ips = [...new Set(reportes.flatMap(r => r.ips || []))];
-    const obs = reportes.map(r => r.observaciones).filter(Boolean).join(' | ');
     const cuadrilla = todasLasCuadrillas.find(c => reportes.some(r => r.cuadrillaId === c.id));
     resumenFilas.push({
       'Día': nombres[i], 'Fecha': fecha, 'Estado': badge,
@@ -1052,32 +1006,15 @@ function exportarInformeSemanal() {
       'Personas': numPersonas,
       'Actividades': actividades.map(a => ACTIVIDADES_INFO[a]?.label || a).join(', ') || '—',
       'Integrantes': integrantes.join(', ') || '—',
-      'Fibra Principal (m)': fibra,
-      'Herrajes A': herrajesA, 'Herrajes U': herrajesU,
-      'Cajas NAT': cajas, 'Incidencias': numIncidencias,
-      'IPs': ips.join(', ') || '—',
-      'Observaciones': obs || '—'
+      'Fibra (m)': getMat(reportes, 'Fibra Principal'),
+      'Cajas NAT': getMat(reportes, 'Cajas NAT'),
+      'Incidencias': reportes.reduce((s, r) => s + (r.numIncidencias || 0), 0),
+      'IPs': [...new Set(reportes.flatMap(r => r.ips || []))].join(', ') || '—',
+      'Observaciones': reportes.map(r => r.observaciones).filter(Boolean).join(' | ') || '—'
     });
   });
   const wsResumen = XLSX.utils.json_to_sheet(resumenFilas);
   XLSX.utils.book_append_sheet(wb, wsResumen, 'Resumen semanal');
-  const matFilas = [];
-  diasSemana.forEach((fecha, i) => {
-    const reportes = reportesPorFecha[fecha] || [];
-    const actividades = [...new Set(reportes.flatMap(r => r.actividades || []))];
-    reportes.forEach(r => {
-      r.materiales.forEach(m => {
-        matFilas.push({
-          'Día': nombres[i], 'Fecha': fecha,
-          'Actividades': actividades.map(a => ACTIVIDADES_INFO[a]?.label || a).join(', ') || '—',
-          'Integrantes': Array.isArray(r.integrantes) ? r.integrantes.join(', ') : '',
-          'Material': m.material, 'Cantidad': m.cantidad, 'Unidad': m.unidad
-        });
-      });
-    });
-  });
-  const wsMat = XLSX.utils.json_to_sheet(matFilas);
-  XLSX.utils.book_append_sheet(wb, wsMat, 'Detalle materiales');
   XLSX.writeFile(wb, `informe_semana_${semanaActual}.xlsx`);
   toast('✓ Informe semanal exportado');
 }
