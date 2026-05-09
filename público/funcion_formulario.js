@@ -51,10 +51,8 @@ async function init() {
     if (!data.loggedIn) { window.location.href = '/'; return; }
     rolActual = data.rol;
 
-    // Cargar cuadrillas siempre
     await cargarTodasLasCuadrillas();
 
-    // Generar tabs según rol
     const tabsContainer = document.getElementById('nav-tabs');
     if (rolActual === 'admin') {
       tabsContainer.innerHTML = `
@@ -66,16 +64,20 @@ async function init() {
     } else {
       tabsContainer.innerHTML = `
         <button class="tab active" onclick="mostrarTab('registro')">Nuevo registro</button>
-        <button class="tab" onclick="mostrarTab('historial')">Historial</button>`;
-      document.getElementById('fecha').valueAsDate = new Date();
-      document.getElementById('cuadrilla-fecha') && (document.getElementById('cuadrilla-fecha').valueAsDate = new Date());
+        <button class="tab" onclick="mostrarTab('historial')">Historial</button>
+        <button class="tab" onclick="mostrarTab('bodega')">Bodega</button>
+        <button class="tab" onclick="mostrarTab('indicadores')">Indicadores</button>`;
+      const fechaEl = document.getElementById('fecha');
+      if (fechaEl) fechaEl.valueAsDate = new Date();
       await cargarCuadrillaHoy();
       mostrarTab('registro');
     }
 
     cargarConectados();
     setInterval(cargarConectados, 30000);
-  } catch(e) { console.error('Init error:', e); }
+  } catch(e) {
+    console.error('Init error:', e);
+  }
 }
 init();
 
@@ -83,7 +85,7 @@ init();
 async function cargarTodasLasCuadrillas() {
   try {
     const res = await fetch('/api/cuadrillas');
-    if (!res.ok) throw new Error('Error ' + res.status);
+    if (!res.ok) throw new Error('Status ' + res.status);
     todasLasCuadrillas = await res.json();
   } catch(e) {
     console.error('Error cargando cuadrillas:', e);
@@ -151,7 +153,7 @@ async function crearCuadrilla() {
   const fecha = document.getElementById('cuadrilla-fecha').value;
   const integrantes = [...document.querySelectorAll('.cuadrilla-int:checked')].map(i => i.value);
 
-  if (!nombre) { toast('⚠ Ingresa un nombre para la cuadrilla'); return; }
+  if (!nombre) { toast('⚠ Ingresa un nombre'); return; }
   if (!fecha) { toast('⚠ Selecciona la fecha'); return; }
   if (!integrantes.length) { toast('⚠ Selecciona al menos un integrante'); return; }
 
@@ -161,20 +163,27 @@ async function crearCuadrilla() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ nombre, fecha, integrantes })
     });
-    if (!res.ok) {
-      const err = await res.json();
-      toast('Error: ' + err.error);
+
+    const text = await res.text();
+    let data;
+    try { data = JSON.parse(text); }
+    catch(e) {
+      console.error('Respuesta no JSON:', text);
+      toast('Error del servidor: ' + text.slice(0, 100));
       return;
     }
-    const data = await res.json();
-    if (data.ok) {
-      toast('✓ Cuadrilla creada correctamente');
+
+    if (res.ok && data.ok) {
+      toast('✓ Cuadrilla creada');
       document.getElementById('cuadrilla-nombre').value = '';
       document.querySelectorAll('.cuadrilla-int').forEach(c => c.checked = false);
       await cargarCuadrillas();
+    } else {
+      toast('Error: ' + (data.error || 'Error desconocido'));
     }
   } catch(e) {
-    toast('Error al crear cuadrilla: ' + e.message);
+    toast('Error de conexión: ' + e.message);
+    console.error(e);
   }
 }
 
@@ -193,9 +202,8 @@ function mostrarTab(tab) {
     const el = document.getElementById('tab-' + t);
     if (el) el.style.display = t === tab ? 'block' : 'none';
   });
-  document.querySelectorAll('.tab').forEach(btn => btn.classList.remove('active'));
   document.querySelectorAll('.tab').forEach(btn => {
-    if (btn.getAttribute('onclick')?.includes(`'${tab}'`)) btn.classList.add('active');
+    btn.classList.toggle('active', btn.getAttribute('onclick')?.includes(`'${tab}'`));
   });
   if (tab === 'historial') cargarHistorial();
   if (tab === 'bodega') cargarBodega();
@@ -295,7 +303,6 @@ async function guardarReporte() {
   const observaciones = document.getElementById('observaciones').value.trim();
   const cuadrilla = todasLasCuadrillas.find(c => c.id === cuadrillaHoyId);
   const integrantes = cuadrilla ? cuadrilla.integrantes : [];
-
   const materiales = MATERIALES.map(m => ({
     material: m.label,
     cantidad: parseFloat(document.getElementById(m.id)?.value) || 0,
@@ -325,7 +332,8 @@ async function guardarReporte() {
 
 function limpiarFormulario() {
   document.getElementById('observaciones').value = '';
-  document.getElementById('fecha').valueAsDate = new Date();
+  const fechaEl = document.getElementById('fecha');
+  if (fechaEl) fechaEl.valueAsDate = new Date();
   MATERIALES.forEach(m => { const el = document.getElementById(m.id); if(el) el.value = ''; });
   actividadesSeleccionadas.clear();
   document.querySelectorAll('.actividad-btn').forEach(b => b.classList.remove('selected'));
@@ -345,7 +353,7 @@ async function cargarHistorial() {
     todosLosReportes = await res.json();
     renderHistorial(todosLosReportes);
   } catch(e) {
-    document.getElementById('lista-reportes').innerHTML = '<p class="empty">Error al conectar con el servidor.</p>';
+    document.getElementById('lista-reportes').innerHTML = '<p class="empty">Error al conectar.</p>';
   }
 }
 
@@ -845,23 +853,13 @@ function cargarIndicadores() {
     const ips = [...new Set(reportes.flatMap(r => r.ips || []))];
     const incidencias = [...new Set(reportes.flatMap(r => r.incidencias || []))];
     const cuadrilla = todasLasCuadrillas.find(c => reportes.some(r => r.cuadrillaId === c.id));
-
-    let badgeInfo = esSabado
-      ? { badge: 'Extra', color: '#854F0B', bg: '#FAEEDA' }
-      : calcularBadge(reportes, actividades, numPersonas);
-
+    let badgeInfo = esSabado ? { badge: 'Extra', color: '#854F0B', bg: '#FAEEDA' } : calcularBadge(reportes, actividades, numPersonas);
     const observaciones = reportes.map(r => r.observaciones).filter(Boolean);
     const actsHTML = actividades.length > 0 ? `
       <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">
-        ${actividades.map(a => ACTIVIDADES_INFO[a] ? `
-          <span style="font-size:11px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:3px 8px;">
-            ${ACTIVIDADES_INFO[a].icon} ${ACTIVIDADES_INFO[a].label}
-          </span>` : '').join('')}
+        ${actividades.map(a => ACTIVIDADES_INFO[a] ? `<span style="font-size:11px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:3px 8px;">${ACTIVIDADES_INFO[a].icon} ${ACTIVIDADES_INFO[a].label}</span>` : '').join('')}
       </div>` : '';
-
-    const todosMat = MATERIALES.map(m => ({
-      label: m.label, val: getMat(reportes, m.label), unidad: m.unidad
-    })).filter(m => m.val > 0);
+    const todosMat = MATERIALES.map(m => ({ label: m.label, val: getMat(reportes, m.label), unidad: m.unidad })).filter(m => m.val > 0);
 
     return `
       <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:1rem;margin-bottom:10px;">
@@ -877,81 +875,18 @@ function cargarIndicadores() {
         ${reportes.length === 0 ? '<p style="font-size:12px;color:var(--muted);text-align:center;padding:0.5rem 0;">Sin actividad registrada</p>' : `
           ${cuadrilla ? `<div style="font-size:12px;color:var(--accent);margin-bottom:8px;">🏷️ ${cuadrilla.nombre}</div>` : ''}
           ${actsHTML}
-          ${integrantes.length > 0 ? `
-            <div style="margin-bottom:10px;">
-              <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:3px;">👷 Integrantes</div>
-              <div style="font-size:13px;">${integrantes.join(', ')}</div>
-            </div>` : ''}
-          ${observaciones.length > 0 ? `
-            <div style="margin-bottom:10px;background:var(--surface);border-left:3px solid var(--accent2);border-radius:0 6px 6px 0;padding:8px 12px;">
-              <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:3px;">📋 Observaciones</div>
-              <div style="font-size:13px;line-height:1.5;">${observaciones.join(' | ')}</div>
-            </div>` : ''}
-          ${incidencias.length > 0 || numIncidencias > 0 ? `
-            <div style="margin-bottom:10px;">
-              <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px;">⚠️ Incidencias${numIncidencias > 0 ? ` (${numIncidencias} atendidas)` : ''}</div>
-              <div style="display:flex;flex-wrap:wrap;gap:6px;">
-                ${incidencias.map(i => INCIDENCIAS_INFO[i] ? `<span style="font-size:12px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:3px 8px;">${INCIDENCIAS_INFO[i].icon} ${INCIDENCIAS_INFO[i].label}</span>` : '').join('')}
-              </div>
-            </div>` : ''}
-          ${ips.length > 0 ? `
-            <div style="margin-bottom:10px;">
-              <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px;">🌐 IPs atendidas</div>
-              <div style="display:flex;flex-wrap:wrap;gap:6px;">
-                ${ips.map(ip => `<span style="font-size:12px;font-family:'IBM Plex Mono',monospace;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:3px 8px;">${ip}</span>`).join('')}
-              </div>
-            </div>` : ''}
+          ${integrantes.length > 0 ? `<div style="margin-bottom:10px;"><div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:3px;">👷 Integrantes</div><div style="font-size:13px;">${integrantes.join(', ')}</div></div>` : ''}
+          ${observaciones.length > 0 ? `<div style="margin-bottom:10px;background:var(--surface);border-left:3px solid var(--accent2);border-radius:0 6px 6px 0;padding:8px 12px;"><div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:3px;">📋 Observaciones</div><div style="font-size:13px;line-height:1.5;">${observaciones.join(' | ')}</div></div>` : ''}
+          ${incidencias.length > 0 || numIncidencias > 0 ? `<div style="margin-bottom:10px;"><div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px;">⚠️ Incidencias${numIncidencias > 0 ? ` (${numIncidencias} atendidas)` : ''}</div><div style="display:flex;flex-wrap:wrap;gap:6px;">${incidencias.map(i => INCIDENCIAS_INFO[i] ? `<span style="font-size:12px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:3px 8px;">${INCIDENCIAS_INFO[i].icon} ${INCIDENCIAS_INFO[i].label}</span>` : '').join('')}</div></div>` : ''}
+          ${ips.length > 0 ? `<div style="margin-bottom:10px;"><div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px;">🌐 IPs atendidas</div><div style="display:flex;flex-wrap:wrap;gap:6px;">${ips.map(ip => `<span style="font-size:12px;font-family:'IBM Plex Mono',monospace;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:3px 8px;">${ip}</span>`).join('')}</div></div>` : ''}
           <div style="margin-bottom:12px;">
             <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">📊 Rendimiento del día</div>
-            ${actividades.includes('fibra') ? `
-              <div style="margin-bottom:8px;">
-                <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
-                  <span style="font-size:12px;color:var(--text);">📡 Fibra Principal</span>
-                  <span style="font-size:11px;color:var(--muted);">meta: ${metaFibra}m</span>
-                </div>
-                ${barMeta(fibra, metaFibra)}
-              </div>` : ''}
-            ${actividades.includes('cajas') ? `
-              <div style="margin-bottom:8px;">
-                <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
-                  <span style="font-size:12px;color:var(--text);">📦 Cajas NAT</span>
-                  <span style="font-size:11px;color:var(--muted);">meta: 5</span>
-                </div>
-                ${barMeta(cajas, 5)}
-              </div>` : ''}
-            ${actividades.includes('incidencias') ? `
-              <div style="margin-bottom:8px;">
-                <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
-                  <span style="font-size:12px;color:var(--text);">⚠️ Incidencias</span>
-                  <span style="font-size:11px;color:var(--muted);">meta: 6</span>
-                </div>
-                ${barMeta(numIncidencias, 6)}
-              </div>` : ''}
-            ${['instalacion','mudanza','odf','mangas'].filter(a => actividades.includes(a)).map(a => `
-              <div style="margin-bottom:8px;">
-                <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
-                  <span style="font-size:12px;color:var(--text);">${ACTIVIDADES_INFO[a].icon} ${ACTIVIDADES_INFO[a].label}</span>
-                  <span style="font-size:11px;color:var(--accent);">✓ Productivo</span>
-                </div>
-                <div style="height:7px;background:#EAF3DE;border-radius:4px;">
-                  <div style="width:100%;height:100%;background:#1D9E75;border-radius:4px;"></div>
-                </div>
-              </div>`).join('')}
+            ${actividades.includes('fibra') ? `<div style="margin-bottom:8px;"><div style="display:flex;justify-content:space-between;margin-bottom:3px;"><span style="font-size:12px;color:var(--text);">📡 Fibra Principal</span><span style="font-size:11px;color:var(--muted);">meta: ${metaFibra}m</span></div>${barMeta(fibra, metaFibra)}</div>` : ''}
+            ${actividades.includes('cajas') ? `<div style="margin-bottom:8px;"><div style="display:flex;justify-content:space-between;margin-bottom:3px;"><span style="font-size:12px;color:var(--text);">📦 Cajas NAT</span><span style="font-size:11px;color:var(--muted);">meta: 5</span></div>${barMeta(cajas, 5)}</div>` : ''}
+            ${actividades.includes('incidencias') ? `<div style="margin-bottom:8px;"><div style="display:flex;justify-content:space-between;margin-bottom:3px;"><span style="font-size:12px;color:var(--text);">⚠️ Incidencias</span><span style="font-size:11px;color:var(--muted);">meta: 6</span></div>${barMeta(numIncidencias, 6)}</div>` : ''}
+            ${['instalacion','mudanza','odf','mangas'].filter(a => actividades.includes(a)).map(a => `<div style="margin-bottom:8px;"><div style="display:flex;justify-content:space-between;margin-bottom:3px;"><span style="font-size:12px;color:var(--text);">${ACTIVIDADES_INFO[a].icon} ${ACTIVIDADES_INFO[a].label}</span><span style="font-size:11px;color:var(--accent);">✓ Productivo</span></div><div style="height:7px;background:#EAF3DE;border-radius:4px;"><div style="width:100%;height:100%;background:#1D9E75;border-radius:4px;"></div></div></div>`).join('')}
           </div>
-          ${todosMat.length > 0 ? `
-          <div>
-            <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">📦 Materiales utilizados</div>
-            <table style="width:100%;border-collapse:collapse;">
-              <tbody>
-                ${todosMat.map(m => `
-                  <tr>
-                    <td style="font-size:12px;color:var(--text);padding:5px 8px 5px 0;width:150px;white-space:nowrap;">${m.label}</td>
-                    <td style="padding:5px 8px;"><div style="height:6px;background:var(--surface);border-radius:3px;overflow:hidden;"><div style="width:100%;height:100%;background:#1D9E75;border-radius:3px;"></div></div></td>
-                    <td style="font-size:12px;color:var(--muted);padding:5px 0;text-align:right;white-space:nowrap;width:80px;">${m.val} ${m.unidad}</td>
-                  </tr>`).join('')}
-              </tbody>
-            </table>
-          </div>` : ''}
+          ${todosMat.length > 0 ? `<div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">📦 Materiales utilizados</div><table style="width:100%;border-collapse:collapse;"><tbody>${todosMat.map(m => `<tr><td style="font-size:12px;color:var(--text);padding:5px 8px 5px 0;width:150px;white-space:nowrap;">${m.label}</td><td style="padding:5px 8px;"><div style="height:6px;background:var(--surface);border-radius:3px;overflow:hidden;"><div style="width:100%;height:100%;background:#1D9E75;border-radius:3px;"></div></div></td><td style="font-size:12px;color:var(--muted);padding:5px 0;text-align:right;white-space:nowrap;width:80px;">${m.val} ${m.unidad}</td></tr>`).join('')}</tbody></table></div>` : ''}
         `}
       </div>`;
   }).join('');

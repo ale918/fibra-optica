@@ -39,31 +39,32 @@ app.use(session({
 const USUARIOS = {
   'Telecomadmin': { nombre: 'Administrador', pass: process.env.ADMIN_PASS, rol: 'admin' },
   'Efrain':       { nombre: 'Efrain',        pass: process.env.USER_EFRAIN_PASS, rol: 'trabajador' },
-  'Alejandro':    { nombre: 'Alejandro',      pass: process.env.USER_ALEJANDRO_PASS, rol: 'trabajador' },
-  'DavidG':       { nombre: 'David Garcia',   pass: process.env.USER_DAVIDG_PASS, rol: 'trabajador' },
+  'Alejandro':    { nombre: 'Alejandro',     pass: process.env.USER_ALEJANDRO_PASS, rol: 'trabajador' },
+  'DavidG':       { nombre: 'David Garcia',  pass: process.env.USER_DAVIDG_PASS, rol: 'trabajador' },
 };
 
 const sesionesActivas = new Map();
 
 function requireAuth(req, res, next) {
-  if (req.session.loggedIn) return next();
+  if (req.session && req.session.loggedIn) return next();
   res.status(401).json({ error: 'No autorizado' });
 }
 
 function requireAdmin(req, res, next) {
-  if (req.session.loggedIn && req.session.rol === 'admin') return next();
+  if (req.session && req.session.loggedIn && req.session.rol === 'admin') return next();
   res.status(403).json({ error: 'Solo el administrador puede hacer esto' });
 }
 
 app.use(express.static(join(__dirname, 'público')));
 
 app.get('/', (req, res) => {
-  if (!req.session.loggedIn) {
+  if (!req.session || !req.session.loggedIn) {
     return res.sendFile(join(__dirname, 'público', 'login.html'));
   }
   res.sendFile(join(__dirname, 'público', 'formulario.html'));
 });
 
+// ── Login / Logout ────────────────────────────────────────
 app.post('/api/login', (req, res) => {
   const { usuario, password } = req.body;
   const user = USUARIOS[usuario];
@@ -93,7 +94,7 @@ app.post('/api/logout', (req, res) => {
 });
 
 app.get('/api/me', (req, res) => {
-  if (req.session.loggedIn) {
+  if (req.session && req.session.loggedIn) {
     res.json({ loggedIn: true, usuario: req.session.usuario, nombre: req.session.nombre, rol: req.session.rol });
   } else {
     res.json({ loggedIn: false });
@@ -104,6 +105,7 @@ app.get('/api/conectados', requireAuth, (req, res) => {
   res.json([...sesionesActivas.values()].map(s => ({ nombre: s.nombre, rol: s.rol })));
 });
 
+// ── Base de datos ─────────────────────────────────────────
 const adapter = new JSONFileSync(join(DATA_DIR, 'database.json'));
 const defaultData = { reportes: [], bodega: [], movimientos: [], cuadrillas: [] };
 const db = new Low(adapter, defaultData);
@@ -118,151 +120,204 @@ db.write();
 
 // ── Cuadrillas ────────────────────────────────────────────
 app.get('/api/cuadrillas', requireAuth, (req, res) => {
-  res.json(db.data.cuadrillas);
+  try {
+    if (!db.data.cuadrillas) db.data.cuadrillas = [];
+    res.json(db.data.cuadrillas);
+  } catch(e) {
+    console.error('Error GET cuadrillas:', e);
+    res.status(500).json({ error: e.message });
+  }
 });
 
 app.post('/api/cuadrillas', requireAdmin, (req, res) => {
-  const { nombre, integrantes, fecha } = req.body;
-  if (!nombre || !integrantes?.length || !fecha) {
-    return res.status(400).json({ error: 'Faltan datos' });
+  try {
+    const { nombre, integrantes, fecha } = req.body;
+    if (!nombre || !integrantes?.length || !fecha) {
+      return res.status(400).json({ error: 'Faltan datos' });
+    }
+    if (!db.data.cuadrillas) db.data.cuadrillas = [];
+    const nueva = {
+      id: Date.now(),
+      nombre,
+      integrantes,
+      fecha,
+      creado_en: new Date().toLocaleString('es-EC')
+    };
+    db.data.cuadrillas.push(nueva);
+    db.write();
+    res.json({ ok: true, id: nueva.id });
+  } catch(e) {
+    console.error('Error POST cuadrillas:', e);
+    res.status(500).json({ error: e.message });
   }
-  const nueva = {
-    id: Date.now(),
-    nombre,
-    integrantes,
-    fecha,
-    creado_en: new Date().toLocaleString('es-EC')
-  };
-  db.data.cuadrillas.push(nueva);
-  db.write();
-  res.json({ ok: true, id: nueva.id });
 });
 
 app.delete('/api/cuadrillas/:id', requireAdmin, (req, res) => {
-  db.data.cuadrillas = db.data.cuadrillas.filter(c => c.id !== parseInt(req.params.id));
-  db.write();
-  res.json({ ok: true });
+  try {
+    if (!db.data.cuadrillas) db.data.cuadrillas = [];
+    db.data.cuadrillas = db.data.cuadrillas.filter(c => c.id !== parseInt(req.params.id));
+    db.write();
+    res.json({ ok: true });
+  } catch(e) {
+    console.error('Error DELETE cuadrillas:', e);
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // ── Reportes ─────────────────────────────────────────────
 app.post('/api/reportes', requireAuth, (req, res) => {
-  const { fecha, observaciones, integrantes, materiales, actividades, incidencias, numIncidencias, ips, cuadrillaId } = req.body;
-  if (!fecha || !actividades?.length) {
-    return res.status(400).json({ error: 'Faltan datos obligatorios' });
+  try {
+    const { fecha, observaciones, integrantes, materiales, actividades, incidencias, numIncidencias, ips, cuadrillaId } = req.body;
+    if (!fecha || !actividades?.length) {
+      return res.status(400).json({ error: 'Faltan datos obligatorios' });
+    }
+    const nuevoReporte = {
+      id: Date.now(),
+      fecha,
+      observaciones: observaciones || '',
+      integrantes: integrantes || [],
+      materiales: materiales || [],
+      actividades: actividades || [],
+      incidencias: incidencias || [],
+      numIncidencias: numIncidencias || 0,
+      ips: ips || [],
+      cuadrillaId: cuadrillaId || null,
+      fotos: [],
+      creado_en: new Date().toLocaleString('es-EC')
+    };
+    db.data.reportes.push(nuevoReporte);
+    db.write();
+    res.json({ ok: true, id: nuevoReporte.id });
+  } catch(e) {
+    console.error('Error POST reportes:', e);
+    res.status(500).json({ error: e.message });
   }
-  const nuevoReporte = {
-    id: Date.now(),
-    fecha,
-    observaciones: observaciones || '',
-    integrantes: integrantes || [],
-    materiales: materiales || [],
-    actividades: actividades || [],
-    incidencias: incidencias || [],
-    numIncidencias: numIncidencias || 0,
-    ips: ips || [],
-    cuadrillaId: cuadrillaId || null,
-    fotos: [],
-    creado_en: new Date().toLocaleString('es-EC')
-  };
-  db.data.reportes.push(nuevoReporte);
-  db.write();
-  res.json({ ok: true, id: nuevoReporte.id });
 });
 
 app.get('/api/reportes', requireAuth, (req, res) => {
-  const reportes = [...db.data.reportes].reverse().map(r => ({
-    ...r,
-    integrantes: Array.isArray(r.integrantes) ? r.integrantes : (r.integrantes || '').split(',').map(i => i.trim()),
-    actividades: r.actividades || [],
-    incidencias: r.incidencias || [],
-    ips: r.ips || [],
-    fotos: r.fotos || []
-  }));
-  res.json(reportes);
+  try {
+    const reportes = [...db.data.reportes].reverse().map(r => ({
+      ...r,
+      integrantes: Array.isArray(r.integrantes) ? r.integrantes : [],
+      actividades: r.actividades || [],
+      incidencias: r.incidencias || [],
+      ips: r.ips || [],
+      fotos: r.fotos || []
+    }));
+    res.json(reportes);
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 app.put('/api/reportes/:id', requireAuth, (req, res) => {
-  const id = parseInt(req.params.id);
-  const reporte = db.data.reportes.find(r => r.id === id);
-  if (!reporte) return res.status(404).json({ error: 'Reporte no encontrado' });
-  const { fecha, observaciones } = req.body;
-  if (fecha) reporte.fecha = fecha;
-  if (observaciones !== undefined) reporte.observaciones = observaciones;
-  reporte.editado_en = new Date().toLocaleString('es-EC');
-  db.write();
-  res.json({ ok: true });
+  try {
+    const id = parseInt(req.params.id);
+    const reporte = db.data.reportes.find(r => r.id === id);
+    if (!reporte) return res.status(404).json({ error: 'Reporte no encontrado' });
+    const { fecha, observaciones } = req.body;
+    if (fecha) reporte.fecha = fecha;
+    if (observaciones !== undefined) reporte.observaciones = observaciones;
+    reporte.editado_en = new Date().toLocaleString('es-EC');
+    db.write();
+    res.json({ ok: true });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 app.delete('/api/reportes/:id', requireAuth, (req, res) => {
-  db.data.reportes = db.data.reportes.filter(r => r.id !== parseInt(req.params.id));
-  db.write();
-  res.json({ ok: true });
+  try {
+    db.data.reportes = db.data.reportes.filter(r => r.id !== parseInt(req.params.id));
+    db.write();
+    res.json({ ok: true });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // ── Fotos ─────────────────────────────────────────────────
 app.post('/api/reportes/:id/fotos', requireAuth, upload.array('fotos', 5), async (req, res) => {
-  const id = parseInt(req.params.id);
-  const reporte = db.data.reportes.find(r => r.id === id);
-  if (!reporte) return res.status(404).json({ error: 'Reporte no encontrado' });
-  if (!reporte.fotos) reporte.fotos = [];
-  const nuevasFotos = req.files.map(f => ({
-    url: f.path, public_id: f.filename,
-    subida_en: new Date().toLocaleString('es-EC')
-  }));
-  reporte.fotos.push(...nuevasFotos);
-  db.write();
-  res.json({ ok: true, fotos: nuevasFotos });
+  try {
+    const id = parseInt(req.params.id);
+    const reporte = db.data.reportes.find(r => r.id === id);
+    if (!reporte) return res.status(404).json({ error: 'Reporte no encontrado' });
+    if (!reporte.fotos) reporte.fotos = [];
+    const nuevasFotos = req.files.map(f => ({
+      url: f.path, public_id: f.filename,
+      subida_en: new Date().toLocaleString('es-EC')
+    }));
+    reporte.fotos.push(...nuevasFotos);
+    db.write();
+    res.json({ ok: true, fotos: nuevasFotos });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 app.delete('/api/reportes/:id/fotos/:public_id', requireAuth, async (req, res) => {
-  const id = parseInt(req.params.id);
-  const public_id = decodeURIComponent(req.params.public_id);
-  const reporte = db.data.reportes.find(r => r.id === id);
-  if (!reporte) return res.status(404).json({ error: 'Reporte no encontrado' });
-  await cloudinary.uploader.destroy(public_id);
-  reporte.fotos = (reporte.fotos || []).filter(f => f.public_id !== public_id);
-  db.write();
-  res.json({ ok: true });
+  try {
+    const id = parseInt(req.params.id);
+    const public_id = decodeURIComponent(req.params.public_id);
+    const reporte = db.data.reportes.find(r => r.id === id);
+    if (!reporte) return res.status(404).json({ error: 'Reporte no encontrado' });
+    await cloudinary.uploader.destroy(public_id);
+    reporte.fotos = (reporte.fotos || []).filter(f => f.public_id !== public_id);
+    db.write();
+    res.json({ ok: true });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // ── Bodega ───────────────────────────────────────────────
-app.get('/api/bodega', requireAuth, (req, res) => { res.json(db.data.bodega); });
+app.get('/api/bodega', requireAuth, (req, res) => {
+  res.json(db.data.bodega);
+});
 
 app.post('/api/bodega/stock', requireAuth, (req, res) => {
-  const { material, cantidad } = req.body;
-  if (!material || cantidad === undefined) return res.status(400).json({ error: 'Faltan datos' });
-  const item = db.data.bodega.find(b => b.material === material);
-  if (item) { item.cantidad = cantidad; } else { db.data.bodega.push({ material, cantidad }); }
-  db.write();
-  res.json({ ok: true });
+  try {
+    const { material, cantidad } = req.body;
+    if (!material || cantidad === undefined) return res.status(400).json({ error: 'Faltan datos' });
+    const item = db.data.bodega.find(b => b.material === material);
+    if (item) { item.cantidad = cantidad; } else { db.data.bodega.push({ material, cantidad }); }
+    db.write();
+    res.json({ ok: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
 app.post('/api/bodega/movimiento', requireAuth, (req, res) => {
-  const { tipo, material, cantidad, responsable, nota } = req.body;
-  if (!tipo || !material || !cantidad || !responsable) return res.status(400).json({ error: 'Faltan datos' });
-  const item = db.data.bodega.find(b => b.material === material);
-  if (!item) return res.status(400).json({ error: 'Material no encontrado en bodega' });
-  if (tipo === 'salida' && item.cantidad < cantidad) return res.status(400).json({ error: 'Stock insuficiente' });
-  item.cantidad += tipo === 'entrada' || tipo === 'devolucion' ? cantidad : -cantidad;
-  db.data.movimientos.push({ id: Date.now(), tipo, material, cantidad, responsable, nota: nota || '', fecha: new Date().toLocaleString('es-EC') });
-  db.write();
-  res.json({ ok: true });
+  try {
+    const { tipo, material, cantidad, responsable, nota } = req.body;
+    if (!tipo || !material || !cantidad || !responsable) return res.status(400).json({ error: 'Faltan datos' });
+    const item = db.data.bodega.find(b => b.material === material);
+    if (!item) return res.status(400).json({ error: 'Material no encontrado en bodega' });
+    if (tipo === 'salida' && item.cantidad < cantidad) return res.status(400).json({ error: 'Stock insuficiente' });
+    item.cantidad += tipo === 'entrada' || tipo === 'devolucion' ? cantidad : -cantidad;
+    db.data.movimientos.push({ id: Date.now(), tipo, material, cantidad, responsable, nota: nota || '', fecha: new Date().toLocaleString('es-EC') });
+    db.write();
+    res.json({ ok: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-app.get('/api/bodega/movimientos', requireAuth, (req, res) => { res.json([...db.data.movimientos].reverse()); });
+app.get('/api/bodega/movimientos', requireAuth, (req, res) => {
+  res.json([...db.data.movimientos].reverse());
+});
 
 app.delete('/api/bodega/movimientos/:id', requireAuth, (req, res) => {
-  const id = parseInt(req.params.id);
-  const movimiento = db.data.movimientos.find(m => m.id === id);
-  if (!movimiento) return res.status(404).json({ error: 'No encontrado' });
-  const item = db.data.bodega.find(b => b.material === movimiento.material);
-  if (item) {
-    if (movimiento.tipo === 'salida') { item.cantidad += movimiento.cantidad; }
-    else { item.cantidad -= movimiento.cantidad; if (item.cantidad < 0) item.cantidad = 0; }
-  }
-  db.data.movimientos = db.data.movimientos.filter(m => m.id !== id);
-  db.write();
-  res.json({ ok: true });
+  try {
+    const id = parseInt(req.params.id);
+    const movimiento = db.data.movimientos.find(m => m.id === id);
+    if (!movimiento) return res.status(404).json({ error: 'No encontrado' });
+    const item = db.data.bodega.find(b => b.material === movimiento.material);
+    if (item) {
+      if (movimiento.tipo === 'salida') { item.cantidad += movimiento.cantidad; }
+      else { item.cantidad -= movimiento.cantidad; if (item.cantidad < 0) item.cantidad = 0; }
+    }
+    db.data.movimientos = db.data.movimientos.filter(m => m.id !== id);
+    db.write();
+    res.json({ ok: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
 const PORT = process.env.PORT || 3000;
