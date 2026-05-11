@@ -56,53 +56,106 @@
       </div>
     </div>
 
-    <div class="card">
-      <h3>Tipo de actividad del día</h3>
-      <p class="card-sub">Selecciona una o varias actividades realizadas hoy.</p>
-      <div class="actividades-grid">
-        <div class="actividad-btn" id="act-fibra" onclick="toggleActividad('fibra')">
-          <span class="act-icon">📡</span>
-          <span class="act-label">Pasado de fibra principal</span>
-        </div>
-        <div class="actividad-btn" id="act-cajas" onclick="toggleActividad('cajas')">
-          <span class="act-icon">📦</span>
-          <span class="act-label">Armado de cajas NAT</span>
-        </div>
-        <div class="actividad-btn" id="act-instalacion" onclick="toggleActividad('instalacion')">
-          <span class="act-icon">🔌</span>
-          <span class="act-label">Instalación cliente final</span>
-        </div>
-        <div class="actividad-btn" id="act-mudanza" onclick="toggleActividad('mudanza')">
-          <span class="act-icon">🔄</span>
-          <span class="act-label">Mudar clientes radio a fibra</span>
-        </div>
-        <div class="actividad-btn" id="act-odf" onclick="toggleActividad('odf')">
-          <span class="act-icon">🗄️</span>
-          <span class="act-label">Armado de ODF</span>
-        </div>
-        <div class="actividad-btn" id="act-mangas" onclick="toggleActividad('mangas')">
-          <span class="act-icon">🔧</span>
-          <span class="act-label">Armado de mangas</span>
-        </div>
-        <div class="actividad-btn" id="act-incidencias" onclick="toggleActividad('incidencias')">
-          <span class="act-icon">⚠️</span>
-          <span class="act-label">Incidencias</span>
+   <div class="card">
+  <h3>Tipo de actividad del día</h3>
+  <p class="card-sub">Selecciona una o varias actividades realizadas hoy.</p>
+  <div class="actividades-grid">
+    <div class="actividad-btn" id="act-fibra" onclick="toggleActividad('fibra')">
+      <span class="act-icon">📡</span>
+      <span class="act-label">Pasado de fibra principal</span>
+    </div>
+    <div class="actividad-btn" id="act-cajas" onclick="toggleActividad('cajas')">
+      <span class="act-icon">📦</span>
+      <span class="act-label">Armado de cajas NAT</span>
+    </div>
+    <div class="actividad-btn" id="act-instalacion" onclick="toggleActividad('instalacion')">
+      <span class="act-icon">🔌</span>
+      <span class="act-label">Instalación cliente final</span>
+    </div>
+    <div class="actividad-btn" id="act-mudanza" onclick="toggleActividad('mudanza')">
+      <span class="act-icon">🔄</span>
+      <span class="act-label">Mudar clientes radio a fibra</span>
+    </div>
+    <div class="actividad-btn" id="act-odf" onclick="toggleActividad('odf')">
+      <span class="act-icon">🗄️</span>
+      <span class="act-label">Armado de ODF</span>
+    </div>
+    <div class="actividad-btn" id="act-mangas" onclick="toggleActividad('mangas')">
+      <span class="act-icon">🔧</span>
+      <span class="act-label">Armado de mangas</span>
+    </div>
+    <div class="actividad-btn" id="act-incidencias" onclick="toggleActividad('incidencias')">
+      <span class="act-icon">⚠️</span>
+      <span class="act-label">Incidencias</span>
+    </div>
+  </div>
+
+  <!-- IPs de instalación -->
+  <div id="ips-panel-instalacion" style="display:none;margin-top:1rem;background:var(--surface2);border-radius:8px;padding:1rem;">
+    <div style="font-size:11px;color:var(--accent);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;">🔌 IPs — Instalación cliente</div>
+    <div id="ips-lista-instalacion"></div>
+    <button onclick="agregarIPActividad('instalacion')" style="font-size:12px;padding:4px 10px;margin-top:4px;">+ Agregar IP</button>
+  </div>
+
+  <!-- IPs de mudanza -->
+  <div id="ips-panel-mudanza" style="display:none;margin-top:1rem;background:var(--surface2);border-radius:8px;padding:1rem;">
+    <div style="font-size:11px;color:var(--accent);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;">🔄 IPs — Mudanza radio a fibra</div>
+    <div id="ips-lista-mudanza"></div>
+    <button onclick="agregarIPActividad('mudanza')" style="font-size:12px;padding:4px 10px;margin-top:4px;">+ Agregar IP</button>
+  </div>
+
+  <!-- Panel incidencias -->
+  <div id="incidencias-panel" style="display:none;margin-top:1rem;background:var(--surface2);border-radius:8px;padding:1rem;">
+    <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;">Tipo de incidencias</div>
+    <div style="display:flex;flex-direction:column;gap:10px;">
+
+      <div>
+        <label class="integrante-check" style="margin-bottom:6px;">
+          <input type="checkbox" id="inc-reparaciones" class="inc-check" value="reparaciones" onchange="toggleIncidencia('reparaciones')" /> 🔨 Reparaciones
+        </label>
+        <div id="ips-panel-reparaciones" style="display:none;margin-left:24px;margin-top:4px;">
+          <div id="ips-lista-reparaciones"></div>
+          <button onclick="agregarIPActividad('reparaciones')" style="font-size:12px;padding:4px 10px;margin-top:4px;">+ Agregar IP</button>
         </div>
       </div>
 
-      <div id="incidencias-panel" style="display:none;margin-top:1rem;background:var(--surface2);border-radius:8px;padding:1rem;">
-        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;">Tipo de incidencias</div>
-        <div class="actividades-grid">
-          <label class="integrante-check"><input type="checkbox" class="inc-check" value="reparaciones" /> 🔨 Reparaciones</label>
-          <label class="integrante-check"><input type="checkbox" class="inc-check" value="focos_rojos" /> 🔴 Focos rojos</label>
-          <label class="integrante-check"><input type="checkbox" class="inc-check" value="actualizaciones" /> 🔄 Actualizaciones</label>
-          <label class="integrante-check"><input type="checkbox" class="inc-check" value="cambio_domicilio" /> 🏠 Cambio de domicilio</label>
-        </div>
-        <div class="form-group" style="margin-top:10px;">
-          <label>Cantidad de incidencias atendidas</label>
-          <input type="number" min="0" id="num-incidencias" placeholder="0" style="max-width:120px;" />
+      <div>
+        <label class="integrante-check" style="margin-bottom:6px;">
+          <input type="checkbox" id="inc-focos_rojos" class="inc-check" value="focos_rojos" onchange="toggleIncidencia('focos_rojos')" /> 🔴 Focos rojos
+        </label>
+        <div id="ips-panel-focos_rojos" style="display:none;margin-left:24px;margin-top:4px;">
+          <div id="ips-lista-focos_rojos"></div>
+          <button onclick="agregarIPActividad('focos_rojos')" style="font-size:12px;padding:4px 10px;margin-top:4px;">+ Agregar IP</button>
         </div>
       </div>
+
+      <div>
+        <label class="integrante-check" style="margin-bottom:6px;">
+          <input type="checkbox" id="inc-actualizaciones" class="inc-check" value="actualizaciones" onchange="toggleIncidencia('actualizaciones')" /> 🔄 Actualizaciones
+        </label>
+        <div id="ips-panel-actualizaciones" style="display:none;margin-left:24px;margin-top:4px;">
+          <div id="ips-lista-actualizaciones"></div>
+          <button onclick="agregarIPActividad('actualizaciones')" style="font-size:12px;padding:4px 10px;margin-top:4px;">+ Agregar IP</button>
+        </div>
+      </div>
+
+      <div>
+        <label class="integrante-check" style="margin-bottom:6px;">
+          <input type="checkbox" id="inc-cambio_domicilio" class="inc-check" value="cambio_domicilio" onchange="toggleIncidencia('cambio_domicilio')" /> 🏠 Cambio de domicilio
+        </label>
+        <div id="ips-panel-cambio_domicilio" style="display:none;margin-left:24px;margin-top:4px;">
+          <div id="ips-lista-cambio_domicilio"></div>
+          <button onclick="agregarIPActividad('cambio_domicilio')" style="font-size:12px;padding:4px 10px;margin-top:4px;">+ Agregar IP</button>
+        </div>
+      </div>
+
+    </div>
+    <div class="form-group" style="margin-top:10px;">
+      <label>Cantidad total de incidencias atendidas</label>
+      <input type="number" min="0" id="num-incidencias" placeholder="0" style="max-width:120px;" />
+    </div>
+  </div>
+</div>
 
       <div id="ips-panel" style="display:none;margin-top:1rem;background:var(--surface2);border-radius:8px;padding:1rem;">
         <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;">IPs de clientes atendidos</div>
