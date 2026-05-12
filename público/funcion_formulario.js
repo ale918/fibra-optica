@@ -43,6 +43,12 @@ let rolActual = '';
 let cuadrillaHoyId = null;
 let ipCounters = {};
 
+// ── Fecha local ──────────────────────────────────────────
+function fechaLocal() {
+  const ahora = new Date();
+  return `${ahora.getFullYear()}-${String(ahora.getMonth()+1).padStart(2,'0')}-${String(ahora.getDate()).padStart(2,'0')}`;
+}
+
 // ── Init ─────────────────────────────────────────────────
 async function init() {
   try {
@@ -68,11 +74,7 @@ async function init() {
         <button class="tab" onclick="mostrarTab('bodega')">Bodega</button>
         <button class="tab" onclick="mostrarTab('indicadores')">Indicadores</button>`;
       const fechaEl = document.getElementById('fecha');
-if (fechaEl) {
-  const ahora = new Date();
-  const hoy = `${ahora.getFullYear()}-${String(ahora.getMonth()+1).padStart(2,'0')}-${String(ahora.getDate()).padStart(2,'0')}`;
-  fechaEl.value = hoy;
-}
+      if (fechaEl) fechaEl.value = fechaLocal();
       await cargarCuadrillaHoy();
       mostrarTab('registro');
     }
@@ -109,13 +111,16 @@ function getIPsDeContexto(contexto) {
     .filter(Boolean);
 }
 
-function renderIPsPanel(contexto, label, icon) {
-  return `
-    <div style="margin-top:8px;">
-      <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">${icon} IPs de ${label}</div>
-      <div id="ips-lista-${contexto}"></div>
-      <button onclick="agregarIPActividad('${contexto}')" style="font-size:12px;padding:4px 10px;margin-top:4px;">+ Agregar IP</button>
-    </div>`;
+function todasLasIPs() {
+  const resultado = [];
+  getIPsDeContexto('instalacion').forEach(ip => resultado.push({ ip, tipo: 'instalacion', label: 'Instalación cliente', icon: '🔌' }));
+  getIPsDeContexto('mudanza').forEach(ip => resultado.push({ ip, tipo: 'mudanza', label: 'Mudanza radio a fibra', icon: '🔄' }));
+  Object.keys(INCIDENCIAS_INFO).forEach(tipo => {
+    getIPsDeContexto(tipo).forEach(ip => resultado.push({
+      ip, tipo, label: INCIDENCIAS_INFO[tipo].label, icon: INCIDENCIAS_INFO[tipo].icon
+    }));
+  });
+  return resultado;
 }
 
 // ── Actividades ──────────────────────────────────────────
@@ -128,16 +133,10 @@ function toggleActividad(id) {
     actividadesSeleccionadas.add(id);
     btn.classList.add('selected');
   }
-
-  // Panel instalacion
   const panelInst = document.getElementById('ips-panel-instalacion');
   if (panelInst) panelInst.style.display = actividadesSeleccionadas.has('instalacion') ? 'block' : 'none';
-
-  // Panel mudanza
   const panelMud = document.getElementById('ips-panel-mudanza');
   if (panelMud) panelMud.style.display = actividadesSeleccionadas.has('mudanza') ? 'block' : 'none';
-
-  // Panel incidencias
   const panelInc = document.getElementById('incidencias-panel');
   if (panelInc) panelInc.style.display = actividadesSeleccionadas.has('incidencias') ? 'block' : 'none';
 }
@@ -146,28 +145,6 @@ function toggleIncidencia(tipo) {
   const cb = document.getElementById(`inc-${tipo}`);
   const panel = document.getElementById(`ips-panel-${tipo}`);
   if (panel) panel.style.display = cb.checked ? 'block' : 'none';
-}
-
-// ── Recolectar todas las IPs con su contexto ─────────────
-function todasLasIPs() {
-  const resultado = [];
-
-  // Instalacion
-  getIPsDeContexto('instalacion').forEach(ip => resultado.push({ ip, tipo: 'instalacion', label: 'Instalación cliente', icon: '🔌' }));
-
-  // Mudanza
-  getIPsDeContexto('mudanza').forEach(ip => resultado.push({ ip, tipo: 'mudanza', label: 'Mudanza radio a fibra', icon: '🔄' }));
-
-  // Incidencias
-  Object.keys(INCIDENCIAS_INFO).forEach(tipo => {
-    getIPsDeContexto(tipo).forEach(ip => resultado.push({
-      ip, tipo,
-      label: INCIDENCIAS_INFO[tipo].label,
-      icon: INCIDENCIAS_INFO[tipo].icon
-    }));
-  });
-
-  return resultado;
 }
 
 // ── Cuadrillas ───────────────────────────────────────────
@@ -183,8 +160,7 @@ async function cargarTodasLasCuadrillas() {
 }
 
 async function cargarCuadrillaHoy() {
-  const ahora = new Date();
-  const hoy = `${ahora.getFullYear()}-${String(ahora.getMonth()+1).padStart(2,'0')}-${String(ahora.getDate()).padStart(2,'0')}`;
+  const hoy = fechaLocal();
   const cuadrilla = todasLasCuadrillas.find(c => c.fecha === hoy);
   const box = document.getElementById('cuadrilla-hoy-box');
   if (!box) return;
@@ -331,7 +307,6 @@ async function guardarReporte() {
   const observaciones = document.getElementById('observaciones').value.trim();
   const cuadrilla = todasLasCuadrillas.find(c => c.id === cuadrillaHoyId);
   const integrantes = cuadrilla ? cuadrilla.integrantes : [];
-
   const materiales = MATERIALES.map(m => ({
     material: m.label,
     cantidad: parseFloat(document.getElementById(m.id)?.value) || 0,
@@ -343,8 +318,6 @@ async function guardarReporte() {
     return cb && cb.checked;
   });
   const numIncidencias = parseInt(document.getElementById('num-incidencias')?.value) || 0;
-
-  // IPs con contexto
   const ips = todasLasIPs();
 
   try {
@@ -367,7 +340,7 @@ async function guardarReporte() {
 function limpiarFormulario() {
   document.getElementById('observaciones').value = '';
   const fechaEl = document.getElementById('fecha');
-  if (fechaEl) fechaEl.valueAsDate = new Date();
+  if (fechaEl) fechaEl.value = fechaLocal();
   MATERIALES.forEach(m => { const el = document.getElementById(m.id); if(el) el.value = ''; });
   actividadesSeleccionadas.clear();
   document.querySelectorAll('.actividad-btn').forEach(b => b.classList.remove('selected'));
@@ -405,24 +378,22 @@ function filtrarHistorial() {
 
 function renderIPsHistorial(ips) {
   if (!ips || !ips.length) return '';
-  // Agrupar por tipo
   const grupos = {};
   ips.forEach(item => {
     const key = item.tipo || 'otro';
     if (!grupos[key]) grupos[key] = { label: item.label || key, icon: item.icon || '🌐', ips: [] };
     grupos[key].ips.push(item.ip || item);
   });
-
   return `
     <div style="margin-bottom:10px;">
       <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">🌐 IPs de clientes</div>
       ${Object.values(grupos).map(g => `
-        <div style="margin-bottom:6px;">
+        <div style="margin-bottom:8px;">
           <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">${g.icon} ${g.label}</div>
           <div style="display:flex;flex-wrap:wrap;gap:6px;">
             ${g.ips.map(ip => `
               <a href="http://${ip}" target="_blank" rel="noopener"
-                style="font-size:12px;font-family:'IBM Plex Mono',monospace;background:var(--surface);border:1px solid var(--accent);border-radius:6px;padding:3px 10px;color:var(--accent);text-decoration:none;cursor:pointer;"
+                style="font-size:12px;font-family:'IBM Plex Mono',monospace;background:var(--surface);border:1px solid var(--accent);border-radius:6px;padding:3px 10px;color:var(--accent);text-decoration:none;"
                 title="Abrir ${ip}">
                 ${ip} ↗
               </a>`).join('')}
@@ -443,8 +414,6 @@ function renderHistorial(reportes) {
     const incidencias = r.incidencias || [];
     const cuadrilla = todasLasCuadrillas.find(c => c.id === r.cuadrillaId);
     const ips = r.ips || [];
-    const tieneIps = ips.length > 0;
-
     return `
       <div class="reporte-card">
         <div class="reporte-header" onclick="toggleReporte(${r.id})">
@@ -456,7 +425,7 @@ function renderHistorial(reportes) {
           </div>
           <div style="display:flex;align-items:center;gap:8px;">
             ${fotos.length > 0 ? `<span style="font-size:11px;color:var(--muted);">📷 ${fotos.length}</span>` : ''}
-            ${tieneIps ? `<span style="font-size:11px;color:var(--accent);">🌐 ${ips.length}</span>` : ''}
+            ${ips.length > 0 ? `<span style="font-size:11px;color:var(--accent);">🌐 ${ips.length}</span>` : ''}
             <div style="color:var(--muted);font-size:18px;" id="arrow-${r.id}">▼</div>
           </div>
         </div>
@@ -477,9 +446,7 @@ function renderHistorial(reportes) {
                 ${incidencias.map(i => INCIDENCIAS_INFO[i] ? `<span style="font-size:12px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:3px 8px;">${INCIDENCIAS_INFO[i].icon} ${INCIDENCIAS_INFO[i].label}</span>` : '').join('')}
               </div>
             </div>` : ''}
-
           ${renderIPsHistorial(ips)}
-
           <table class="mat-table">
             <thead><tr><th>Material</th><th>Cantidad</th><th>Unidad</th></tr></thead>
             <tbody>${(r.materiales || []).map(m => `<tr><td>${m.material}</td><td class="cant">${m.cantidad}</td><td>${m.unidad}</td></tr>`).join('')}</tbody>
@@ -814,8 +781,11 @@ function barMeta(valor, meta) {
     </div>`;
 }
 
-function calcularBadge(reportes, actividades, numPersonas = 5) {
-  if (reportes.length === 0) return { badge: 'Sin registro', color: 'var(--muted)', bg: 'var(--surface2)' };
+function calcularBadge(reportes, actividades, numPersonas = 5, cuadrillaAsignada = false) {
+  if (reportes.length === 0) {
+    if (cuadrillaAsignada) return { badge: 'Sin reporte', color: '#fff', bg: '#A32D2D' };
+    return { badge: 'Sin registro', color: 'var(--muted)', bg: 'var(--surface2)' };
+  }
   const fibra = getMat(reportes, 'Fibra Principal');
   const cajas = getMat(reportes, 'Cajas NAT');
   const numIncidencias = reportes.reduce((s, r) => s + (r.numIncidencias || 0), 0);
@@ -840,6 +810,8 @@ async function iniciarIndicadores() {
     todosLosReportes = await res.json();
     const semanas = {};
     todosLosReportes.forEach(r => { semanas[getLunes(r.fecha)] = true; });
+    // También incluir semanas con cuadrillas aunque no tengan reportes
+    todasLasCuadrillas.forEach(c => { semanas[getLunes(c.fecha)] = true; });
     const semanasOrdenadas = Object.keys(semanas).sort().reverse();
     const sel = document.getElementById('semana-select');
     sel.innerHTML = semanasOrdenadas.map(s => {
@@ -878,7 +850,8 @@ function cargarIndicadores() {
     const actividades = [...new Set(reportes.flatMap(r => r.actividades || []))];
     const integrantes = [...new Set(reportes.flatMap(r => r.integrantes || []))];
     const numPersonas = integrantes.length || 5;
-    const { badge } = calcularBadge(reportes, actividades, numPersonas);
+    const cuadrillaDelDia = todasLasCuadrillas.find(c => c.fecha === fecha);
+    const { badge } = calcularBadge(reportes, actividades, numPersonas, !!cuadrillaDelDia);
     if (badge === 'Productivo') diasProductivos++;
     totalFibra += getMat(reportes, 'Fibra Principal');
     totalCajas += getMat(reportes, 'Cajas NAT');
@@ -922,9 +895,13 @@ function cargarIndicadores() {
     const numIncidencias = reportes.reduce((s, r) => s + (r.numIncidencias || 0), 0);
     const incidencias = [...new Set(reportes.flatMap(r => r.incidencias || []))];
     const cuadrilla = todasLasCuadrillas.find(c => reportes.some(r => r.cuadrillaId === c.id));
+    const cuadrillaDelDia = todasLasCuadrillas.find(c => c.fecha === fecha);
     const allIps = reportes.flatMap(r => r.ips || []);
 
-    let badgeInfo = esSabado ? { badge: 'Extra', color: '#854F0B', bg: '#FAEEDA' } : calcularBadge(reportes, actividades, numPersonas);
+    let badgeInfo = esSabado
+      ? { badge: 'Extra', color: '#854F0B', bg: '#FAEEDA' }
+      : calcularBadge(reportes, actividades, numPersonas, !!cuadrillaDelDia);
+
     const observaciones = reportes.map(r => r.observaciones).filter(Boolean);
     const actsHTML = actividades.length > 0 ? `
       <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">
@@ -943,7 +920,18 @@ function cargarIndicadores() {
           </div>
           <span style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;background:${badgeInfo.bg};color:${badgeInfo.color};">${badgeInfo.badge}</span>
         </div>
-        ${reportes.length === 0 ? '<p style="font-size:12px;color:var(--muted);text-align:center;padding:0.5rem 0;">Sin actividad registrada</p>' : `
+
+        ${reportes.length === 0 ? `
+          ${cuadrillaDelDia ? `
+            <div style="background:rgba(163,45,45,0.1);border:1px solid rgba(163,45,45,0.3);border-radius:8px;padding:1rem;text-align:center;">
+              <div style="font-size:13px;font-weight:600;color:#ff6b6b;margin-bottom:6px;">⚠️ Sin reporte</div>
+              <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">La cuadrilla <strong style="color:var(--text);">${cuadrillaDelDia.nombre}</strong> no registró actividad este día</div>
+              <div style="display:flex;flex-wrap:wrap;gap:5px;justify-content:center;">
+                ${cuadrillaDelDia.integrantes.map(i => `<span style="font-size:11px;background:rgba(163,45,45,0.15);border:1px solid rgba(163,45,45,0.3);border-radius:20px;padding:2px 8px;color:#ff6b6b;">👷 ${i}</span>`).join('')}
+              </div>
+            </div>` :
+            '<p style="font-size:12px;color:var(--muted);text-align:center;padding:0.5rem 0;">Sin actividad registrada</p>'}
+        ` : `
           ${cuadrilla ? `<div style="font-size:12px;color:var(--accent);margin-bottom:8px;">🏷️ ${cuadrilla.nombre}</div>` : ''}
           ${actsHTML}
           ${integrantes.length > 0 ? `<div style="margin-bottom:10px;"><div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:3px;">👷 Integrantes</div><div style="font-size:13px;">${integrantes.join(', ')}</div></div>` : ''}
@@ -1004,13 +992,13 @@ function exportarInformeSemanal() {
     const actividades = [...new Set(reportes.flatMap(r => r.actividades || []))];
     const integrantes = [...new Set(reportes.flatMap(r => r.integrantes || []))];
     const numPersonas = integrantes.length || 5;
-    const { badge } = i === 5 ? { badge: 'Extra' } : calcularBadge(reportes, actividades, numPersonas);
-    const cuadrilla = todasLasCuadrillas.find(c => reportes.some(r => r.cuadrillaId === c.id));
+    const cuadrillaDelDia = todasLasCuadrillas.find(c => c.fecha === fecha);
+    const { badge } = i === 5 ? { badge: 'Extra' } : calcularBadge(reportes, actividades, numPersonas, !!cuadrillaDelDia);
     const allIps = reportes.flatMap(r => r.ips || []);
     const ipsTexto = allIps.map(i => typeof i === 'object' ? `${i.label}: ${i.ip}` : i).join(' | ');
     resumenFilas.push({
       'Día': nombres[i], 'Fecha': fecha, 'Estado': badge,
-      'Cuadrilla': cuadrilla ? cuadrilla.nombre : '—',
+      'Cuadrilla': cuadrillaDelDia ? cuadrillaDelDia.nombre : '—',
       'Personas': numPersonas,
       'Actividades': actividades.map(a => ACTIVIDADES_INFO[a]?.label || a).join(', ') || '—',
       'Integrantes': integrantes.join(', ') || '—',
