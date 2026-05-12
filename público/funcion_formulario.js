@@ -68,7 +68,11 @@ async function init() {
         <button class="tab" onclick="mostrarTab('bodega')">Bodega</button>
         <button class="tab" onclick="mostrarTab('indicadores')">Indicadores</button>`;
       const fechaEl = document.getElementById('fecha');
-      if (fechaEl) fechaEl.valueAsDate = new Date();
+if (fechaEl) {
+  const ahora = new Date();
+  const hoy = `${ahora.getFullYear()}-${String(ahora.getMonth()+1).padStart(2,'0')}-${String(ahora.getDate()).padStart(2,'0')}`;
+  fechaEl.value = hoy;
+}
       await cargarCuadrillaHoy();
       mostrarTab('registro');
     }
@@ -179,7 +183,8 @@ async function cargarTodasLasCuadrillas() {
 }
 
 async function cargarCuadrillaHoy() {
-  const hoy = new Date().toISOString().slice(0, 10);
+  const ahora = new Date();
+  const hoy = `${ahora.getFullYear()}-${String(ahora.getMonth()+1).padStart(2,'0')}-${String(ahora.getDate()).padStart(2,'0')}`;
   const cuadrilla = todasLasCuadrillas.find(c => c.fecha === hoy);
   const box = document.getElementById('cuadrilla-hoy-box');
   if (!box) return;
