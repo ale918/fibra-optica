@@ -196,12 +196,72 @@ async function cargarCuadrillas() {
           <div style="font-weight:600;color:var(--accent);font-size:15px;">${c.nombre}</div>
           <div style="font-size:12px;color:var(--muted);margin-top:2px;">📅 ${c.fecha}</div>
         </div>
-        <button class="btn-danger" onclick="eliminarCuadrilla(${c.id})" style="font-size:12px;padding:5px 10px;">Eliminar</button>
+        <div style="display:flex;gap:6px;">
+          <button onclick="reutilizarCuadrilla(${c.id})" style="font-size:12px;padding:5px 10px;background:var(--surface);border:1px solid var(--accent);color:var(--accent);border-radius:7px;cursor:pointer;">♻️ Reutilizar</button>
+          <button class="btn-danger" onclick="eliminarCuadrilla(${c.id})" style="font-size:12px;padding:5px 10px;">Eliminar</button>
+        </div>
       </div>
       <div style="display:flex;flex-wrap:wrap;gap:5px;">
         ${c.integrantes.map(i => `<span style="font-size:12px;background:rgba(0,212,170,0.1);border:1px solid rgba(0,212,170,0.3);border-radius:20px;padding:3px 10px;color:var(--accent);">👷 ${i}</span>`).join('')}
       </div>
     </div>`).join('');
+}
+
+function reutilizarCuadrilla(id) {
+  const c = todasLasCuadrillas.find(x => x.id === id);
+  if (!c) return;
+
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);z-index:500;display:flex;align-items:center;justify-content:center;padding:1rem;';
+  overlay.innerHTML = `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.5rem;width:100%;max-width:420px;">
+      <h3 style="color:var(--accent);font-size:14px;margin-bottom:4px;font-family:'IBM Plex Mono',monospace;">♻️ Reutilizar cuadrilla</h3>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:1rem;">Se creará <strong style="color:var(--text);">${c.nombre}</strong> con los mismos integrantes para una nueva fecha.</p>
+      <div style="background:var(--surface2);border-radius:8px;padding:10px 12px;margin-bottom:1rem;display:flex;flex-wrap:wrap;gap:5px;">
+        ${c.integrantes.map(i => `<span style="font-size:11px;background:rgba(0,212,170,0.15);border:1px solid rgba(0,212,170,0.3);border-radius:20px;padding:2px 8px;color:var(--accent);">👷 ${i}</span>`).join('')}
+      </div>
+      <div style="display:flex;flex-direction:column;gap:5px;margin-bottom:1rem;">
+        <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;">Nueva fecha</label>
+        <input type="date" id="reutilizar-fecha" style="background:var(--surface2);border:1px solid var(--border);border-radius:7px;color:var(--text);font-size:13px;padding:8px 10px;outline:none;" />
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button onclick="confirmarReutilizar(${c.id})" style="flex:1;background:var(--accent);color:#000;border:none;border-radius:8px;font-size:13px;font-weight:600;padding:10px;cursor:pointer;">Crear</button>
+        <button onclick="this.closest('div[style*=fixed]').remove()" style="flex:1;background:none;border:1px solid var(--border);border-radius:8px;font-size:13px;color:var(--text);padding:10px;cursor:pointer;">Cancelar</button>
+      </div>
+    </div>`;
+
+  // Poner fecha de mañana por defecto
+  const manana = new Date();
+  manana.setDate(manana.getDate() + 1);
+  const y = manana.getFullYear();
+  const m = String(manana.getMonth()+1).padStart(2,'0');
+  const d = String(manana.getDate()).padStart(2,'0');
+  overlay.querySelector('#reutilizar-fecha').value = `${y}-${m}-${d}`;
+
+  document.body.appendChild(overlay);
+}
+
+async function confirmarReutilizar(id) {
+  const c = todasLasCuadrillas.find(x => x.id === id);
+  if (!c) return;
+  const fecha = document.getElementById('reutilizar-fecha').value;
+  if (!fecha) { toast('⚠ Selecciona una fecha'); return; }
+
+  try {
+    const res = await fetch('/api/cuadrillas', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nombre: c.nombre, fecha, integrantes: c.integrantes })
+    });
+    const text = await res.text();
+    let data;
+    try { data = JSON.parse(text); } catch(e) { toast('Error del servidor'); return; }
+    if (res.ok && data.ok) {
+      toast('✓ Cuadrilla reutilizada para ' + fecha);
+      document.querySelector('div[style*="position:fixed"]')?.remove();
+      await cargarCuadrillas();
+    } else { toast('Error: ' + (data.error || 'Error desconocido')); }
+  } catch(e) { toast('Error de conexión: ' + e.message); }
 }
 
 async function crearCuadrilla() {
