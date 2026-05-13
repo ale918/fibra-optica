@@ -188,23 +188,75 @@ async function cargarCuadrillas() {
   await cargarTodasLasCuadrillas();
   const cont = document.getElementById('lista-cuadrillas');
   if (!cont) return;
-  if (!todasLasCuadrillas.length) { cont.innerHTML = '<p class="empty">No hay cuadrillas creadas.</p>'; return; }
-  cont.innerHTML = todasLasCuadrillas.map(c => `
-    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:1rem;margin-bottom:8px;">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
-        <div>
-          <div style="font-weight:600;color:var(--accent);font-size:15px;">${c.nombre}</div>
-          <div style="font-size:12px;color:var(--muted);margin-top:2px;">📅 ${c.fecha}</div>
+
+  const cuadrillasOriginales = todasLasCuadrillas.filter(c => !c.reutilizada);
+  if (!cuadrillasOriginales.length) { cont.innerHTML = '<p class="empty">No hay cuadrillas creadas.</p>'; return; }
+
+  cont.innerHTML = cuadrillasOriginales.map(c => {
+    const reusos = todasLasCuadrillas.filter(x => x.reutilizada && x.nombre === c.nombre);
+    return `
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:1rem;margin-bottom:8px;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
+          <div>
+            <div style="font-weight:600;color:var(--accent);font-size:15px;">${c.nombre}</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:2px;">
+              📅 ${c.fecha}
+              ${reusos.length > 0 ? `<span style="margin-left:8px;font-size:11px;color:var(--muted);">♻️ reutilizada ${reusos.length} vez${reusos.length > 1 ? 'es' : ''}</span>` : ''}
+            </div>
+          </div>
+          <div style="display:flex;gap:6px;">
+            <button onclick="reutilizarCuadrilla(${c.id})" style="font-size:12px;padding:5px 10px;background:var(--surface);border:1px solid var(--accent);color:var(--accent);border-radius:7px;cursor:pointer;">♻️ Reutilizar</button>
+            <button class="btn-danger" onclick="eliminarCuadrilla(${c.id})" style="font-size:12px;padding:5px 10px;">Eliminar</button>
+          </div>
         </div>
-        <div style="display:flex;gap:6px;">
-          <button onclick="reutilizarCuadrilla(${c.id})" style="font-size:12px;padding:5px 10px;background:var(--surface);border:1px solid var(--accent);color:var(--accent);border-radius:7px;cursor:pointer;">♻️ Reutilizar</button>
-          <button class="btn-danger" onclick="eliminarCuadrilla(${c.id})" style="font-size:12px;padding:5px 10px;">Eliminar</button>
+        <div style="display:flex;flex-wrap:wrap;gap:5px;">
+          ${c.integrantes.map(i => `<span style="font-size:12px;background:rgba(0,212,170,0.1);border:1px solid rgba(0,212,170,0.3);border-radius:20px;padding:3px 10px;color:var(--accent);">👷 ${i}</span>`).join('')}
         </div>
-      </div>
-      <div style="display:flex;flex-wrap:wrap;gap:5px;">
-        ${c.integrantes.map(i => `<span style="font-size:12px;background:rgba(0,212,170,0.1);border:1px solid rgba(0,212,170,0.3);border-radius:20px;padding:3px 10px;color:var(--accent);">👷 ${i}</span>`).join('')}
-      </div>
-    </div>`).join('');
+      </div>`;
+  }).join('');
+}
+
+async function crearCuadrilla() {
+  const nombre = document.getElementById('cuadrilla-nombre').value.trim();
+  const fecha = document.getElementById('cuadrilla-fecha').value;
+  const integrantes = [...document.querySelectorAll('.cuadrilla-int:checked')].map(i => i.value);
+  if (!nombre) { toast('⚠ Ingresa un nombre'); return; }
+  if (!fecha) { toast('⚠ Selecciona la fecha'); return; }
+  if (!integrantes.length) { toast('⚠ Selecciona al menos un integrante'); return; }
+  try {
+    const res = await fetch('/api/cuadrillas', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nombre, fecha, integrantes, reutilizada: false })
+    });
+    const text = await res.text();
+    let data;
+    try { data = JSON.parse(text); } catch(e) { toast('Error del servidor'); return; }
+    if (res.ok && data.ok) {
+      toast('✓ Cuadrilla creada');
+      document.getElementById('cuadrilla-nombre').value = '';
+      document.querySelectorAll('.cuadrilla-int').forEach(c => c.checked = false);
+      await cargarCuadrillas();
+    } else { toast('Error: ' + (data.error || 'Error desconocido')); }
+  } catch(e) { toast('Error de conexión: ' + e.message); }
+}
+
+async function eliminarCuadrilla(id) {
+  if (!confirm('¿Eliminar esta cuadrilla y todos sus reusos?')) return;
+  try {
+    const c = todasLasCuadrillas.find(x => x.id === id);
+    // Eliminar original
+    await fetch('/api/cuadrillas/' + id, { method: 'DELETE' });
+    // Eliminar reusos del mismo nombre
+    if (c) {
+      const reusos = todasLasCuadrillas.filter(x => x.reutilizada && x.nombre === c.nombre);
+      for (const r of reusos) {
+        await fetch('/api/cuadrillas/' + r.id, { method: 'DELETE' });
+      }
+    }
+    toast('Cuadrilla eliminada');
+    await cargarCuadrillas();
+  } catch(e) { toast('Error al eliminar'); }
 }
 
 function reutilizarCuadrilla(id) {
@@ -230,14 +282,12 @@ function reutilizarCuadrilla(id) {
       </div>
     </div>`;
 
-  // Poner fecha de mañana por defecto
   const manana = new Date();
   manana.setDate(manana.getDate() + 1);
   const y = manana.getFullYear();
   const m = String(manana.getMonth()+1).padStart(2,'0');
   const d = String(manana.getDate()).padStart(2,'0');
   overlay.querySelector('#reutilizar-fecha').value = `${y}-${m}-${d}`;
-
   document.body.appendChild(overlay);
 }
 
@@ -246,12 +296,11 @@ async function confirmarReutilizar(id) {
   if (!c) return;
   const fecha = document.getElementById('reutilizar-fecha').value;
   if (!fecha) { toast('⚠ Selecciona una fecha'); return; }
-
   try {
     const res = await fetch('/api/cuadrillas', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nombre: c.nombre, fecha, integrantes: c.integrantes })
+      body: JSON.stringify({ nombre: c.nombre, fecha, integrantes: c.integrantes, reutilizada: true })
     });
     const text = await res.text();
     let data;
@@ -262,40 +311,6 @@ async function confirmarReutilizar(id) {
       await cargarCuadrillas();
     } else { toast('Error: ' + (data.error || 'Error desconocido')); }
   } catch(e) { toast('Error de conexión: ' + e.message); }
-}
-
-async function crearCuadrilla() {
-  const nombre = document.getElementById('cuadrilla-nombre').value.trim();
-  const fecha = document.getElementById('cuadrilla-fecha').value;
-  const integrantes = [...document.querySelectorAll('.cuadrilla-int:checked')].map(i => i.value);
-  if (!nombre) { toast('⚠ Ingresa un nombre'); return; }
-  if (!fecha) { toast('⚠ Selecciona la fecha'); return; }
-  if (!integrantes.length) { toast('⚠ Selecciona al menos un integrante'); return; }
-  try {
-    const res = await fetch('/api/cuadrillas', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nombre, fecha, integrantes })
-    });
-    const text = await res.text();
-    let data;
-    try { data = JSON.parse(text); } catch(e) { toast('Error del servidor'); return; }
-    if (res.ok && data.ok) {
-      toast('✓ Cuadrilla creada');
-      document.getElementById('cuadrilla-nombre').value = '';
-      document.querySelectorAll('.cuadrilla-int').forEach(c => c.checked = false);
-      await cargarCuadrillas();
-    } else { toast('Error: ' + (data.error || 'Error desconocido')); }
-  } catch(e) { toast('Error de conexión: ' + e.message); }
-}
-
-async function eliminarCuadrilla(id) {
-  if (!confirm('¿Eliminar esta cuadrilla?')) return;
-  try {
-    await fetch('/api/cuadrillas/' + id, { method: 'DELETE' });
-    toast('Cuadrilla eliminada');
-    await cargarCuadrillas();
-  } catch(e) { toast('Error al eliminar'); }
 }
 
 // ── Tabs ─────────────────────────────────────────────────
@@ -870,7 +885,6 @@ async function iniciarIndicadores() {
     todosLosReportes = await res.json();
     const semanas = {};
     todosLosReportes.forEach(r => { semanas[getLunes(r.fecha)] = true; });
-    // También incluir semanas con cuadrillas aunque no tengan reportes
     todasLasCuadrillas.forEach(c => { semanas[getLunes(c.fecha)] = true; });
     const semanasOrdenadas = Object.keys(semanas).sort().reverse();
     const sel = document.getElementById('semana-select');

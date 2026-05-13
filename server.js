@@ -64,7 +64,6 @@ app.get('/', (req, res) => {
   res.sendFile(join(__dirname, 'público', 'formulario.html'));
 });
 
-// ── Login / Logout ────────────────────────────────────────
 app.post('/api/login', (req, res) => {
   const { usuario, password } = req.body;
   const user = USUARIOS[usuario];
@@ -105,7 +104,6 @@ app.get('/api/conectados', requireAuth, (req, res) => {
   res.json([...sesionesActivas.values()].map(s => ({ nombre: s.nombre, rol: s.rol })));
 });
 
-// ── Base de datos ─────────────────────────────────────────
 const adapter = new JSONFileSync(join(DATA_DIR, 'database.json'));
 const defaultData = { reportes: [], bodega: [], movimientos: [], cuadrillas: [] };
 const db = new Low(adapter, defaultData);
@@ -131,7 +129,7 @@ app.get('/api/cuadrillas', requireAuth, (req, res) => {
 
 app.post('/api/cuadrillas', requireAdmin, (req, res) => {
   try {
-    const { nombre, integrantes, fecha } = req.body;
+    const { nombre, integrantes, fecha, reutilizada } = req.body;
     if (!nombre || !integrantes?.length || !fecha) {
       return res.status(400).json({ error: 'Faltan datos' });
     }
@@ -141,6 +139,7 @@ app.post('/api/cuadrillas', requireAdmin, (req, res) => {
       nombre,
       integrantes,
       fecha,
+      reutilizada: reutilizada || false,
       creado_en: new Date().toLocaleString('es-EC')
     };
     db.data.cuadrillas.push(nueva);
@@ -271,9 +270,7 @@ app.delete('/api/reportes/:id/fotos/:public_id', requireAuth, async (req, res) =
 });
 
 // ── Bodega ───────────────────────────────────────────────
-app.get('/api/bodega', requireAuth, (req, res) => {
-  res.json(db.data.bodega);
-});
+app.get('/api/bodega', requireAuth, (req, res) => { res.json(db.data.bodega); });
 
 app.post('/api/bodega/stock', requireAuth, (req, res) => {
   try {
