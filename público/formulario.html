@@ -10,6 +10,12 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <style>
+    .sel-hilo { background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;padding:6px 8px;outline:none;cursor:pointer; }
+    .dist-row { display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap; }
+    .dist-row select { flex:1;min-width:100px; }
+    .dist-row input { flex:2;min-width:120px;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;padding:6px 8px;outline:none; }
+  </style>
 </head>
 <body>
 
@@ -38,7 +44,7 @@
 
 <main>
 
-  <!-- ═══ TAB: REGISTRO ═══ -->
+  <!-- ═══ REGISTRO ═══ -->
   <section id="tab-registro" style="display:none;">
     <div id="cuadrilla-hoy-box"></div>
     <div class="card">
@@ -55,7 +61,6 @@
 
     <div class="card">
       <h3>Tipo de actividad del día</h3>
-      <p class="card-sub">Selecciona una o varias actividades realizadas hoy.</p>
       <div class="actividades-grid">
         <div class="actividad-btn" id="act-fibra" onclick="toggleActividad('fibra')"><span class="act-icon">📡</span><span class="act-label">Pasado de fibra principal</span></div>
         <div class="actividad-btn" id="act-cajas" onclick="toggleActividad('cajas')"><span class="act-icon">📦</span><span class="act-label">Armado de cajas NAT</span></div>
@@ -65,36 +70,33 @@
         <div class="actividad-btn" id="act-mangas" onclick="toggleActividad('mangas')"><span class="act-icon">🔧</span><span class="act-label">Armado de mangas</span></div>
         <div class="actividad-btn" id="act-incidencias" onclick="toggleActividad('incidencias')"><span class="act-icon">⚠️</span><span class="act-label">Incidencias</span></div>
       </div>
-
       <div id="ips-panel-instalacion" style="display:none;margin-top:1rem;background:var(--surface2);border-radius:8px;padding:1rem;">
         <div style="font-size:11px;color:var(--accent);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;">🔌 IPs — Instalación cliente</div>
         <div id="ips-lista-instalacion"></div>
         <button onclick="agregarIPActividad('instalacion')" style="font-size:12px;padding:4px 10px;margin-top:4px;">+ Agregar IP</button>
       </div>
-
       <div id="ips-panel-mudanza" style="display:none;margin-top:1rem;background:var(--surface2);border-radius:8px;padding:1rem;">
         <div style="font-size:11px;color:var(--accent);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;">🔄 IPs — Mudanza radio a fibra</div>
         <div id="ips-lista-mudanza"></div>
         <button onclick="agregarIPActividad('mudanza')" style="font-size:12px;padding:4px 10px;margin-top:4px;">+ Agregar IP</button>
       </div>
-
       <div id="incidencias-panel" style="display:none;margin-top:1rem;background:var(--surface2);border-radius:8px;padding:1rem;">
         <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;">Tipo de incidencias</div>
         <div style="display:flex;flex-direction:column;gap:10px;">
           <div>
-            <label class="integrante-check"><input type="checkbox" id="inc-reparaciones" class="inc-check" value="reparaciones" onchange="toggleIncidencia('reparaciones')" /> 🔨 Reparaciones</label>
+            <label class="integrante-check"><input type="checkbox" id="inc-reparaciones" value="reparaciones" onchange="toggleIncidencia('reparaciones')" /> 🔨 Reparaciones</label>
             <div id="ips-panel-reparaciones" style="display:none;margin-left:24px;margin-top:4px;"><div id="ips-lista-reparaciones"></div><button onclick="agregarIPActividad('reparaciones')" style="font-size:12px;padding:4px 10px;margin-top:4px;">+ Agregar IP</button></div>
           </div>
           <div>
-            <label class="integrante-check"><input type="checkbox" id="inc-focos_rojos" class="inc-check" value="focos_rojos" onchange="toggleIncidencia('focos_rojos')" /> 🔴 Focos rojos</label>
+            <label class="integrante-check"><input type="checkbox" id="inc-focos_rojos" value="focos_rojos" onchange="toggleIncidencia('focos_rojos')" /> 🔴 Focos rojos</label>
             <div id="ips-panel-focos_rojos" style="display:none;margin-left:24px;margin-top:4px;"><div id="ips-lista-focos_rojos"></div><button onclick="agregarIPActividad('focos_rojos')" style="font-size:12px;padding:4px 10px;margin-top:4px;">+ Agregar IP</button></div>
           </div>
           <div>
-            <label class="integrante-check"><input type="checkbox" id="inc-actualizaciones" class="inc-check" value="actualizaciones" onchange="toggleIncidencia('actualizaciones')" /> 🔄 Actualizaciones</label>
+            <label class="integrante-check"><input type="checkbox" id="inc-actualizaciones" value="actualizaciones" onchange="toggleIncidencia('actualizaciones')" /> 🔄 Actualizaciones</label>
             <div id="ips-panel-actualizaciones" style="display:none;margin-left:24px;margin-top:4px;"><div id="ips-lista-actualizaciones"></div><button onclick="agregarIPActividad('actualizaciones')" style="font-size:12px;padding:4px 10px;margin-top:4px;">+ Agregar IP</button></div>
           </div>
           <div>
-            <label class="integrante-check"><input type="checkbox" id="inc-cambio_domicilio" class="inc-check" value="cambio_domicilio" onchange="toggleIncidencia('cambio_domicilio')" /> 🏠 Cambio de domicilio</label>
+            <label class="integrante-check"><input type="checkbox" id="inc-cambio_domicilio" value="cambio_domicilio" onchange="toggleIncidencia('cambio_domicilio')" /> 🏠 Cambio de domicilio</label>
             <div id="ips-panel-cambio_domicilio" style="display:none;margin-left:24px;margin-top:4px;"><div id="ips-lista-cambio_domicilio"></div><button onclick="agregarIPActividad('cambio_domicilio')" style="font-size:12px;padding:4px 10px;margin-top:4px;">+ Agregar IP</button></div>
           </div>
         </div>
@@ -107,64 +109,56 @@
 
     <div class="card">
       <h3>Materiales utilizados</h3>
-      <p class="card-sub">Ingresa solo los que se usaron.</p>
       <div class="materiales-grid">
-        <div class="mat-group">
-          <span class="mat-cat">Herrajes</span>
+        <div class="mat-group"><span class="mat-cat">Herrajes</span>
           <div class="mat-row"><label>Herrajes A</label><input type="number" min="0" id="herrajesA" placeholder="0" /><span class="unidad">und</span></div>
           <div class="mat-row"><label>Herrajes U</label><input type="number" min="0" id="herrajesU" placeholder="0" /><span class="unidad">und</span></div>
         </div>
-        <div class="mat-group">
-          <span class="mat-cat">Cintas</span>
+        <div class="mat-group"><span class="mat-cat">Cintas</span>
           <div class="mat-row"><label>Cinta 3/4"</label><input type="number" min="0" id="cinta34" placeholder="0" /><span class="unidad">m</span></div>
           <div class="mat-row"><label>Cinta 3/2"</label><input type="number" min="0" id="cinta32" placeholder="0" /><span class="unidad">m</span></div>
         </div>
-        <div class="mat-group">
-          <span class="mat-cat">Cable</span>
+        <div class="mat-group"><span class="mat-cat">Cable</span>
           <div class="mat-row"><label>Cable Drop</label><input type="number" min="0" id="cableDrop" placeholder="0" /><span class="unidad">m</span></div>
           <div class="mat-row"><label>Fibra Principal</label><input type="number" min="0" id="fibraPrincipal" placeholder="0" /><span class="unidad">m</span></div>
         </div>
-        <div class="mat-group">
-          <span class="mat-cat">Hebillas</span>
+        <div class="mat-group"><span class="mat-cat">Hebillas</span>
           <div class="mat-row"><label>Hebilla metálica 3/4"</label><input type="number" min="0" id="hebilla34" placeholder="0" /><span class="unidad">und</span></div>
           <div class="mat-row"><label>Hebilla metálica 3/2"</label><input type="number" min="0" id="hebilla32" placeholder="0" /><span class="unidad">und</span></div>
         </div>
-        <div class="mat-group">
-          <span class="mat-cat">Accesorios</span>
+        <div class="mat-group"><span class="mat-cat">Accesorios</span>
           <div class="mat-row"><label>Chupones</label><input type="number" min="0" id="chupones" placeholder="0" /><span class="unidad">und</span></div>
           <div class="mat-row"><label>Preformados</label><input type="number" min="0" id="preformados" placeholder="0" /><span class="unidad">und</span></div>
         </div>
-        <div class="mat-group">
-          <span class="mat-cat">Cajas / Splitters</span>
+        <div class="mat-group"><span class="mat-cat">Cajas / Splitters</span>
           <div class="mat-row"><label>Cajas NAT</label><input type="number" min="0" id="cajasNat" placeholder="0" /><span class="unidad">und</span></div>
           <div class="mat-row"><label>Splitter 1/16</label><input type="number" min="0" id="splitter116" placeholder="0" /><span class="unidad">und</span></div>
           <div class="mat-row"><label>Splitter 1/4</label><input type="number" min="0" id="splitter14" placeholder="0" /><span class="unidad">und</span></div>
         </div>
-        <div class="mat-group">
-          <span class="mat-cat">Instalación cliente</span>
+        <div class="mat-group"><span class="mat-cat">Instalación cliente</span>
           <div class="mat-row"><label>Ganchos telefónicos</label><input type="number" min="0" id="ganchosTel" placeholder="0" /><span class="unidad">und</span></div>
           <div class="mat-row"><label>Conector UPC</label><input type="number" min="0" id="conectorUpc" placeholder="0" /><span class="unidad">und</span></div>
           <div class="mat-row"><label>Conector APC</label><input type="number" min="0" id="conectorApc" placeholder="0" /><span class="unidad">und</span></div>
         </div>
       </div>
     </div>
-
     <div class="btn-row">
       <button class="btn-primary" onclick="guardarReporte()">Guardar reporte del día</button>
       <button onclick="limpiarFormulario()">Limpiar</button>
     </div>
   </section>
 
-  <!-- ═══ TAB: MAPA ═══ -->
+  <!-- ═══ MAPA ═══ -->
   <section id="tab-mapa" style="display:none;">
     <div id="mapa-trabajador-form" style="display:none;">
       <div class="card">
         <h3>Registrar punto en mapa</h3>
-        <p class="card-sub">Se usará tu ubicación GPS actual.</p>
+        <p class="card-sub" id="mapa-instruccion">Usa GPS o haz clic en el mapa para fijar la ubicación.</p>
+
         <div class="form-row">
           <div class="form-group">
             <label>Tipo</label>
-            <select id="caja-tipo">
+            <select id="caja-tipo" onchange="actualizarFormCaja()">
               <option value="principal">📦 Caja principal</option>
               <option value="cliente">🔌 Caja cliente</option>
               <option value="pasante">➡️ Pasante</option>
@@ -175,6 +169,7 @@
             <input type="text" id="caja-referencia" placeholder="Ej. Caja 01, Pasante Norte..." />
           </div>
         </div>
+
         <div class="form-row">
           <div class="form-group">
             <label>Total de puertos</label>
@@ -185,10 +180,56 @@
             <input type="number" min="0" id="caja-puertos-ocupados" value="0" />
           </div>
         </div>
-        <div id="gps-status" style="font-size:12px;color:var(--muted);margin-bottom:10px;">📍 Esperando GPS...</div>
-        <div class="btn-row">
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Buffer (tubo de color)</label>
+            <select id="caja-buffer" class="sel-hilo">
+              <option value="">Seleccionar...</option>
+              <option value="Azul">🔵 Azul</option>
+              <option value="Naranja">🟠 Naranja</option>
+              <option value="Verde">🟢 Verde</option>
+              <option value="Café">🟤 Café</option>
+              <option value="Gris">⚫ Gris</option>
+              <option value="Blanco">⚪ Blanco</option>
+              <option value="Rojo">🔴 Rojo</option>
+              <option value="Negro">⚫ Negro</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Hilo de la caja</label>
+            <select id="caja-hilo" class="sel-hilo">
+              <option value="">Seleccionar...</option>
+              <option value="Azul">Azul</option>
+              <option value="Naranja">Naranja</option>
+              <option value="Verde">Verde</option>
+              <option value="Café">Café</option>
+              <option value="Gris">Gris</option>
+              <option value="Blanco">Blanco</option>
+              <option value="Rojo">Rojo</option>
+              <option value="Negro">Negro</option>
+              <option value="Amarillo">Amarillo</option>
+              <option value="Violeta">Violeta</option>
+              <option value="Rosado">Rosado</option>
+              <option value="Aqua">Aqua</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Distribución solo para cajas principales -->
+        <div id="distribucion-panel" style="display:none;margin-top:1rem;">
+          <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;">📡 Hilos que distribuye esta caja</div>
+          <div id="distribucion-lista"></div>
+          <button onclick="agregarDistribucion()" style="font-size:12px;padding:5px 12px;margin-top:4px;">+ Agregar hilo distribuido</button>
+        </div>
+
+        <div id="gps-status" style="font-size:12px;color:var(--muted);margin-top:12px;padding:8px;background:var(--surface2);border-radius:6px;">
+          📍 Esperando ubicación...
+        </div>
+
+        <div class="btn-row" style="margin-top:1rem;">
           <button class="btn-primary" onclick="registrarCaja()">📍 Registrar punto</button>
-          <button onclick="obtenerGPS()">🔄 Actualizar GPS</button>
+          <button onclick="obtenerGPS()">🛰️ Usar GPS</button>
         </div>
       </div>
     </div>
@@ -196,29 +237,20 @@
     <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:8px;">
         <h3 style="margin:0;">Mapa de red</h3>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          <button onclick="filtrarMapa('todos')" id="filtro-todos" class="filtro-activo" style="font-size:12px;padding:4px 10px;border-radius:6px;border:1px solid var(--accent);background:var(--accent);color:#000;cursor:pointer;">Todos</button>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          <button onclick="filtrarMapa('todos')" id="filtro-todos" style="font-size:12px;padding:4px 10px;border-radius:6px;border:1px solid var(--accent);background:var(--accent);color:#000;cursor:pointer;">Todos</button>
           <button onclick="filtrarMapa('principal')" id="filtro-principal" style="font-size:12px;padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:none;color:var(--muted);cursor:pointer;">📦 Principal</button>
           <button onclick="filtrarMapa('cliente')" id="filtro-cliente" style="font-size:12px;padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:none;color:var(--muted);cursor:pointer;">🔌 Cliente</button>
           <button onclick="filtrarMapa('pasante')" id="filtro-pasante" style="font-size:12px;padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:none;color:var(--muted);cursor:pointer;">➡️ Pasante</button>
         </div>
       </div>
-
-      <!-- Leyenda -->
       <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px;">
-        <div style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--muted);">
-          <span style="width:12px;height:12px;background:#1D9E75;border-radius:50%;display:inline-block;"></span> Caja principal
-        </div>
-        <div style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--muted);">
-          <span style="width:12px;height:12px;background:#3B82F6;border-radius:50%;display:inline-block;"></span> Caja cliente
-        </div>
-        <div style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--muted);">
-          <span style="width:12px;height:12px;background:#F59E0B;border-radius:50%;display:inline-block;"></span> Pasante
-        </div>
+        <div style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--muted);"><span style="width:12px;height:12px;background:#1D9E75;border-radius:50%;display:inline-block;"></span> Principal</div>
+        <div style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--muted);"><span style="width:12px;height:12px;background:#3B82F6;border-radius:50%;display:inline-block;"></span> Cliente</div>
+        <div style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--muted);"><span style="width:12px;height:12px;background:#F59E0B;border-radius:50%;display:inline-block;"></span> Pasante</div>
+        <div style="font-size:11px;color:var(--muted);" id="modo-seleccion-label"></div>
       </div>
-
-      <div id="mapa" style="height:450px;border-radius:10px;overflow:hidden;border:1px solid var(--border);"></div>
-
+      <div id="mapa" style="height:420px;border-radius:10px;overflow:hidden;border:1px solid var(--border);"></div>
       <div style="margin-top:1rem;">
         <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">Puntos registrados</div>
         <div id="lista-cajas"></div>
@@ -226,7 +258,7 @@
     </div>
   </section>
 
-  <!-- ═══ TAB: HISTORIAL ═══ -->
+  <!-- ═══ HISTORIAL ═══ -->
   <section id="tab-historial" style="display:none;">
     <div class="toolbar">
       <input type="text" id="buscar-fecha" placeholder="Buscar por fecha (YYYY-MM-DD)..." oninput="filtrarHistorial()" />
@@ -235,7 +267,7 @@
     <div id="lista-reportes"><p class="empty">Cargando reportes...</p></div>
   </section>
 
-  <!-- ═══ TAB: BODEGA ═══ -->
+  <!-- ═══ BODEGA ═══ -->
   <section id="tab-bodega" style="display:none;">
     <div class="card">
       <h3>Stock actual</h3>
@@ -248,71 +280,40 @@
     <div class="card">
       <h3>Registrar movimiento</h3>
       <div class="form-row">
-        <div class="form-group">
-          <label>Tipo</label>
-          <select id="mov-tipo">
-            <option value="salida">Salida</option>
-            <option value="entrada">Entrada</option>
-            <option value="devolucion">Devolución</option>
-          </select>
+        <div class="form-group"><label>Tipo</label>
+          <select id="mov-tipo"><option value="salida">Salida</option><option value="entrada">Entrada</option><option value="devolucion">Devolución</option></select>
         </div>
-        <div class="form-group">
-          <label>Material</label>
+        <div class="form-group"><label>Material</label>
           <select id="mov-material">
-            <option value="Herrajes A">Herrajes A</option>
-            <option value="Herrajes U">Herrajes U</option>
-            <option value="Cinta 3/4&quot;">Cinta 3/4"</option>
-            <option value="Cinta 3/2&quot;">Cinta 3/2"</option>
-            <option value="Cable Drop">Cable Drop</option>
-            <option value="Fibra Principal">Fibra Principal</option>
-            <option value="Hebilla metálica 3/4&quot;">Hebilla metálica 3/4"</option>
-            <option value="Hebilla metálica 3/2&quot;">Hebilla metálica 3/2"</option>
-            <option value="Chupones">Chupones</option>
-            <option value="Preformados">Preformados</option>
-            <option value="Cajas NAT">Cajas NAT</option>
-            <option value="Splitter 1/16">Splitter 1/16</option>
-            <option value="Splitter 1/4">Splitter 1/4</option>
-            <option value="Ganchos telefónicos">Ganchos telefónicos</option>
-            <option value="Conector UPC">Conector UPC</option>
-            <option value="Conector APC">Conector APC</option>
+            <option value="Herrajes A">Herrajes A</option><option value="Herrajes U">Herrajes U</option>
+            <option value="Cinta 3/4&quot;">Cinta 3/4"</option><option value="Cinta 3/2&quot;">Cinta 3/2"</option>
+            <option value="Cable Drop">Cable Drop</option><option value="Fibra Principal">Fibra Principal</option>
+            <option value="Hebilla metálica 3/4&quot;">Hebilla metálica 3/4"</option><option value="Hebilla metálica 3/2&quot;">Hebilla metálica 3/2"</option>
+            <option value="Chupones">Chupones</option><option value="Preformados">Preformados</option>
+            <option value="Cajas NAT">Cajas NAT</option><option value="Splitter 1/16">Splitter 1/16</option>
+            <option value="Splitter 1/4">Splitter 1/4</option><option value="Ganchos telefónicos">Ganchos telefónicos</option>
+            <option value="Conector UPC">Conector UPC</option><option value="Conector APC">Conector APC</option>
           </select>
         </div>
       </div>
       <div class="form-row">
-        <div class="form-group">
-          <label>Cantidad</label>
-          <input type="number" min="1" id="mov-cantidad" placeholder="0" />
-        </div>
-        <div class="form-group">
-          <label>Responsable</label>
-          <input type="text" id="mov-responsable" placeholder="Nombre" />
-        </div>
+        <div class="form-group"><label>Cantidad</label><input type="number" min="1" id="mov-cantidad" placeholder="0" /></div>
+        <div class="form-group"><label>Responsable</label><input type="text" id="mov-responsable" placeholder="Nombre" /></div>
       </div>
-      <div class="form-group">
-        <label>Nota <span class="hint">(opcional)</span></label>
-        <input type="text" id="mov-nota" placeholder="Observación..." />
-      </div>
-      <div class="btn-row" style="margin-top:1rem;">
-        <button class="btn-primary" onclick="registrarMovimiento()">Registrar movimiento</button>
-      </div>
+      <div class="form-group"><label>Nota <span class="hint">(opcional)</span></label><input type="text" id="mov-nota" placeholder="Observación..." /></div>
+      <div class="btn-row" style="margin-top:1rem;"><button class="btn-primary" onclick="registrarMovimiento()">Registrar movimiento</button></div>
     </div>
-    <div class="card">
-      <h3>Historial de movimientos</h3>
-      <div id="tabla-movimientos"><p class="empty">Cargando...</p></div>
-    </div>
+    <div class="card"><h3>Historial de movimientos</h3><div id="tabla-movimientos"><p class="empty">Cargando...</p></div></div>
     <div id="modal-stock" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:200;align-items:center;justify-content:center;">
       <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:2rem;width:90%;max-width:500px;max-height:80vh;overflow-y:auto;">
-        <h3 style="color:var(--accent);font-family:'IBM Plex Mono',monospace;font-size:13px;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:1rem;">Actualizar stock</h3>
+        <h3 style="color:var(--accent);font-family:'IBM Plex Mono',monospace;font-size:13px;text-transform:uppercase;margin-bottom:1rem;">Actualizar stock</h3>
         <div id="modal-stock-items"></div>
-        <div class="btn-row" style="margin-top:1rem;">
-          <button class="btn-primary" onclick="guardarStock()">Guardar</button>
-          <button onclick="cerrarModalStock()">Cancelar</button>
-        </div>
+        <div class="btn-row" style="margin-top:1rem;"><button class="btn-primary" onclick="guardarStock()">Guardar</button><button onclick="cerrarModalStock()">Cancelar</button></div>
       </div>
     </div>
   </section>
 
-  <!-- ═══ TAB: INDICADORES ═══ -->
+  <!-- ═══ INDICADORES ═══ -->
   <section id="tab-indicadores" style="display:none;">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:1.25rem;flex-wrap:wrap;">
       <span style="font-size:13px;color:var(--muted);">Semana del</span>
@@ -324,19 +325,13 @@
     <div class="card"><h3>Materiales más usados</h3><div id="top-materiales"></div></div>
   </section>
 
-  <!-- ═══ TAB: CUADRILLAS (solo admin) ═══ -->
+  <!-- ═══ CUADRILLAS ═══ -->
   <section id="tab-cuadrillas" style="display:none;">
     <div class="card">
       <h3>Nueva cuadrilla</h3>
       <div class="form-row">
-        <div class="form-group">
-          <label>Nombre de la cuadrilla</label>
-          <input type="text" id="cuadrilla-nombre" placeholder="Ej. Grupo A..." />
-        </div>
-        <div class="form-group">
-          <label>Fecha asignada</label>
-          <input type="date" id="cuadrilla-fecha" />
-        </div>
+        <div class="form-group"><label>Nombre</label><input type="text" id="cuadrilla-nombre" placeholder="Ej. Grupo A..." /></div>
+        <div class="form-group"><label>Fecha asignada</label><input type="date" id="cuadrilla-fecha" /></div>
       </div>
       <div class="form-group" style="margin-top:12px;">
         <label>Integrantes</label>
@@ -351,14 +346,9 @@
           <label class="integrante-check"><input type="checkbox" class="cuadrilla-int" value="David Mora" /> David Mora</label>
         </div>
       </div>
-      <div class="btn-row" style="margin-top:1rem;">
-        <button class="btn-primary" onclick="crearCuadrilla()">Crear cuadrilla</button>
-      </div>
+      <div class="btn-row" style="margin-top:1rem;"><button class="btn-primary" onclick="crearCuadrilla()">Crear cuadrilla</button></div>
     </div>
-    <div class="card">
-      <h3>Cuadrillas creadas</h3>
-      <div id="lista-cuadrillas"><p class="empty">Cargando...</p></div>
-    </div>
+    <div class="card"><h3>Cuadrillas creadas</h3><div id="lista-cuadrillas"><p class="empty">Cargando...</p></div></div>
   </section>
 
 </main>

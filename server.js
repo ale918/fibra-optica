@@ -58,9 +58,7 @@ function requireAdmin(req, res, next) {
 app.use(express.static(join(__dirname, 'público')));
 
 app.get('/', (req, res) => {
-  if (!req.session || !req.session.loggedIn) {
-    return res.sendFile(join(__dirname, 'público', 'login.html'));
-  }
+  if (!req.session || !req.session.loggedIn) return res.sendFile(join(__dirname, 'público', 'login.html'));
   res.sendFile(join(__dirname, 'público', 'formulario.html'));
 });
 
@@ -115,17 +113,14 @@ db.write();
 
 // ── Cuadrillas ────────────────────────────────────────────
 app.get('/api/cuadrillas', requireAuth, (req, res) => {
-  try {
-    if (!db.data.cuadrillas) db.data.cuadrillas = [];
-    res.json(db.data.cuadrillas);
-  } catch(e) { res.status(500).json({ error: e.message }); }
+  try { res.json(db.data.cuadrillas || []); }
+  catch(e) { res.status(500).json({ error: e.message }); }
 });
 
 app.post('/api/cuadrillas', requireAdmin, (req, res) => {
   try {
     const { nombre, integrantes, fecha, reutilizada } = req.body;
     if (!nombre || !integrantes?.length || !fecha) return res.status(400).json({ error: 'Faltan datos' });
-    if (!db.data.cuadrillas) db.data.cuadrillas = [];
     const nueva = { id: Date.now(), nombre, integrantes, fecha, reutilizada: reutilizada || false, creado_en: new Date().toLocaleString('es-EC') };
     db.data.cuadrillas.push(nueva);
     db.write();
@@ -141,19 +136,16 @@ app.delete('/api/cuadrillas/:id', requireAdmin, (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-// ── Cajas (mapa) ──────────────────────────────────────────
+// ── Cajas ─────────────────────────────────────────────────
 app.get('/api/cajas', requireAuth, (req, res) => {
-  try {
-    res.json(db.data.cajas || []);
-  } catch(e) { res.status(500).json({ error: e.message }); }
+  try { res.json(db.data.cajas || []); }
+  catch(e) { res.status(500).json({ error: e.message }); }
 });
 
 app.post('/api/cajas', requireAuth, (req, res) => {
   try {
-    const { tipo, referencia, lat, lng, totalPuertos, puertosOcupados } = req.body;
-    if (!tipo || !referencia || lat === undefined || lng === undefined) {
-      return res.status(400).json({ error: 'Faltan datos' });
-    }
+    const { tipo, referencia, lat, lng, totalPuertos, puertosOcupados, buffer, hilo, distribucion } = req.body;
+    if (!tipo || !referencia || lat === undefined || lng === undefined) return res.status(400).json({ error: 'Faltan datos' });
     const nueva = {
       id: Date.now(),
       tipo,
@@ -162,10 +154,12 @@ app.post('/api/cajas', requireAuth, (req, res) => {
       lng: parseFloat(lng),
       totalPuertos: parseInt(totalPuertos) || 16,
       puertosOcupados: parseInt(puertosOcupados) || 0,
+      buffer: buffer || '',
+      hilo: hilo || '',
+      distribucion: distribucion || [],
       registrado_por: req.session.nombre,
       creado_en: new Date().toLocaleString('es-EC')
     };
-    if (!db.data.cajas) db.data.cajas = [];
     db.data.cajas.push(nueva);
     db.write();
     res.json({ ok: true, id: nueva.id });
@@ -177,11 +171,14 @@ app.put('/api/cajas/:id', requireAuth, (req, res) => {
     const id = parseInt(req.params.id);
     const caja = db.data.cajas.find(c => c.id === id);
     if (!caja) return res.status(404).json({ error: 'Caja no encontrada' });
-    const { tipo, referencia, totalPuertos, puertosOcupados } = req.body;
-    if (tipo) caja.tipo = tipo;
-    if (referencia) caja.referencia = referencia;
+    const { tipo, referencia, totalPuertos, puertosOcupados, buffer, hilo, distribucion } = req.body;
+    if (tipo !== undefined) caja.tipo = tipo;
+    if (referencia !== undefined) caja.referencia = referencia;
     if (totalPuertos !== undefined) caja.totalPuertos = parseInt(totalPuertos);
     if (puertosOcupados !== undefined) caja.puertosOcupados = parseInt(puertosOcupados);
+    if (buffer !== undefined) caja.buffer = buffer;
+    if (hilo !== undefined) caja.hilo = hilo;
+    if (distribucion !== undefined) caja.distribucion = distribucion;
     caja.editado_en = new Date().toLocaleString('es-EC');
     db.write();
     res.json({ ok: true });
