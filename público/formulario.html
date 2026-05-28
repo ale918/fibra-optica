@@ -10,17 +10,6 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-  <style>
-    .act-panel { background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:1.25rem;margin-top:1rem; }
-    .act-panel h4 { font-size:12px;color:var(--accent);text-transform:uppercase;letter-spacing:0.07em;font-family:'IBM Plex Mono',monospace;margin-bottom:1rem; }
-    .field-row { display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px; }
-    .field-row .form-group { flex:1;min-width:120px; }
-    .sel-field { background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;padding:7px 8px;outline:none;width:100%; }
-    .inp-field { background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;padding:7px 8px;outline:none;width:100%; }
-    .check-row { display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px; }
-    .tag-check { display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text);background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:5px 10px;cursor:pointer; }
-    .tag-check input { accent-color:var(--accent); }
-  </style>
 </head>
 <body>
 
@@ -30,19 +19,19 @@
       <span class="logo">⬡ Airnet</span>
       <span class="logo-sub">Control de materiales</span>
     </div>
-    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
       <div class="tabs" id="nav-tabs"></div>
       <div style="position:relative;">
-        <div id="conectados-badge" onclick="toggleConectados()" style="font-size:12px;color:#6b7280;display:flex;align-items:center;gap:6px;cursor:pointer;padding:5px 10px;border-radius:7px;border:1px solid #2a2f3a;">
-          <span style="width:8px;height:8px;background:#00d4aa;border-radius:50%;display:inline-block;"></span>
+        <div id="conectados-badge" onclick="toggleConectados()" style="font-size:12px;color:#6b7280;display:flex;align-items:center;gap:5px;cursor:pointer;padding:4px 8px;border-radius:6px;border:1px solid #2a2f3a;">
+          <span style="width:7px;height:7px;background:#00d4aa;border-radius:50%;display:inline-block;"></span>
           <span id="conectados-texto">...</span>
         </div>
-        <div id="conectados-popup" style="display:none;position:absolute;top:calc(100% + 8px);right:0;background:#14171c;border:1px solid #2a2f3a;border-radius:10px;padding:12px;min-width:200px;z-index:200;box-shadow:0 4px 20px rgba(0,0,0,0.4);">
+        <div id="conectados-popup" style="display:none;position:absolute;top:calc(100% + 8px);right:0;background:#14171c;border:1px solid #2a2f3a;border-radius:10px;padding:12px;min-width:190px;z-index:200;box-shadow:0 4px 20px rgba(0,0,0,0.4);">
           <div style="font-size:10px;color:#6b7280;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;">Conectados ahora</div>
           <div id="conectados-lista"></div>
         </div>
       </div>
-      <button onclick="cerrarSesion()" style="font-size:12px;padding:6px 12px;border-radius:7px;background:none;border:1px solid #2a2f3a;color:#6b7280;cursor:pointer;">Salir</button>
+      <button onclick="cerrarSesion()" style="font-size:12px;padding:5px 10px;border-radius:6px;background:none;border:1px solid #2a2f3a;color:#6b7280;cursor:pointer;">Salir</button>
     </div>
   </div>
 </header>
@@ -59,7 +48,7 @@
         <label>Fecha</label>
         <input type="date" id="fecha" />
       </div>
-      <div class="form-group" style="margin-top:12px;">
+      <div class="form-group" style="margin-top:10px;">
         <label>Observaciones generales</label>
         <textarea id="observaciones" placeholder="Sector, novedad del día..."></textarea>
       </div>
@@ -67,11 +56,13 @@
 
     <div class="card">
       <h3>Actividades del día</h3>
-      <p class="card-sub">Selecciona y llena los detalles de cada actividad realizada.</p>
+      <p class="card-sub">Selecciona y llena los detalles de cada actividad.</p>
 
       <!-- FIBRA PRINCIPAL -->
-      <div class="actividad-btn" id="act-fibra" onclick="toggleActividad('fibra')">
-        <span class="act-icon">📡</span><span class="act-label">Pasado de fibra principal</span>
+      <div class="actividades-grid" style="grid-template-columns:1fr;">
+        <div class="actividad-btn" id="act-fibra" onclick="toggleActividad('fibra')">
+          <span class="act-icon">📡</span><span class="act-label">Pasado de fibra principal</span>
+        </div>
       </div>
       <div id="panel-fibra" class="act-panel" style="display:none;">
         <h4>📡 Pasado de fibra principal</h4>
@@ -84,8 +75,8 @@
           <div class="form-group"><label>Herrajes U</label><input type="number" min="0" id="fibra-herrajesU" class="inp-field" placeholder="0" /></div>
         </div>
         <div class="field-row">
-          <div class="form-group"><label>Hebilla metálica 3/4"</label><input type="number" min="0" id="fibra-hebilla34" class="inp-field" placeholder="0" /></div>
-          <div class="form-group"><label>Hebilla metálica 3/2"</label><input type="number" min="0" id="fibra-hebilla32" class="inp-field" placeholder="0" /></div>
+          <div class="form-group"><label>Hebilla 3/4"</label><input type="number" min="0" id="fibra-hebilla34" class="inp-field" placeholder="0" /></div>
+          <div class="form-group"><label>Hebilla 3/2"</label><input type="number" min="0" id="fibra-hebilla32" class="inp-field" placeholder="0" /></div>
         </div>
         <div class="field-row">
           <div class="form-group"><label>Preformados</label><input type="number" min="0" id="fibra-preformados" class="inp-field" placeholder="0" /></div>
@@ -94,14 +85,16 @@
       </div>
 
       <!-- ARMADO DE CAJA -->
-      <div class="actividad-btn" id="act-cajas" onclick="toggleActividad('cajas')" style="margin-top:8px;">
-        <span class="act-icon">📦</span><span class="act-label">Armado de cajas NAT</span>
+      <div class="actividades-grid" style="grid-template-columns:1fr;margin-top:8px;">
+        <div class="actividad-btn" id="act-cajas" onclick="toggleActividad('cajas')">
+          <span class="act-icon">📦</span><span class="act-label">Armado de cajas NAT</span>
+        </div>
       </div>
       <div id="panel-cajas" class="act-panel" style="display:none;">
         <h4>📦 Armado de cajas NAT</h4>
         <div class="field-row">
           <div class="form-group"><label>Tipo de caja</label>
-            <select id="caja-tipo-reg" class="sel-field">
+            <select id="caja-tipo-reg" class="sel-field" onchange="toggleDistribucionReg()">
               <option value="principal">Caja principal</option>
               <option value="cliente">Caja cliente</option>
               <option value="pasante">Pasante</option>
@@ -125,7 +118,7 @@
               <option>Gris</option><option>Blanco</option><option>Rojo</option><option>Negro</option>
             </select>
           </div>
-          <div class="form-group"><label>Hilo usado</label>
+          <div class="form-group"><label>Hilo de esta caja</label>
             <select id="caja-hilo-reg" class="sel-field">
               <option value="">Seleccionar...</option>
               <option>Azul</option><option>Naranja</option><option>Verde</option><option>Café</option>
@@ -138,16 +131,31 @@
           <div class="form-group"><label>Total puertos</label><input type="number" min="1" id="caja-total-reg" class="inp-field" value="16" /></div>
           <div class="form-group"><label>Puertos ocupados</label><input type="number" min="0" id="caja-ocupados-reg" class="inp-field" value="0" /></div>
         </div>
-        <div style="margin-top:8px;">
-          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;">📍 GPS de la caja</label>
-          <div id="caja-gps-status" style="font-size:12px;color:var(--muted);margin-top:4px;padding:6px 8px;background:var(--surface);border-radius:6px;">Esperando GPS...</div>
-          <button onclick="obtenerGPSCaja()" style="margin-top:6px;font-size:12px;padding:5px 12px;">🛰️ Obtener GPS</button>
+
+        <!-- Distribución de hilos — solo caja principal -->
+        <div id="dist-reg-panel" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);">
+          <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">📡 Hilos que reparte esta caja</div>
+          <div id="dist-reg-lista"></div>
+          <button onclick="agregarDistReg()" style="font-size:12px;padding:4px 10px;margin-top:4px;">+ Agregar hilo repartido</button>
+        </div>
+
+        <!-- GPS / Guardar en mapa -->
+        <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);">
+          <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">📍 Guardar ubicación en mapa</div>
+          <div id="caja-gps-status" style="font-size:12px;color:var(--muted);padding:6px 10px;background:var(--surface);border-radius:6px;margin-bottom:8px;">Sin ubicación — la caja no se guardará en el mapa</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button onclick="obtenerGPSCaja()">🛰️ Usar GPS</button>
+            <button onclick="activarSeleccionMapaCaja()">🗺️ Marcar en mapa</button>
+            <button onclick="limpiarGPSCaja()" style="color:var(--muted);font-size:12px;">✕ Sin ubicación</button>
+          </div>
         </div>
       </div>
 
       <!-- INSTALACION CLIENTE -->
-      <div class="actividad-btn" id="act-instalacion" onclick="toggleActividad('instalacion')" style="margin-top:8px;">
-        <span class="act-icon">🔌</span><span class="act-label">Instalación cliente final</span>
+      <div class="actividades-grid" style="grid-template-columns:1fr;margin-top:8px;">
+        <div class="actividad-btn" id="act-instalacion" onclick="toggleActividad('instalacion')">
+          <span class="act-icon">🔌</span><span class="act-label">Instalación cliente final</span>
+        </div>
       </div>
       <div id="panel-instalacion" class="act-panel" style="display:none;">
         <h4>🔌 Instalación cliente final</h4>
@@ -160,15 +168,17 @@
           <div class="form-group"><label>Conector APC</label><input type="number" min="0" id="inst-apc" class="inp-field" placeholder="0" /></div>
         </div>
         <div style="margin-top:6px;">
-          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;">IP del cliente</label>
+          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;">IP del cliente</label>
           <div id="ips-lista-instalacion" style="margin-top:4px;"></div>
           <button onclick="agregarIPActividad('instalacion')" style="font-size:12px;padding:4px 10px;margin-top:4px;">+ Agregar IP</button>
         </div>
       </div>
 
       <!-- MUDANZA -->
-      <div class="actividad-btn" id="act-mudanza" onclick="toggleActividad('mudanza')" style="margin-top:8px;">
-        <span class="act-icon">🔄</span><span class="act-label">Mudar clientes radio a fibra</span>
+      <div class="actividades-grid" style="grid-template-columns:1fr;margin-top:8px;">
+        <div class="actividad-btn" id="act-mudanza" onclick="toggleActividad('mudanza')">
+          <span class="act-icon">🔄</span><span class="act-label">Mudar clientes radio a fibra</span>
+        </div>
       </div>
       <div id="panel-mudanza" class="act-panel" style="display:none;">
         <h4>🔄 Mudanza radio a fibra</h4>
@@ -184,15 +194,17 @@
           <div class="form-group"><label>Conector APC</label><input type="number" min="0" id="mud-apc" class="inp-field" placeholder="0" /></div>
         </div>
         <div style="margin-top:6px;">
-          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;">IPs de clientes mudados</label>
+          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;">IPs de clientes mudados</label>
           <div id="ips-lista-mudanza" style="margin-top:4px;"></div>
           <button onclick="agregarIPActividad('mudanza')" style="font-size:12px;padding:4px 10px;margin-top:4px;">+ Agregar IP</button>
         </div>
       </div>
 
       <!-- ODF -->
-      <div class="actividad-btn" id="act-odf" onclick="toggleActividad('odf')" style="margin-top:8px;">
-        <span class="act-icon">🗄️</span><span class="act-label">Armado de ODF</span>
+      <div class="actividades-grid" style="grid-template-columns:1fr;margin-top:8px;">
+        <div class="actividad-btn" id="act-odf" onclick="toggleActividad('odf')">
+          <span class="act-icon">🗄️</span><span class="act-label">Armado de ODF</span>
+        </div>
       </div>
       <div id="panel-odf" class="act-panel" style="display:none;">
         <h4>🗄️ Armado de ODF</h4>
@@ -209,13 +221,15 @@
         </div>
         <div class="field-row">
           <div class="form-group"><label>Línea activa</label><input type="text" id="odf-linea" class="inp-field" placeholder="Ej. Línea 1, Puerto 3..." /></div>
-          <div class="form-group"><label>Observación del nodo</label><input type="text" id="odf-obs" class="inp-field" placeholder="Sector, ciudad..." /></div>
+          <div class="form-group"><label>Observación</label><input type="text" id="odf-obs" class="inp-field" placeholder="Sector, detalle..." /></div>
         </div>
       </div>
 
       <!-- MANGAS -->
-      <div class="actividad-btn" id="act-mangas" onclick="toggleActividad('mangas')" style="margin-top:8px;">
-        <span class="act-icon">🔧</span><span class="act-label">Armado de mangas</span>
+      <div class="actividades-grid" style="grid-template-columns:1fr;margin-top:8px;">
+        <div class="actividad-btn" id="act-mangas" onclick="toggleActividad('mangas')">
+          <span class="act-icon">🔧</span><span class="act-label">Armado de mangas</span>
+        </div>
       </div>
       <div id="panel-mangas" class="act-panel" style="display:none;">
         <h4>🔧 Armado de mangas</h4>
@@ -235,12 +249,14 @@
       </div>
 
       <!-- INCIDENCIAS -->
-      <div class="actividad-btn" id="act-incidencias" onclick="toggleActividad('incidencias')" style="margin-top:8px;">
-        <span class="act-icon">⚠️</span><span class="act-label">Incidencias</span>
+      <div class="actividades-grid" style="grid-template-columns:1fr;margin-top:8px;">
+        <div class="actividad-btn" id="act-incidencias" onclick="toggleActividad('incidencias')">
+          <span class="act-icon">⚠️</span><span class="act-label">Incidencias</span>
+        </div>
       </div>
       <div id="panel-incidencias" class="act-panel" style="display:none;">
         <h4>⚠️ Incidencias</h4>
-        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">Tipos de incidencia</div>
+        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">Tipo de incidencia</div>
 
         <!-- Cambio de equipos -->
         <div style="margin-bottom:10px;">
@@ -255,7 +271,7 @@
               <button onclick="agregarIPActividad('cambio_equipos')" style="font-size:12px;padding:4px 10px;margin-top:4px;">+ Agregar IP</button>
             </div>
             <div style="margin-top:8px;">
-              <label style="font-size:11px;color:var(--muted);">📷 Foto del equipo cambiado</label>
+              <label style="font-size:11px;color:var(--muted);">📷 Foto del equipo</label>
               <input type="file" accept="image/*" id="inc-ce-foto" style="margin-top:4px;font-size:12px;color:var(--text);" />
             </div>
           </div>
@@ -272,8 +288,8 @@
               <label class="tag-check"><input type="checkbox" id="fr-fibra" /> Fibra óptica dañada</label>
             </div>
             <div class="field-row" style="margin-top:6px;">
-              <div class="form-group"><label>Conector UPC</label><input type="number" min="0" id="fr-upc-cant" class="inp-field" placeholder="0" /></div>
-              <div class="form-group"><label>Conector APC</label><input type="number" min="0" id="fr-apc-cant" class="inp-field" placeholder="0" /></div>
+              <div class="form-group"><label>Cant. UPC</label><input type="number" min="0" id="fr-upc-cant" class="inp-field" placeholder="0" /></div>
+              <div class="form-group"><label>Cant. APC</label><input type="number" min="0" id="fr-apc-cant" class="inp-field" placeholder="0" /></div>
             </div>
             <div style="margin-top:6px;">
               <label style="font-size:11px;color:var(--muted);">IP del cliente</label>
@@ -288,7 +304,7 @@
           <label class="tag-check"><input type="checkbox" id="inc-actualizaciones" onchange="toggleIncPanel('actualizaciones')" /> 🔄 Actualizaciones</label>
           <div id="subpanel-actualizaciones" style="display:none;margin-top:8px;padding:10px;background:var(--surface);border-radius:8px;">
             <div class="field-row">
-              <div class="form-group"><label>Descripción del cambio</label><input type="text" id="inc-act-desc" class="inp-field" placeholder="Qué equipo se actualizó..." /></div>
+              <div class="form-group"><label>Descripción</label><input type="text" id="inc-act-desc" class="inp-field" placeholder="Qué equipo se actualizó..." /></div>
             </div>
             <div style="margin-top:6px;">
               <label style="font-size:11px;color:var(--muted);">IP del cliente</label>
@@ -322,9 +338,11 @@
         </div>
       </div>
 
-      <!-- REPARACION FIBRA PRINCIPAL -->
-      <div class="actividad-btn" id="act-reparacion" onclick="toggleActividad('reparacion')" style="margin-top:8px;">
-        <span class="act-icon">🛠️</span><span class="act-label">Reparación de fibra principal</span>
+      <!-- REPARACION FIBRA -->
+      <div class="actividades-grid" style="grid-template-columns:1fr;margin-top:8px;">
+        <div class="actividad-btn" id="act-reparacion" onclick="toggleActividad('reparacion')">
+          <span class="act-icon">🛠️</span><span class="act-label">Reparación de fibra principal</span>
+        </div>
       </div>
       <div id="panel-reparacion" class="act-panel" style="display:none;">
         <h4>🛠️ Reparación de fibra principal</h4>
@@ -335,7 +353,7 @@
           <label class="tag-check"><input type="checkbox" id="rep-atenuacion" /> 📉 Atenuación de hilos</label>
         </div>
         <div class="field-row" style="margin-top:8px;">
-          <div class="form-group"><label>Sector arreglado</label><input type="text" id="rep-sector" class="inp-field" placeholder="Ej. Calle 5 y Av. Norte..." /></div>
+          <div class="form-group"><label>Sector arreglado</label><input type="text" id="rep-sector" class="inp-field" placeholder="Calle, sector..." /></div>
           <div class="form-group"><label>Hilos fusionados</label><input type="number" min="0" id="rep-hilos" class="inp-field" placeholder="0" /></div>
         </div>
         <div class="field-row">
@@ -346,7 +364,7 @@
               <option>Gris</option><option>Blanco</option><option>Rojo</option><option>Negro</option>
             </select>
           </div>
-          <div class="form-group"><label>Sector quedó up</label><input type="text" id="rep-up" class="inp-field" placeholder="Sector que quedó activo..." /></div>
+          <div class="form-group"><label>Sector quedó up</label><input type="text" id="rep-up" class="inp-field" placeholder="Sector activo..." /></div>
         </div>
       </div>
 
@@ -419,13 +437,13 @@
           <button onclick="filtrarMapa('pasante')" id="filtro-pasante" style="font-size:12px;padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:none;color:var(--muted);cursor:pointer;">➡️ Pasante</button>
         </div>
       </div>
-      <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px;">
-        <div style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--muted);"><span style="width:12px;height:12px;background:#1D9E75;border-radius:50%;display:inline-block;"></span> Principal</div>
-        <div style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--muted);"><span style="width:12px;height:12px;background:#3B82F6;border-radius:50%;display:inline-block;"></span> Cliente</div>
-        <div style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--muted);"><span style="width:12px;height:12px;background:#F59E0B;border-radius:50%;display:inline-block;"></span> Pasante</div>
-        <div style="font-size:11px;color:var(--muted);" id="modo-seleccion-label"></div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:8px;">
+        <div style="display:flex;align-items:center;gap:4px;font-size:12px;color:var(--muted);"><span style="width:10px;height:10px;background:#1D9E75;border-radius:50%;display:inline-block;"></span> Principal</div>
+        <div style="display:flex;align-items:center;gap:4px;font-size:12px;color:var(--muted);"><span style="width:10px;height:10px;background:#3B82F6;border-radius:50%;display:inline-block;"></span> Cliente</div>
+        <div style="display:flex;align-items:center;gap:4px;font-size:12px;color:var(--muted);"><span style="width:10px;height:10px;background:#F59E0B;border-radius:50%;display:inline-block;"></span> Pasante</div>
+        <div style="font-size:11px;color:var(--accent);" id="modo-seleccion-label"></div>
       </div>
-      <div id="mapa" style="height:420px;border-radius:10px;overflow:hidden;border:1px solid var(--border);"></div>
+      <div id="mapa" style="height:400px;border-radius:10px;overflow:hidden;border:1px solid var(--border);"></div>
       <div style="margin-top:1rem;">
         <div style="font-size:11px;color:var(--muted);text-transform:uppercase;margin-bottom:8px;">Puntos registrados</div>
         <div id="lista-cajas"></div>
@@ -436,8 +454,8 @@
   <!-- ═══ HISTORIAL ═══ -->
   <section id="tab-historial" style="display:none;">
     <div class="toolbar">
-      <input type="text" id="buscar-fecha" placeholder="Buscar por fecha (YYYY-MM-DD)..." oninput="filtrarHistorial()" />
-      <button onclick="exportarTodoExcel()">↓ Exportar historial</button>
+      <input type="text" id="buscar-fecha" placeholder="Buscar por fecha..." oninput="filtrarHistorial()" />
+      <button onclick="exportarTodoExcel()">↓ Exportar</button>
     </div>
     <div id="lista-reportes"><p class="empty">Cargando reportes...</p></div>
   </section>
@@ -477,9 +495,9 @@
       <div class="btn-row" style="margin-top:1rem;"><button class="btn-primary" onclick="registrarMovimiento()">Registrar</button></div>
     </div>
     <div class="card"><h3>Historial de movimientos</h3><div id="tabla-movimientos"><p class="empty">Cargando...</p></div></div>
-    <div id="modal-stock" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:200;align-items:center;justify-content:center;">
-      <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:2rem;width:90%;max-width:500px;max-height:80vh;overflow-y:auto;">
-        <h3 style="color:var(--accent);font-family:'IBM Plex Mono',monospace;font-size:13px;text-transform:uppercase;margin-bottom:1rem;">Actualizar stock</h3>
+    <div id="modal-stock" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:200;align-items:center;justify-content:center;padding:1rem;">
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.5rem;width:100%;max-width:480px;max-height:85vh;overflow-y:auto;">
+        <h3 style="color:var(--accent);font-family:'IBM Plex Mono',monospace;font-size:12px;text-transform:uppercase;margin-bottom:1rem;">Actualizar stock</h3>
         <div id="modal-stock-items"></div>
         <div class="btn-row" style="margin-top:1rem;"><button class="btn-primary" onclick="guardarStock()">Guardar</button><button onclick="cerrarModalStock()">Cancelar</button></div>
       </div>
@@ -488,12 +506,12 @@
 
   <!-- ═══ INDICADORES ═══ -->
   <section id="tab-indicadores" style="display:none;">
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:1.25rem;flex-wrap:wrap;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:1rem;flex-wrap:wrap;">
       <span style="font-size:13px;color:var(--muted);">Semana del</span>
-      <select id="semana-select" onchange="cargarIndicadores()" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;padding:6px 10px;"></select>
-      <button onclick="exportarInformeSemanal()">↓ Exportar informe</button>
+      <select id="semana-select" onchange="cargarIndicadores()" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;padding:6px 10px;flex:1;min-width:200px;"></select>
+      <button onclick="exportarInformeSemanal()">↓ Exportar</button>
     </div>
-    <div id="metricas-resumen" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:1.25rem;"></div>
+    <div id="metricas-resumen" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:1rem;"></div>
     <div class="card"><h3>Rendimiento por día</h3><div id="dias-semana"></div></div>
     <div class="card"><h3>Materiales más usados</h3><div id="top-materiales"></div></div>
   </section>
@@ -506,8 +524,8 @@
         <div class="form-group"><label>Nombre</label><input type="text" id="cuadrilla-nombre" placeholder="Ej. Grupo A..." /></div>
         <div class="form-group"><label>Fecha asignada</label><input type="date" id="cuadrilla-fecha" /></div>
       </div>
-      <div class="form-group" style="margin-top:12px;"><label>Integrantes</label>
-        <div class="integrantes-grid">
+      <div class="form-group" style="margin-top:10px;"><label>Integrantes</label>
+        <div class="integrantes-grid" style="margin-top:6px;">
           <label class="integrante-check"><input type="checkbox" class="cuadrilla-int" value="David Garcia" /> David Garcia</label>
           <label class="integrante-check"><input type="checkbox" class="cuadrilla-int" value="Efrain Velez" /> Efrain Velez</label>
           <label class="integrante-check"><input type="checkbox" class="cuadrilla-int" value="Fernando Pilligua" /> Fernando Pilligua</label>
