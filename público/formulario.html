@@ -133,13 +133,13 @@
         </div>
 
         <!-- Distribución de hilos — solo caja principal -->
-        <div id="dist-reg-panel" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);">
+        <div id="dist-reg-panel" style="display:none;margin-top:12px;padding-top:10px;border-top:1px solid var(--border);">
           <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">📡 Hilos que reparte esta caja</div>
           <div id="dist-reg-lista"></div>
-          <button onclick="agregarDistReg()" style="font-size:12px;padding:4px 10px;margin-top:4px;">+ Agregar hilo repartido</button>
+          <button onclick="agregarDistReg()" style="font-size:12px;padding:5px 12px;margin-top:4px;">+ Agregar buffer</button>
         </div>
 
-        <!-- GPS / Guardar en mapa -->
+        <!-- GPS -->
         <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);">
           <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">📍 Guardar ubicación en mapa</div>
           <div id="caja-gps-status" style="font-size:12px;color:var(--muted);padding:6px 10px;background:var(--surface);border-radius:6px;margin-bottom:8px;">Sin ubicación — la caja no se guardará en el mapa</div>
@@ -258,7 +258,6 @@
         <h4>⚠️ Incidencias</h4>
         <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">Tipo de incidencia</div>
 
-        <!-- Cambio de equipos -->
         <div style="margin-bottom:10px;">
           <label class="tag-check"><input type="checkbox" id="inc-cambio_equipos" onchange="toggleIncPanel('cambio_equipos')" /> 🔧 Cambio de equipos</label>
           <div id="subpanel-cambio_equipos" style="display:none;margin-top:8px;padding:10px;background:var(--surface);border-radius:8px;">
@@ -277,7 +276,6 @@
           </div>
         </div>
 
-        <!-- Foco rojo -->
         <div style="margin-bottom:10px;">
           <label class="tag-check"><input type="checkbox" id="inc-foco_rojo" onchange="toggleIncPanel('foco_rojo')" /> 🔴 Foco rojo</label>
           <div id="subpanel-foco_rojo" style="display:none;margin-top:8px;padding:10px;background:var(--surface);border-radius:8px;">
@@ -299,7 +297,6 @@
           </div>
         </div>
 
-        <!-- Actualizaciones -->
         <div style="margin-bottom:10px;">
           <label class="tag-check"><input type="checkbox" id="inc-actualizaciones" onchange="toggleIncPanel('actualizaciones')" /> 🔄 Actualizaciones</label>
           <div id="subpanel-actualizaciones" style="display:none;margin-top:8px;padding:10px;background:var(--surface);border-radius:8px;">
@@ -314,7 +311,6 @@
           </div>
         </div>
 
-        <!-- Cambio de domicilio -->
         <div style="margin-bottom:10px;">
           <label class="tag-check"><input type="checkbox" id="inc-cambio_domicilio" onchange="toggleIncPanel('cambio_domicilio')" /> 🏠 Cambio de domicilio</label>
           <div id="subpanel-cambio_domicilio" style="display:none;margin-top:8px;padding:10px;background:var(--surface);border-radius:8px;">

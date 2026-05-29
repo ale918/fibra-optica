@@ -130,45 +130,82 @@ function toggleIncPanel(tipo) {
   if (panel) panel.style.display = cb.checked ? 'block' : 'none';
 }
 
-// ── Distribución de hilos en REGISTRO ───────────────────
+// ── Distribución de hilos en REGISTRO (por buffer) ───────
 function toggleDistribucionReg() {
   const tipo = document.getElementById('caja-tipo-reg')?.value;
   const panel = document.getElementById('dist-reg-panel');
   if (panel) panel.style.display = tipo === 'principal' ? 'block' : 'none';
 }
 
-function agregarDistReg(buf = '', hil = '', dest = '') {
+function agregarDistReg(bufferPreset = '') {
   distRegContador++;
   const id = distRegContador;
   const lista = document.getElementById('dist-reg-lista');
   const div = document.createElement('div');
-  div.id = `dreg-row-${id}`;
-  div.style.cssText = 'display:flex;gap:6px;align-items:center;margin-bottom:6px;flex-wrap:wrap;';
+  div.id = `dreg-grupo-${id}`;
+  div.style.cssText = 'background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;';
   div.innerHTML = `
-    <select id="dreg-buf-${id}" class="sel-field" style="flex:1;min-width:90px;">
-      <option value="">Buffer...</option>
-      ${BUFFERS.map(b => `<option value="${b}" ${buf===b?'selected':''}>${b}</option>`).join('')}
-    </select>
-    <select id="dreg-hil-${id}" class="sel-field" style="flex:1;min-width:90px;">
-      <option value="">Hilo...</option>
-      ${HILOS.map(h => `<option value="${h}" ${hil===h?'selected':''}>${h}</option>`).join('')}
-    </select>
-    <input type="text" id="dreg-dest-${id}" placeholder="Destino..." value="${dest}"
-      style="flex:2;min-width:110px;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;padding:6px 8px;outline:none;" />
-    <button onclick="document.getElementById('dreg-row-${id}').remove()"
-      style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;flex-shrink:0;">✕</button>`;
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+      <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;flex-shrink:0;">Buffer</label>
+      <select id="dreg-buf-${id}" class="sel-field" style="flex:1;" onchange="renderHilosBuffer(${id})">
+        <option value="">Seleccionar buffer...</option>
+        ${BUFFERS.map(b => `<option value="${b}" ${b===bufferPreset?'selected':''}>${b}</option>`).join('')}
+      </select>
+      <button onclick="document.getElementById('dreg-grupo-${id}').remove()"
+        style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;flex-shrink:0;line-height:1;">✕</button>
+    </div>
+    <div id="dreg-hilos-${id}" style="padding-left:4px;">
+      <div style="font-size:12px;color:var(--muted);">Selecciona un buffer para ver los hilos disponibles</div>
+    </div>`;
   lista.appendChild(div);
+  if (bufferPreset) renderHilosBuffer(id);
+}
+
+function renderHilosBuffer(grupoId) {
+  const buffer = document.getElementById(`dreg-buf-${grupoId}`)?.value;
+  const cont = document.getElementById(`dreg-hilos-${grupoId}`);
+  if (!cont) return;
+  if (!buffer) {
+    cont.innerHTML = '<div style="font-size:12px;color:var(--muted);">Selecciona un buffer para ver los hilos</div>';
+    return;
+  }
+  const bufColor = COLOR_BUFFER[buffer] || '#6b7280';
+  cont.innerHTML = `
+    <div style="font-size:11px;color:var(--muted);margin-bottom:6px;display:flex;align-items:center;gap:5px;">
+      <span style="width:8px;height:8px;background:${bufColor};border-radius:50%;display:inline-block;"></span>
+      Hilos del buffer ${buffer} — marca los que salen de esta caja
+    </div>
+    ${HILOS.map(h => {
+      const hColor = COLOR_BUFFER[h] || '#6b7280';
+      return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap;">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;min-width:110px;">
+          <input type="checkbox" id="dreg-check-${grupoId}-${h}" style="accent-color:var(--accent);width:14px;height:14px;" />
+          <span style="display:flex;align-items:center;gap:4px;font-size:12px;color:var(--text);">
+            <span style="width:8px;height:8px;background:${hColor};border-radius:50%;display:inline-block;border:1px solid rgba(255,255,255,0.2);"></span>
+            ${h}
+          </span>
+        </label>
+        <input type="text" id="dreg-dest-${grupoId}-${h}" placeholder="Destino (Caja 01, Pasante...)"
+          style="flex:1;min-width:130px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;padding:5px 8px;outline:none;" />
+      </div>`;
+    }).join('')}`;
 }
 
 function getDistribucionReg() {
-  return [...document.querySelectorAll('[id^="dreg-row-"]')].map(row => {
-    const id = row.id.replace('dreg-row-', '');
-    return {
-      buffer: document.getElementById(`dreg-buf-${id}`)?.value || '',
-      hilo: document.getElementById(`dreg-hil-${id}`)?.value || '',
-      destino: document.getElementById(`dreg-dest-${id}`)?.value.trim() || ''
-    };
-  }).filter(d => d.buffer || d.hilo || d.destino);
+  const resultado = [];
+  document.querySelectorAll('[id^="dreg-grupo-"]').forEach(grupo => {
+    const id = grupo.id.replace('dreg-grupo-', '');
+    const buffer = document.getElementById(`dreg-buf-${id}`)?.value;
+    if (!buffer) return;
+    HILOS.forEach(h => {
+      const check = document.getElementById(`dreg-check-${id}-${h}`);
+      if (check?.checked) {
+        const destino = document.getElementById(`dreg-dest-${id}-${h}`)?.value.trim() || '';
+        resultado.push({ buffer, hilo: h, destino });
+      }
+    });
+  });
+  return resultado;
 }
 
 // ── GPS de caja en registro ──────────────────────────────
@@ -236,51 +273,48 @@ function getIPsDeContexto(contexto) {
 function recopilarDatos() {
   const datos = { actividades: [...actividadesSeleccionadas], materiales: [], ips: [], detalles: {} };
 
-  // FIBRA
   if (actividadesSeleccionadas.has('fibra')) {
-    const metros     = parseFloat(document.getElementById('fibra-metros')?.value) || 0;
-    const chupones   = parseFloat(document.getElementById('fibra-chupones')?.value) || 0;
-    const herrajesA  = parseFloat(document.getElementById('fibra-herrajesA')?.value) || 0;
-    const herrajesU  = parseFloat(document.getElementById('fibra-herrajesU')?.value) || 0;
-    const heb34      = parseFloat(document.getElementById('fibra-hebilla34')?.value) || 0;
-    const heb32      = parseFloat(document.getElementById('fibra-hebilla32')?.value) || 0;
-    const preformados= parseFloat(document.getElementById('fibra-preformados')?.value) || 0;
-    const cinta34    = parseFloat(document.getElementById('fibra-cinta34')?.value) || 0;
-    if (metros > 0)      datos.materiales.push({ material:'Fibra Principal',       cantidad:metros,      unidad:'m'   });
-    if (chupones > 0)    datos.materiales.push({ material:'Chupones',              cantidad:chupones,    unidad:'und' });
-    if (herrajesA > 0)   datos.materiales.push({ material:'Herrajes A',            cantidad:herrajesA,   unidad:'und' });
-    if (herrajesU > 0)   datos.materiales.push({ material:'Herrajes U',            cantidad:herrajesU,   unidad:'und' });
-    if (heb34 > 0)       datos.materiales.push({ material:'Hebilla metálica 3/4"', cantidad:heb34,       unidad:'und' });
-    if (heb32 > 0)       datos.materiales.push({ material:'Hebilla metálica 3/2"', cantidad:heb32,       unidad:'und' });
-    if (preformados > 0) datos.materiales.push({ material:'Preformados',           cantidad:preformados, unidad:'und' });
-    if (cinta34 > 0)     datos.materiales.push({ material:'Cinta 3/4"',            cantidad:cinta34,     unidad:'m'   });
+    const metros      = parseFloat(document.getElementById('fibra-metros')?.value) || 0;
+    const chupones    = parseFloat(document.getElementById('fibra-chupones')?.value) || 0;
+    const herrajesA   = parseFloat(document.getElementById('fibra-herrajesA')?.value) || 0;
+    const herrajesU   = parseFloat(document.getElementById('fibra-herrajesU')?.value) || 0;
+    const heb34       = parseFloat(document.getElementById('fibra-hebilla34')?.value) || 0;
+    const heb32       = parseFloat(document.getElementById('fibra-hebilla32')?.value) || 0;
+    const preformados = parseFloat(document.getElementById('fibra-preformados')?.value) || 0;
+    const cinta34     = parseFloat(document.getElementById('fibra-cinta34')?.value) || 0;
+    if (metros > 0)       datos.materiales.push({ material:'Fibra Principal',       cantidad:metros,      unidad:'m'   });
+    if (chupones > 0)     datos.materiales.push({ material:'Chupones',              cantidad:chupones,    unidad:'und' });
+    if (herrajesA > 0)    datos.materiales.push({ material:'Herrajes A',            cantidad:herrajesA,   unidad:'und' });
+    if (herrajesU > 0)    datos.materiales.push({ material:'Herrajes U',            cantidad:herrajesU,   unidad:'und' });
+    if (heb34 > 0)        datos.materiales.push({ material:'Hebilla metálica 3/4"', cantidad:heb34,       unidad:'und' });
+    if (heb32 > 0)        datos.materiales.push({ material:'Hebilla metálica 3/2"', cantidad:heb32,       unidad:'und' });
+    if (preformados > 0)  datos.materiales.push({ material:'Preformados',           cantidad:preformados, unidad:'und' });
+    if (cinta34 > 0)      datos.materiales.push({ material:'Cinta 3/4"',            cantidad:cinta34,     unidad:'m'   });
     datos.detalles.fibra = { metros };
   }
 
-  // CAJAS
   if (actividadesSeleccionadas.has('cajas')) {
     const cajasnat = parseFloat(document.getElementById('caja-cajasnat')?.value) || 0;
     const sp16     = parseFloat(document.getElementById('caja-sp16')?.value) || 0;
     const sp4      = parseFloat(document.getElementById('caja-sp4')?.value) || 0;
     const heb34    = parseFloat(document.getElementById('caja-heb34')?.value) || 0;
     const cinta32  = parseFloat(document.getElementById('caja-cinta32')?.value) || 0;
-    if (cajasnat > 0) datos.materiales.push({ material:'Cajas NAT',            cantidad:cajasnat, unidad:'und' });
-    if (sp16 > 0)     datos.materiales.push({ material:'Splitter 1/16',        cantidad:sp16,     unidad:'und' });
-    if (sp4 > 0)      datos.materiales.push({ material:'Splitter 1/4',         cantidad:sp4,      unidad:'und' });
-    if (heb34 > 0)    datos.materiales.push({ material:'Hebilla metálica 3/4"',cantidad:heb34,    unidad:'und' });
-    if (cinta32 > 0)  datos.materiales.push({ material:'Cinta 3/2"',           cantidad:cinta32,  unidad:'m'   });
+    if (cajasnat > 0) datos.materiales.push({ material:'Cajas NAT',             cantidad:cajasnat, unidad:'und' });
+    if (sp16 > 0)     datos.materiales.push({ material:'Splitter 1/16',         cantidad:sp16,     unidad:'und' });
+    if (sp4 > 0)      datos.materiales.push({ material:'Splitter 1/4',          cantidad:sp4,      unidad:'und' });
+    if (heb34 > 0)    datos.materiales.push({ material:'Hebilla metálica 3/4"', cantidad:heb34,    unidad:'und' });
+    if (cinta32 > 0)  datos.materiales.push({ material:'Cinta 3/2"',            cantidad:cinta32,  unidad:'m'   });
     datos.detalles.cajas = {
-      tipo:           document.getElementById('caja-tipo-reg')?.value,
-      buffer:         document.getElementById('caja-buffer-reg')?.value,
-      hilo:           document.getElementById('caja-hilo-reg')?.value,
-      totalPuertos:   parseInt(document.getElementById('caja-total-reg')?.value) || 16,
-      puertosOcupados:parseInt(document.getElementById('caja-ocupados-reg')?.value) || 0,
-      distribucion:   getDistribucionReg(),
+      tipo:            document.getElementById('caja-tipo-reg')?.value,
+      buffer:          document.getElementById('caja-buffer-reg')?.value,
+      hilo:            document.getElementById('caja-hilo-reg')?.value,
+      totalPuertos:    parseInt(document.getElementById('caja-total-reg')?.value) || 16,
+      puertosOcupados: parseInt(document.getElementById('caja-ocupados-reg')?.value) || 0,
+      distribucion:    getDistribucionReg(),
       lat: cajaGpsLat, lng: cajaGpsLng
     };
   }
 
-  // INSTALACION
   if (actividadesSeleccionadas.has('instalacion')) {
     const ganchos = parseFloat(document.getElementById('inst-ganchos')?.value) || 0;
     const drop    = parseFloat(document.getElementById('inst-drop')?.value) || 0;
@@ -293,7 +327,6 @@ function recopilarDatos() {
     getIPsDeContexto('instalacion').forEach(ip => datos.ips.push({ ip, tipo:'instalacion', label:'Instalación cliente', icon:'🔌' }));
   }
 
-  // MUDANZA
   if (actividadesSeleccionadas.has('mudanza')) {
     const drop = parseFloat(document.getElementById('mud-drop')?.value) || 0;
     const upc  = parseFloat(document.getElementById('mud-upc')?.value) || 0;
@@ -308,7 +341,6 @@ function recopilarDatos() {
     getIPsDeContexto('mudanza').forEach(ip => datos.ips.push({ ip, tipo:'mudanza', label:'Mudanza radio a fibra', icon:'🔄' }));
   }
 
-  // ODF
   if (actividadesSeleccionadas.has('odf')) {
     datos.detalles.odf = {
       nodo:  document.getElementById('odf-nodo')?.value,
@@ -318,7 +350,6 @@ function recopilarDatos() {
     };
   }
 
-  // MANGAS
   if (actividadesSeleccionadas.has('mangas')) {
     datos.detalles.mangas = {
       hilos:  parseInt(document.getElementById('manga-hilos')?.value) || 0,
@@ -327,7 +358,6 @@ function recopilarDatos() {
     };
   }
 
-  // INCIDENCIAS
   if (actividadesSeleccionadas.has('incidencias')) {
     const incTipos = [];
     if (document.getElementById('inc-cambio_equipos')?.checked) {
@@ -365,20 +395,19 @@ function recopilarDatos() {
       getIPsDeContexto('cambio_domicilio').forEach(ip => datos.ips.push({ ip, tipo:'cambio_domicilio', label:'Cambio de domicilio', icon:'🏠' }));
     }
     datos.detalles.incidencias = { tipos: incTipos, total: parseInt(document.getElementById('num-incidencias')?.value) || 0 };
-    datos.incidencias   = incTipos.map(t => t.tipo);
+    datos.incidencias    = incTipos.map(t => t.tipo);
     datos.numIncidencias = parseInt(document.getElementById('num-incidencias')?.value) || 0;
   }
 
-  // REPARACION
   if (actividadesSeleccionadas.has('reparacion')) {
     datos.detalles.reparacion = {
-      ardilla:   document.getElementById('rep-ardilla')?.checked,
-      arrancada: document.getElementById('rep-arrancada')?.checked,
-      atenuacion:document.getElementById('rep-atenuacion')?.checked,
-      sector:    document.getElementById('rep-sector')?.value.trim(),
-      hilos:     parseInt(document.getElementById('rep-hilos')?.value) || 0,
-      buffer:    document.getElementById('rep-buffer')?.value,
-      up:        document.getElementById('rep-up')?.value.trim(),
+      ardilla:    document.getElementById('rep-ardilla')?.checked,
+      arrancada:  document.getElementById('rep-arrancada')?.checked,
+      atenuacion: document.getElementById('rep-atenuacion')?.checked,
+      sector:     document.getElementById('rep-sector')?.value.trim(),
+      hilos:      parseInt(document.getElementById('rep-hilos')?.value) || 0,
+      buffer:     document.getElementById('rep-buffer')?.value,
+      up:         document.getElementById('rep-up')?.value.trim(),
     };
   }
 
@@ -406,7 +435,7 @@ async function guardarReporte() {
   // Guardar caja en mapa si tiene GPS
   if (actividadesSeleccionadas.has('cajas') && cajaGpsLat !== null && cajaGpsLng !== null) {
     const det = datos.detalles.cajas;
-    const tipoLabel = det.tipo === 'principal' ? 'Caja Principal' : det.tipo === 'cliente' ? 'Caja Cliente' : 'Pasante';
+    const tipoLabel = det.tipo==='principal'?'Caja Principal':det.tipo==='cliente'?'Caja Cliente':'Pasante';
     try {
       await fetch('/api/cajas', {
         method: 'POST',
@@ -499,8 +528,30 @@ function renderDetallesHistorial(detalles) {
       ${c.lat?'· 📍 En mapa':''}
     </div>`;
     if (c.distribucion?.length > 0) {
-      html += `<div style="font-size:11px;color:var(--muted);margin-bottom:6px;margin-left:12px;">
-        📡 Reparte: ${c.distribucion.map(d=>`${d.buffer}/${d.hilo}${d.destino?` → ${d.destino}`:''}`).join(' · ')}
+      // Agrupar por buffer para mostrar más limpio
+      const porBuffer = {};
+      c.distribucion.forEach(d => {
+        if (!porBuffer[d.buffer]) porBuffer[d.buffer] = [];
+        porBuffer[d.buffer].push(d);
+      });
+      html += `<div style="font-size:11px;color:var(--muted);margin-bottom:6px;margin-left:12px;padding:6px 10px;background:var(--surface2);border-radius:6px;">
+        <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px;">📡 Distribución de hilos</div>
+        ${Object.entries(porBuffer).map(([buf, hilos]) => {
+          const bc = COLOR_BUFFER[buf] || '#6b7280';
+          return `<div style="margin-bottom:4px;">
+            <span style="display:inline-flex;align-items:center;gap:3px;font-size:11px;">
+              <span style="width:7px;height:7px;background:${bc};border-radius:50%;display:inline-block;"></span>
+              <strong>Buffer ${buf}:</strong>
+            </span>
+            ${hilos.map(d => {
+              const hc = COLOR_BUFFER[d.hilo] || '#6b7280';
+              return `<span style="display:inline-flex;align-items:center;gap:2px;font-size:11px;margin-left:6px;">
+                <span style="width:6px;height:6px;background:${hc};border-radius:50%;display:inline-block;"></span>
+                ${d.hilo}${d.destino?` → ${d.destino}`:''}
+              </span>`;
+            }).join('')}
+          </div>`;
+        }).join('')}
       </div>`;
     }
   }
@@ -528,7 +579,7 @@ function renderDetallesHistorial(detalles) {
   }
   if (detalles.incidencias?.tipos?.length > 0) {
     detalles.incidencias.tipos.forEach(t => {
-      const info = INCIDENCIAS_TIPOS[t.tipo] || { label: t.tipo, icon: '⚠️' };
+      const info = INCIDENCIAS_TIPOS[t.tipo] || { label:t.tipo, icon:'⚠️' };
       html += `<div style="font-size:12px;color:var(--muted);margin-bottom:4px;">
         ${info.icon} ${info.label}
         ${t.desc?`· <em style="color:var(--text);">${t.desc}</em>`:''}
@@ -556,7 +607,7 @@ function renderIPsHistorial(ips) {
   const grupos = {};
   ips.forEach(item => {
     const key = item.tipo || 'otro';
-    if (!grupos[key]) grupos[key] = { label: item.label||key, icon: item.icon||'🌐', ips: [] };
+    if (!grupos[key]) grupos[key] = { label:item.label||key, icon:item.icon||'🌐', ips:[] };
     grupos[key].ips.push(item.ip || item);
   });
   return `<div style="margin-bottom:10px;">
@@ -704,9 +755,7 @@ function exportarTodoExcel() {
     const d = new Date(r.fecha+'T12:00:00');
     const acts = (r.actividades||[]).map(a => ACTIVIDADES_INFO[a]?.label||a).join(', ');
     const ipsTexto = (r.ips||[]).map(i => typeof i==='object'?`${i.label}: ${i.ip}`:i).join(' | ');
-    (r.materiales||[]).forEach(m => {
-      filas.push({ 'Fecha':r.fecha,'Día':dias[d.getDay()],'Actividades':acts,'Integrantes':(r.integrantes||[]).join(', '),'Material':m.material,'Cantidad':m.cantidad,'Unidad':m.unidad,'Observaciones':r.observaciones||'','IPs':ipsTexto });
-    });
+    (r.materiales||[]).forEach(m => { filas.push({ 'Fecha':r.fecha,'Día':dias[d.getDay()],'Actividades':acts,'Integrantes':(r.integrantes||[]).join(', '),'Material':m.material,'Cantidad':m.cantidad,'Unidad':m.unidad,'Observaciones':r.observaciones||'','IPs':ipsTexto }); });
   });
   const ws = XLSX.utils.json_to_sheet(filas);
   const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Historial');
@@ -747,16 +796,14 @@ function verFoto(url) {
 async function iniciarMapa() {
   await cargarCajas();
   if (!mapaLeaflet) {
-    const lat = todasLasCajas.length > 0 ? todasLasCajas[0].lat : -1.0224;
-    const lng = todasLasCajas.length > 0 ? todasLasCajas[0].lng : -79.4604;
-    mapaLeaflet = L.map('mapa').setView([lat, lng], 15);
+    const lat = todasLasCajas.length>0?todasLasCajas[0].lat:-1.0224;
+    const lng = todasLasCajas.length>0?todasLasCajas[0].lng:-79.4604;
+    mapaLeaflet = L.map('mapa').setView([lat,lng],15);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'© OpenStreetMap', maxZoom:19 }).addTo(mapaLeaflet);
 
     mapaLeaflet.on('click', e => {
-      // Modo selección para caja de registro
       if (modoSeleccionMapaCaja) {
-        cajaGpsLat = e.latlng.lat;
-        cajaGpsLng = e.latlng.lng;
+        cajaGpsLat = e.latlng.lat; cajaGpsLng = e.latlng.lng;
         modoSeleccionMapaCaja = false;
         const lbl = document.getElementById('modo-seleccion-label');
         if (lbl) lbl.textContent = '';
@@ -772,20 +819,17 @@ async function iniciarMapa() {
         }, 400);
         return;
       }
-      // Modo selección normal para mapa
       if (!modoSeleccionMapa) return;
-      gpsLat = e.latlng.lat;
-      gpsLng = e.latlng.lng;
+      gpsLat = e.latlng.lat; gpsLng = e.latlng.lng;
       actualizarStatusGPS();
       modoSeleccionMapa = false;
       const lbl = document.getElementById('modo-seleccion-label');
       if (lbl) lbl.textContent = '';
       mapaLeaflet.getContainer().style.cursor = '';
-      toast('✓ Ubicación seleccionada en el mapa');
+      toast('✓ Ubicación seleccionada');
     });
   }
-  renderMarcadores();
-  renderListaCajas();
+  renderMarcadores(); renderListaCajas();
   if (rolActual === 'trabajador') {
     const form = document.getElementById('mapa-trabajador-form');
     if (form) form.style.display = 'block';
@@ -802,7 +846,7 @@ function activarSeleccionMapa() {
 
 function actualizarStatusGPS() {
   const status = document.getElementById('gps-status'); if (!status) return;
-  if (gpsLat !== null && gpsLng !== null) {
+  if (gpsLat!==null&&gpsLng!==null) {
     status.innerHTML = `✅ Ubicación lista: <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;">${gpsLat.toFixed(5)}, ${gpsLng.toFixed(5)}</span>
       <button onclick="activarSeleccionMapa()" style="margin-left:8px;font-size:11px;padding:2px 8px;border-radius:4px;border:1px solid var(--accent);color:var(--accent);background:none;cursor:pointer;">🗺️ Cambiar</button>`;
     status.style.color = 'var(--accent)';
@@ -812,19 +856,13 @@ function actualizarStatusGPS() {
 function obtenerGPS() {
   const status = document.getElementById('gps-status');
   if (!navigator.geolocation) {
-    if (status) status.innerHTML = `❌ GPS no disponible. <button onclick="activarSeleccionMapa()" style="font-size:11px;padding:2px 8px;border-radius:4px;border:1px solid var(--accent);color:var(--accent);background:none;cursor:pointer;">🗺️ Seleccionar en mapa</button>`;
+    if (status) status.innerHTML = `❌ GPS no disponible. <button onclick="activarSeleccionMapa()" style="font-size:11px;padding:2px 8px;border-radius:4px;border:1px solid var(--accent);color:var(--accent);background:none;cursor:pointer;">🗺️ Seleccionar</button>`;
     return;
   }
   if (status) status.textContent = '⏳ Obteniendo GPS...';
   navigator.geolocation.getCurrentPosition(
-    pos => {
-      gpsLat = pos.coords.latitude; gpsLng = pos.coords.longitude;
-      actualizarStatusGPS();
-      if (mapaLeaflet) mapaLeaflet.setView([gpsLat, gpsLng], 17);
-    },
-    () => {
-      if (status) status.innerHTML = `⚠️ No se pudo obtener GPS. <button onclick="activarSeleccionMapa()" style="font-size:11px;padding:2px 8px;border-radius:4px;border:1px solid var(--accent);color:var(--accent);background:none;cursor:pointer;">🗺️ Seleccionar</button>`;
-    },
+    pos => { gpsLat=pos.coords.latitude; gpsLng=pos.coords.longitude; actualizarStatusGPS(); if(mapaLeaflet) mapaLeaflet.setView([gpsLat,gpsLng],17); },
+    () => { if(status) status.innerHTML = `⚠️ No se pudo obtener GPS. <button onclick="activarSeleccionMapa()" style="font-size:11px;padding:2px 8px;border-radius:4px;border:1px solid var(--accent);color:var(--accent);background:none;cursor:pointer;">🗺️ Seleccionar</button>`; },
     { enableHighAccuracy:true, timeout:10000 }
   );
 }
@@ -832,14 +870,14 @@ function obtenerGPS() {
 function actualizarFormCaja() {
   const tipo = document.getElementById('caja-tipo').value;
   const panel = document.getElementById('distribucion-panel');
-  if (panel) panel.style.display = tipo === 'principal' ? 'block' : 'none';
+  if (panel) panel.style.display = tipo==='principal'?'block':'none';
 }
 
-function selHilos(id, val = '') {
+function selHilos(id, val='') {
   return `<select id="${id}" class="sel-field" style="flex:1;min-width:80px;"><option value="">Hilo...</option>${HILOS.map(h=>`<option value="${h}" ${val===h?'selected':''}>${h}</option>`).join('')}</select>`;
 }
 
-function selBuffers(id, val = '') {
+function selBuffers(id, val='') {
   return `<select id="${id}" class="sel-field" style="flex:1;min-width:80px;"><option value="">Buffer...</option>${BUFFERS.map(b=>`<option value="${b}" ${val===b?'selected':''}>${b}</option>`).join('')}</select>`;
 }
 
@@ -873,26 +911,33 @@ function crearIcono(tipo) {
 function renderMarcadores() {
   marcadoresMapa.forEach(m => mapaLeaflet.removeLayer(m));
   marcadoresMapa = [];
-  const cajasFiltradas = filtroActivo==='todos' ? todasLasCajas : todasLasCajas.filter(c => c.tipo===filtroActivo);
+  const cajasFiltradas = filtroActivo==='todos'?todasLasCajas:todasLasCajas.filter(c=>c.tipo===filtroActivo);
   cajasFiltradas.forEach(caja => {
     const libres = caja.totalPuertos - caja.puertosOcupados;
     const pct = Math.round((caja.puertosOcupados/caja.totalPuertos)*100);
     const colorBarra = pct>=90?'#E24B4A':pct>=60?'#F59E0B':'#1D9E75';
     const info = TIPO_CAJA[caja.tipo] || { label:caja.tipo, icon:'📦' };
     const bufColor = COLOR_BUFFER[caja.buffer] || '#6b7280';
-    const distHTML = caja.tipo==='principal' && caja.distribucion?.length>0 ? `
-      <div style="margin-top:8px;border-top:1px solid #e5e7eb;padding-top:6px;">
+
+    // Agrupar distribución por buffer para el popup
+    let distHTML = '';
+    if (caja.tipo==='principal' && caja.distribucion?.length>0) {
+      const porBuffer = {};
+      caja.distribucion.forEach(d => { if (!porBuffer[d.buffer]) porBuffer[d.buffer]=[]; porBuffer[d.buffer].push(d); });
+      distHTML = `<div style="margin-top:8px;border-top:1px solid #e5e7eb;padding-top:6px;">
         <div style="font-size:11px;font-weight:600;margin-bottom:4px;">📡 Hilos distribuidos</div>
-        ${caja.distribucion.map(d => {
-          const dc = COLOR_BUFFER[d.buffer]||'#6b7280';
-          const hc = COLOR_BUFFER[d.hilo]||'#6b7280';
-          return `<div style="font-size:11px;display:flex;align-items:center;gap:4px;margin-bottom:2px;">
-            <span style="width:8px;height:8px;background:${dc};border-radius:50%;display:inline-block;"></span>${d.buffer}
-            <span style="width:8px;height:8px;background:${hc};border-radius:50%;display:inline-block;margin-left:2px;"></span>${d.hilo}
-            ${d.destino?`<span style="color:#6b7280;">→ ${d.destino}</span>`:''}
+        ${Object.entries(porBuffer).map(([buf,hilos]) => {
+          const bc = COLOR_BUFFER[buf]||'#6b7280';
+          return `<div style="margin-bottom:4px;">
+            <span style="font-size:11px;display:flex;align-items:center;gap:3px;">
+              <span style="width:7px;height:7px;background:${bc};border-radius:50%;display:inline-block;"></span>
+              <strong>Buffer ${buf}:</strong>
+            </span>
+            ${hilos.map(d=>{const hc=COLOR_BUFFER[d.hilo]||'#6b7280';return `<span style="font-size:11px;display:inline-flex;align-items:center;gap:2px;margin-left:8px;"><span style="width:6px;height:6px;background:${hc};border-radius:50%;display:inline-block;"></span>${d.hilo}${d.destino?` → ${d.destino}`:''}</span>`;}).join('')}
           </div>`;
         }).join('')}
-      </div>` : '';
+      </div>`;
+    }
 
     const popup = `<div style="font-family:'IBM Plex Sans',sans-serif;min-width:200px;">
       <div style="font-weight:600;font-size:14px;margin-bottom:2px;">${info.icon} ${caja.referencia}</div>
@@ -914,14 +959,14 @@ function renderMarcadores() {
       </div>`:''}
     </div>`;
 
-    const marcador = L.marker([caja.lat, caja.lng], { icon:crearIcono(caja.tipo) }).addTo(mapaLeaflet).bindPopup(popup);
+    const marcador = L.marker([caja.lat,caja.lng], { icon:crearIcono(caja.tipo) }).addTo(mapaLeaflet).bindPopup(popup);
     marcadoresMapa.push(marcador);
   });
 }
 
 function renderListaCajas() {
   const cont = document.getElementById('lista-cajas'); if (!cont) return;
-  const cajasFiltradas = filtroActivo==='todos' ? todasLasCajas : todasLasCajas.filter(c => c.tipo===filtroActivo);
+  const cajasFiltradas = filtroActivo==='todos'?todasLasCajas:todasLasCajas.filter(c=>c.tipo===filtroActivo);
   if (!cajasFiltradas.length) { cont.innerHTML='<p class="empty">No hay puntos registrados.</p>'; return; }
   cont.innerHTML = cajasFiltradas.map(c => {
     const libres = c.totalPuertos - c.puertosOcupados;
@@ -955,7 +1000,7 @@ function renderListaCajas() {
   }).join('');
 }
 
-function irACaja(lat, lng) { if (mapaLeaflet) mapaLeaflet.setView([lat, lng], 18); }
+function irACaja(lat,lng) { if (mapaLeaflet) mapaLeaflet.setView([lat,lng],18); }
 
 function filtrarMapa(tipo) {
   filtroActivo = tipo;
@@ -978,7 +1023,7 @@ async function registrarCaja() {
   const puertosOcupados = parseInt(document.getElementById('caja-puertos-ocupados').value)||0;
   const buffer = document.getElementById('caja-buffer').value;
   const hilo = document.getElementById('caja-hilo').value;
-  const distribucion = tipo==='principal' ? getDistribucion() : [];
+  const distribucion = tipo==='principal'?getDistribucion():[];
   if (!referencia) { toast('⚠ Ingresa una referencia'); return; }
   try {
     const res = await fetch('/api/cajas', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ tipo, referencia, lat:gpsLat, lng:gpsLng, totalPuertos, puertosOcupados, buffer, hilo, distribucion }) });
@@ -999,8 +1044,8 @@ async function registrarCaja() {
 }
 
 function editarCaja(id) {
-  const c = todasLasCajas.find(x => x.id===id); if (!c) return;
-  const esPrincipal = c.tipo === 'principal';
+  const c = todasLasCajas.find(x=>x.id===id); if (!c) return;
+  const esPrincipal = c.tipo==='principal';
   const distFilas = (c.distribucion||[]).map((d,i) => {
     const iid = `edit-dist-${id}-${i}`;
     return `<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;flex-wrap:wrap;" id="${iid}">
@@ -1064,7 +1109,7 @@ function editarCaja(id) {
 }
 
 function agregarDistEdit(cajaId) {
-  if (!editDistMap[cajaId]) editDistMap[cajaId] = 100;
+  if (!editDistMap[cajaId]) editDistMap[cajaId]=100;
   editDistMap[cajaId]++;
   const idx = editDistMap[cajaId];
   const lista = document.getElementById(`edit-dist-lista-${cajaId}`);
@@ -1137,9 +1182,9 @@ async function cargarCuadrillas() {
   await cargarTodasLasCuadrillas();
   const cont = document.getElementById('lista-cuadrillas'); if (!cont) return;
   const originales = todasLasCuadrillas.filter(c => !c.reutilizada);
-  if (!originales.length) { cont.innerHTML = '<p class="empty">No hay cuadrillas creadas.</p>'; return; }
+  if (!originales.length) { cont.innerHTML='<p class="empty">No hay cuadrillas creadas.</p>'; return; }
   cont.innerHTML = originales.map(c => {
-    const reusos = todasLasCuadrillas.filter(x => x.reutilizada && x.nombre === c.nombre);
+    const reusos = todasLasCuadrillas.filter(x => x.reutilizada && x.nombre===c.nombre);
     return `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:1rem;margin-bottom:8px;">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;flex-wrap:wrap;gap:6px;">
         <div>
@@ -1159,39 +1204,35 @@ async function cargarCuadrillas() {
 async function crearCuadrilla() {
   const nombre = document.getElementById('cuadrilla-nombre').value.trim();
   const fecha = document.getElementById('cuadrilla-fecha').value;
-  const integrantes = [...document.querySelectorAll('.cuadrilla-int:checked')].map(i => i.value);
+  const integrantes = [...document.querySelectorAll('.cuadrilla-int:checked')].map(i=>i.value);
   if (!nombre) { toast('⚠ Ingresa un nombre'); return; }
   if (!fecha) { toast('⚠ Selecciona la fecha'); return; }
   if (!integrantes.length) { toast('⚠ Selecciona al menos un integrante'); return; }
   try {
     const res = await fetch('/api/cuadrillas', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ nombre, fecha, integrantes, reutilizada:false }) });
-    const text = await res.text(); let data; try { data = JSON.parse(text); } catch(e) { toast('Error del servidor'); return; }
-    if (res.ok && data.ok) {
-      toast('✓ Cuadrilla creada');
-      document.getElementById('cuadrilla-nombre').value = '';
-      document.querySelectorAll('.cuadrilla-int').forEach(c => c.checked = false);
-      await cargarCuadrillas();
-    } else { toast('Error: '+(data.error||'Error desconocido')); }
+    const text = await res.text(); let data; try{data=JSON.parse(text);}catch(e){toast('Error del servidor');return;}
+    if (res.ok&&data.ok) { toast('✓ Cuadrilla creada'); document.getElementById('cuadrilla-nombre').value=''; document.querySelectorAll('.cuadrilla-int').forEach(c=>c.checked=false); await cargarCuadrillas(); }
+    else { toast('Error: '+(data.error||'Error desconocido')); }
   } catch(e) { toast('Error de conexión'); }
 }
 
 async function eliminarCuadrilla(id) {
   if (!confirm('¿Eliminar esta cuadrilla y sus reusos?')) return;
   try {
-    const c = todasLasCuadrillas.find(x => x.id === id);
+    const c = todasLasCuadrillas.find(x=>x.id===id);
     await fetch('/api/cuadrillas/'+id, { method:'DELETE' });
-    if (c) { const reusos = todasLasCuadrillas.filter(x => x.reutilizada && x.nombre === c.nombre); for (const r of reusos) await fetch('/api/cuadrillas/'+r.id, { method:'DELETE' }); }
+    if (c) { const reusos=todasLasCuadrillas.filter(x=>x.reutilizada&&x.nombre===c.nombre); for(const r of reusos) await fetch('/api/cuadrillas/'+r.id,{method:'DELETE'}); }
     toast('Cuadrilla eliminada'); await cargarCuadrillas();
   } catch(e) { toast('Error al eliminar'); }
 }
 
 function reutilizarCuadrilla(id) {
-  const c = todasLasCuadrillas.find(x => x.id === id); if (!c) return;
+  const c = todasLasCuadrillas.find(x=>x.id===id); if (!c) return;
   const overlay = document.createElement('div');
   overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);z-index:500;display:flex;align-items:center;justify-content:center;padding:1rem;';
   overlay.innerHTML = `<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.5rem;width:100%;max-width:400px;">
     <h3 style="color:var(--accent);font-size:13px;margin-bottom:4px;font-family:'IBM Plex Mono',monospace;">♻️ Reutilizar cuadrilla</h3>
-    <p style="font-size:13px;color:var(--muted);margin-bottom:1rem;">Mismos integrantes de <strong style="color:var(--text);">${c.nombre}</strong> para una nueva fecha.</p>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:1rem;">Mismos integrantes de <strong style="color:var(--text);">${c.nombre}</strong> para nueva fecha.</p>
     <div style="background:var(--surface2);border-radius:8px;padding:10px;margin-bottom:1rem;display:flex;flex-wrap:wrap;gap:5px;">${c.integrantes.map(i=>`<span style="font-size:11px;background:rgba(0,212,170,0.15);border:1px solid rgba(0,212,170,0.3);border-radius:20px;padding:2px 8px;color:var(--accent);">👷 ${i}</span>`).join('')}</div>
     <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:1rem;">
       <label style="font-size:11px;color:var(--muted);text-transform:uppercase;">Nueva fecha</label>
@@ -1208,13 +1249,13 @@ function reutilizarCuadrilla(id) {
 }
 
 async function confirmarReutilizar(id) {
-  const c = todasLasCuadrillas.find(x => x.id === id); if (!c) return;
+  const c = todasLasCuadrillas.find(x=>x.id===id); if (!c) return;
   const fecha = document.getElementById('reutilizar-fecha').value;
   if (!fecha) { toast('⚠ Selecciona una fecha'); return; }
   try {
     const res = await fetch('/api/cuadrillas', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ nombre:c.nombre, fecha, integrantes:c.integrantes, reutilizada:true }) });
-    const text = await res.text(); let data; try { data = JSON.parse(text); } catch(e) { toast('Error del servidor'); return; }
-    if (res.ok && data.ok) { toast('✓ Cuadrilla reutilizada para '+fecha); document.querySelector('div[style*="position:fixed"]')?.remove(); await cargarCuadrillas(); }
+    const text = await res.text(); let data; try{data=JSON.parse(text);}catch(e){toast('Error del servidor');return;}
+    if (res.ok&&data.ok) { toast('✓ Cuadrilla reutilizada para '+fecha); document.querySelector('div[style*="position:fixed"]')?.remove(); await cargarCuadrillas(); }
     else { toast('Error: '+(data.error||'Error desconocido')); }
   } catch(e) { toast('Error de conexión'); }
 }
@@ -1253,25 +1294,25 @@ function toggleConectados() {
 document.addEventListener('click', e => {
   const badge = document.getElementById('conectados-badge');
   const popup = document.getElementById('conectados-popup');
-  if (popup && badge && !badge.contains(e.target) && !popup.contains(e.target)) popup.style.display = 'none';
+  if (popup && badge && !badge.contains(e.target) && !popup.contains(e.target)) popup.style.display='none';
 });
 
 function toast(msg) {
   const t = document.getElementById('toast');
-  t.textContent = msg; t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 2500);
+  t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2500);
 }
 
 async function cerrarSesion() {
-  await fetch('/api/logout', { method:'POST' });
-  window.location.href = '/';
+  await fetch('/api/logout',{method:'POST'});
+  window.location.href='/';
 }
 
 // ── Bodega ───────────────────────────────────────────────
 async function cargarBodega() {
   try {
     const res = await fetch('/api/bodega'); stockActual = await res.json();
-    renderStock(); setTimeout(() => llenarSelectMaterial(), 100); cargarMovimientos();
+    renderStock(); setTimeout(()=>llenarSelectMaterial(),100); cargarMovimientos();
   } catch(e) { document.getElementById('tabla-stock').innerHTML='<p class="empty">Error.</p>'; }
 }
 
@@ -1288,18 +1329,18 @@ function llenarSelectMaterial() {
 
 function mostrarModalStock() {
   const cont = document.getElementById('modal-stock-items');
-  cont.innerHTML = MATERIALES_STOCK.map(m => { const item = stockActual.find(s=>s.material===m.label); return `<div class="mat-row" style="margin-bottom:8px;"><label style="color:var(--text);font-size:12px;text-transform:none;letter-spacing:0;">${m.label}</label><input type="number" min="0" id="stock-${m.id}" value="${item?item.cantidad:0}" style="width:70px;text-align:right;" /><span class="unidad">${m.unidad}</span></div>`; }).join('');
-  document.getElementById('modal-stock').style.display = 'flex';
+  cont.innerHTML = MATERIALES_STOCK.map(m=>{const item=stockActual.find(s=>s.material===m.label);return `<div class="mat-row" style="margin-bottom:8px;"><label style="color:var(--text);font-size:12px;text-transform:none;letter-spacing:0;">${m.label}</label><input type="number" min="0" id="stock-${m.id}" value="${item?item.cantidad:0}" style="width:70px;text-align:right;" /><span class="unidad">${m.unidad}</span></div>`;}).join('');
+  document.getElementById('modal-stock').style.display='flex';
 }
 
-function cerrarModalStock() { document.getElementById('modal-stock').style.display = 'none'; }
+function cerrarModalStock() { document.getElementById('modal-stock').style.display='none'; }
 
 async function guardarStock() {
   try {
     for (const m of MATERIALES_STOCK) {
       const el = document.getElementById('stock-'+m.id);
-      const cantidad = el ? parseFloat(el.value)||0 : 0;
-      const res = await fetch('/api/bodega/stock', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ material:m.label, cantidad }) });
+      const cantidad = el?parseFloat(el.value)||0:0;
+      const res = await fetch('/api/bodega/stock',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({material:m.label,cantidad})});
       const data = await res.json();
       if (!data.ok) { toast('Error: '+data.error); return; }
     }
@@ -1316,15 +1357,10 @@ async function registrarMovimiento() {
   if (!cantidad||cantidad<=0) { toast('⚠ Ingresa una cantidad válida'); return; }
   if (!responsable) { toast('⚠ Ingresa el responsable'); return; }
   try {
-    const res = await fetch('/api/bodega/movimiento', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ tipo, material, cantidad, responsable, nota }) });
+    const res = await fetch('/api/bodega/movimiento',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tipo,material,cantidad,responsable,nota})});
     const data = await res.json();
-    if (data.ok) {
-      toast('✓ Movimiento registrado');
-      document.getElementById('mov-cantidad').value = '';
-      document.getElementById('mov-responsable').value = '';
-      document.getElementById('mov-nota').value = '';
-      await cargarBodega();
-    } else { toast('Error: '+data.error); }
+    if (data.ok) { toast('✓ Movimiento registrado'); document.getElementById('mov-cantidad').value=''; document.getElementById('mov-responsable').value=''; document.getElementById('mov-nota').value=''; await cargarBodega(); }
+    else { toast('Error: '+data.error); }
   } catch(e) { toast('Error de conexión'); }
 }
 
@@ -1334,15 +1370,15 @@ async function cargarMovimientos() {
     const movimientos = await res.json();
     const cont = document.getElementById('tabla-movimientos');
     if (!movimientos.length) { cont.innerHTML='<p class="empty">No hay movimientos.</p>'; return; }
-    const colores = { salida:'var(--danger)', entrada:'var(--accent)', devolucion:'#f59e0b' };
-    cont.innerHTML = `<table class="mat-table"><thead><tr><th>Fecha</th><th>Tipo</th><th>Material</th><th>Cant.</th><th>Responsable</th><th>Nota</th><th></th></tr></thead><tbody>${movimientos.map(m=>`<tr><td style="font-size:11px;color:var(--muted);">${m.fecha}</td><td><span style="color:${colores[m.tipo]};font-weight:600;font-size:12px;text-transform:capitalize;">${m.tipo}</span></td><td style="font-size:12px;">${m.material}</td><td class="cant">${m.cantidad}</td><td style="font-size:12px;">${m.responsable}</td><td style="color:var(--muted);font-size:12px;">${m.nota||'—'}</td><td><button class="del-btn" onclick="eliminarMovimiento(${m.id})">✕</button></td></tr>`).join('')}</tbody></table>`;
+    const colores={salida:'var(--danger)',entrada:'var(--accent)',devolucion:'#f59e0b'};
+    cont.innerHTML=`<table class="mat-table"><thead><tr><th>Fecha</th><th>Tipo</th><th>Material</th><th>Cant.</th><th>Responsable</th><th>Nota</th><th></th></tr></thead><tbody>${movimientos.map(m=>`<tr><td style="font-size:11px;color:var(--muted);">${m.fecha}</td><td><span style="color:${colores[m.tipo]};font-weight:600;font-size:12px;text-transform:capitalize;">${m.tipo}</span></td><td style="font-size:12px;">${m.material}</td><td class="cant">${m.cantidad}</td><td style="font-size:12px;">${m.responsable}</td><td style="color:var(--muted);font-size:12px;">${m.nota||'—'}</td><td><button class="del-btn" onclick="eliminarMovimiento(${m.id})">✕</button></td></tr>`).join('')}</tbody></table>`;
   } catch(e) {}
 }
 
 async function eliminarMovimiento(id) {
   if (!confirm('¿Eliminar este movimiento?')) return;
   try {
-    const res = await fetch('/api/bodega/movimientos/'+id, { method:'DELETE' });
+    const res = await fetch('/api/bodega/movimientos/'+id,{method:'DELETE'});
     const data = await res.json();
     if (data.ok) { toast('Movimiento eliminado'); cargarMovimientos(); }
   } catch(e) { toast('Error al eliminar'); }
@@ -1350,62 +1386,62 @@ async function eliminarMovimiento(id) {
 
 function exportarBodegaExcel() {
   if (!stockActual.length) { toast('⚠ No hay stock'); return; }
-  const datos = stockActual.map(s=>({ 'Material':s.material, 'Stock disponible':s.cantidad }));
+  const datos = stockActual.map(s=>({'Material':s.material,'Stock disponible':s.cantidad}));
   const ws = XLSX.utils.json_to_sheet(datos);
-  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Stock');
-  XLSX.writeFile(wb, `bodega_${new Date().toISOString().slice(0,10)}.xlsx`); toast('✓ Stock exportado');
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Stock');
+  XLSX.writeFile(wb,`bodega_${new Date().toISOString().slice(0,10)}.xlsx`); toast('✓ Stock exportado');
 }
 
 // ── Indicadores ──────────────────────────────────────────
 function getLunes(fecha) {
-  const d = new Date(fecha+'T12:00:00'); const dia = d.getDay();
-  const diff = dia===0?-6:1-dia; d.setDate(d.getDate()+diff);
+  const d=new Date(fecha+'T12:00:00'); const dia=d.getDay();
+  const diff=dia===0?-6:1-dia; d.setDate(d.getDate()+diff);
   return d.toISOString().slice(0,10);
 }
 
-function getMat(reportes, label) {
-  return reportes.reduce((s,r) => { const m = (r.materiales||[]).find(m=>m.material===label); return s+(m?m.cantidad:0); }, 0);
+function getMat(reportes,label) {
+  return reportes.reduce((s,r)=>{const m=(r.materiales||[]).find(m=>m.material===label);return s+(m?m.cantidad:0);},0);
 }
 
-function barMeta(valor, meta) {
-  const pct = Math.min(Math.round(valor/meta*100),100);
-  const c = valor>=meta?'#1D9E75':valor>=meta/2?'#BA7517':'#E24B4A';
+function barMeta(valor,meta) {
+  const pct=Math.min(Math.round(valor/meta*100),100);
+  const c=valor>=meta?'#1D9E75':valor>=meta/2?'#BA7517':'#E24B4A';
   return `<div style="display:flex;align-items:center;gap:8px;"><div style="flex:1;height:7px;background:var(--surface2);border-radius:4px;overflow:hidden;"><div style="width:${pct}%;height:100%;background:${c};border-radius:4px;"></div></div><span style="font-size:11px;color:var(--muted);width:70px;text-align:right;">${valor} / ${meta}</span></div>`;
 }
 
-function calcularBadge(reportes, actividades, numPersonas=5, cuadrillaAsignada=false) {
+function calcularBadge(reportes,actividades,numPersonas=5,cuadrillaAsignada=false) {
   if (reportes.length===0) {
-    if (cuadrillaAsignada) return { badge:'Sin reporte', color:'#fff', bg:'#A32D2D' };
-    return { badge:'Sin registro', color:'var(--muted)', bg:'var(--surface2)' };
+    if (cuadrillaAsignada) return {badge:'Sin reporte',color:'#fff',bg:'#A32D2D'};
+    return {badge:'Sin registro',color:'var(--muted)',bg:'var(--surface2)'};
   }
-  const fibra = getMat(reportes,'Fibra Principal');
-  const cajas = getMat(reportes,'Cajas NAT');
-  const numInc = reportes.reduce((s,r)=>s+(r.numIncidencias||0),0);
-  const acts = new Set(actividades);
-  if (numPersonas>=5&&fibra>=2000&&acts.has('fibra'))    return { badge:'Productivo', color:'#3B6D11', bg:'#EAF3DE' };
-  if (numPersonas===3&&fibra>=1500&&acts.has('fibra'))   return { badge:'Productivo', color:'#3B6D11', bg:'#EAF3DE' };
-  if (numPersonas>=5&&fibra>=500&&acts.has('fibra')&&acts.has('cajas')&&(acts.has('instalacion')||acts.has('mudanza'))) return { badge:'Productivo', color:'#3B6D11', bg:'#EAF3DE' };
-  if (numPersonas<=2&&cajas>=5&&acts.has('cajas'))       return { badge:'Productivo', color:'#3B6D11', bg:'#EAF3DE' };
-  if (numPersonas<=2&&acts.has('odf'))                   return { badge:'Productivo', color:'#3B6D11', bg:'#EAF3DE' };
-  if (numPersonas<=2&&acts.has('mangas'))                return { badge:'Productivo', color:'#3B6D11', bg:'#EAF3DE' };
-  if (numPersonas<=2&&numInc>6&&acts.has('incidencias')) return { badge:'Productivo', color:'#3B6D11', bg:'#EAF3DE' };
-  if (acts.has('instalacion'))   return { badge:'Productivo', color:'#3B6D11', bg:'#EAF3DE' };
-  if (acts.has('mudanza'))       return { badge:'Productivo', color:'#3B6D11', bg:'#EAF3DE' };
-  if (acts.has('reparacion'))    return { badge:'Productivo', color:'#3B6D11', bg:'#EAF3DE' };
-  if (fibra>0||cajas>0||numInc>0) return { badge:'Parcial', color:'#854F0B', bg:'#FAEEDA' };
-  return { badge:'Bajo', color:'#A32D2D', bg:'#FCEBEB' };
+  const fibra=getMat(reportes,'Fibra Principal');
+  const cajas=getMat(reportes,'Cajas NAT');
+  const numInc=reportes.reduce((s,r)=>s+(r.numIncidencias||0),0);
+  const acts=new Set(actividades);
+  if (numPersonas>=5&&fibra>=2000&&acts.has('fibra'))    return {badge:'Productivo',color:'#3B6D11',bg:'#EAF3DE'};
+  if (numPersonas===3&&fibra>=1500&&acts.has('fibra'))   return {badge:'Productivo',color:'#3B6D11',bg:'#EAF3DE'};
+  if (numPersonas>=5&&fibra>=500&&acts.has('fibra')&&acts.has('cajas')&&(acts.has('instalacion')||acts.has('mudanza'))) return {badge:'Productivo',color:'#3B6D11',bg:'#EAF3DE'};
+  if (numPersonas<=2&&cajas>=5&&acts.has('cajas'))       return {badge:'Productivo',color:'#3B6D11',bg:'#EAF3DE'};
+  if (numPersonas<=2&&acts.has('odf'))                   return {badge:'Productivo',color:'#3B6D11',bg:'#EAF3DE'};
+  if (numPersonas<=2&&acts.has('mangas'))                return {badge:'Productivo',color:'#3B6D11',bg:'#EAF3DE'};
+  if (numPersonas<=2&&numInc>6&&acts.has('incidencias')) return {badge:'Productivo',color:'#3B6D11',bg:'#EAF3DE'};
+  if (acts.has('instalacion'))  return {badge:'Productivo',color:'#3B6D11',bg:'#EAF3DE'};
+  if (acts.has('mudanza'))      return {badge:'Productivo',color:'#3B6D11',bg:'#EAF3DE'};
+  if (acts.has('reparacion'))   return {badge:'Productivo',color:'#3B6D11',bg:'#EAF3DE'};
+  if (fibra>0||cajas>0||numInc>0) return {badge:'Parcial',color:'#854F0B',bg:'#FAEEDA'};
+  return {badge:'Bajo',color:'#A32D2D',bg:'#FCEBEB'};
 }
 
 async function iniciarIndicadores() {
   try {
-    const res = await fetch('/api/reportes'); todosLosReportes = await res.json();
-    const semanas = {};
-    todosLosReportes.forEach(r => { semanas[getLunes(r.fecha)] = true; });
-    todasLasCuadrillas.forEach(c => { semanas[getLunes(c.fecha)] = true; });
-    const semanasOrdenadas = Object.keys(semanas).sort().reverse();
-    const sel = document.getElementById('semana-select');
-    sel.innerHTML = semanasOrdenadas.map(s => {
-      const lunes = new Date(s+'T12:00:00'); const sabado = new Date(lunes); sabado.setDate(sabado.getDate()+5);
+    const res=await fetch('/api/reportes'); todosLosReportes=await res.json();
+    const semanas={};
+    todosLosReportes.forEach(r=>{semanas[getLunes(r.fecha)]=true;});
+    todasLasCuadrillas.forEach(c=>{semanas[getLunes(c.fecha)]=true;});
+    const semanasOrdenadas=Object.keys(semanas).sort().reverse();
+    const sel=document.getElementById('semana-select');
+    sel.innerHTML=semanasOrdenadas.map(s=>{
+      const lunes=new Date(s+'T12:00:00'); const sabado=new Date(lunes); sabado.setDate(sabado.getDate()+5);
       return `<option value="${s}">${lunes.toLocaleDateString('es-EC',{day:'2-digit',month:'short'})} – ${sabado.toLocaleDateString('es-EC',{day:'2-digit',month:'short',year:'numeric'})}</option>`;
     }).join('');
     cargarIndicadores();
@@ -1413,53 +1449,53 @@ async function iniciarIndicadores() {
 }
 
 function cargarIndicadores() {
-  semanaActual = document.getElementById('semana-select').value;
+  semanaActual=document.getElementById('semana-select').value;
   if (!semanaActual) return;
-  const inicio = new Date(semanaActual+'T12:00:00');
-  const diasSemana = [];
-  for (let i=0;i<6;i++) { const d=new Date(inicio); d.setDate(d.getDate()+i); diasSemana.push(d.toISOString().slice(0,10)); }
-  const rpf = {};
-  todosLosReportes.forEach(r => { if (!rpf[r.fecha]) rpf[r.fecha]=[]; rpf[r.fecha].push(r); });
-  const nombres = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
-  let diasProd=0, totalFibra=0, totalCajas=0, totalInst=0;
-  diasSemana.slice(0,5).forEach(fecha => {
-    const reportes = rpf[fecha]||[];
-    const actividades = [...new Set(reportes.flatMap(r=>r.actividades||[]))];
-    const integrantes = [...new Set(reportes.flatMap(r=>r.integrantes||[]))];
-    const numP = integrantes.length||5;
-    const cuadrillaDia = todasLasCuadrillas.find(c=>c.fecha===fecha);
-    const { badge } = calcularBadge(reportes, actividades, numP, !!cuadrillaDia);
-    if (badge==='Productivo') diasProd++;
-    totalFibra += getMat(reportes,'Fibra Principal');
-    totalCajas += getMat(reportes,'Cajas NAT');
-    if (actividades.includes('instalacion') && reportes.length>0) totalInst++;
+  const inicio=new Date(semanaActual+'T12:00:00');
+  const diasSemana=[];
+  for(let i=0;i<6;i++){const d=new Date(inicio);d.setDate(d.getDate()+i);diasSemana.push(d.toISOString().slice(0,10));}
+  const rpf={};
+  todosLosReportes.forEach(r=>{if(!rpf[r.fecha])rpf[r.fecha]=[];rpf[r.fecha].push(r);});
+  const nombres=['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+  let diasProd=0,totalFibra=0,totalCajas=0,totalInst=0;
+  diasSemana.slice(0,5).forEach(fecha=>{
+    const reportes=rpf[fecha]||[];
+    const actividades=[...new Set(reportes.flatMap(r=>r.actividades||[]))];
+    const integrantes=[...new Set(reportes.flatMap(r=>r.integrantes||[]))];
+    const numP=integrantes.length||5;
+    const cuadrillaDia=todasLasCuadrillas.find(c=>c.fecha===fecha);
+    const {badge}=calcularBadge(reportes,actividades,numP,!!cuadrillaDia);
+    if(badge==='Productivo')diasProd++;
+    totalFibra+=getMat(reportes,'Fibra Principal');
+    totalCajas+=getMat(reportes,'Cajas NAT');
+    if(actividades.includes('instalacion')&&reportes.length>0)totalInst++;
   });
-  const tieneSab = (rpf[diasSemana[5]]||[]).length > 0;
+  const tieneSab=(rpf[diasSemana[5]]||[]).length>0;
 
-  document.getElementById('metricas-resumen').innerHTML = `
+  document.getElementById('metricas-resumen').innerHTML=`
     <div style="background:var(--surface2);border-radius:8px;padding:1rem;"><div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Días productivos</div><div style="font-size:20px;font-weight:600;color:${diasProd>=4?'var(--accent)':diasProd>=2?'#f59e0b':'var(--danger)'};">${diasProd}/5</div><div style="font-size:11px;color:var(--muted);">Lun–Vie</div></div>
     <div style="background:var(--surface2);border-radius:8px;padding:1rem;"><div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Fibra tendida</div><div style="font-size:20px;font-weight:600;">${totalFibra}m</div><div style="font-size:11px;color:var(--muted);">semana</div></div>
     <div style="background:var(--surface2);border-radius:8px;padding:1rem;"><div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Cajas armadas</div><div style="font-size:20px;font-weight:600;">${totalCajas}</div><div style="font-size:11px;color:var(--muted);">semana</div></div>
     <div style="background:var(--surface2);border-radius:8px;padding:1rem;"><div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Instalaciones</div><div style="font-size:20px;font-weight:600;color:var(--accent);">${totalInst}</div><div style="font-size:11px;color:var(--muted);">${tieneSab?'+ Sáb extra':'días'}</div></div>`;
 
-  const cont = document.getElementById('dias-semana');
-  cont.innerHTML = diasSemana.map((fecha,i) => {
-    const reportes = rpf[fecha]||[];
-    const esSab = i===5;
-    const actividades = [...new Set(reportes.flatMap(r=>r.actividades||[]))];
-    const integrantes = [...new Set(reportes.flatMap(r=>r.integrantes||[]))];
-    const numP = integrantes.length||5;
-    const metaFibra = numP>=5?2000:numP===3?1500:Math.round(2000*numP/5);
-    const fibra = getMat(reportes,'Fibra Principal');
-    const cajas = getMat(reportes,'Cajas NAT');
-    const numInc = reportes.reduce((s,r)=>s+(r.numIncidencias||0),0);
-    const cuadrilla = todasLasCuadrillas.find(c=>reportes.some(r=>r.cuadrillaId===c.id));
-    const cuadrillaDia = todasLasCuadrillas.find(c=>c.fecha===fecha);
-    const allIps = reportes.flatMap(r=>r.ips||[]);
-    let badgeInfo = esSab ? { badge:'Extra', color:'#854F0B', bg:'#FAEEDA' } : calcularBadge(reportes, actividades, numP, !!cuadrillaDia);
-    const obs = reportes.map(r=>r.observaciones).filter(Boolean);
-    const actsHTML = actividades.length>0 ? `<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px;">${actividades.map(a=>ACTIVIDADES_INFO[a]?`<span style="font-size:11px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:3px 8px;">${ACTIVIDADES_INFO[a].icon} ${ACTIVIDADES_INFO[a].label}</span>`:'').join('')}</div>` : '';
-    const todosMat = MATERIALES_STOCK.map(m=>({ label:m.label, val:getMat(reportes,m.label), unidad:m.unidad })).filter(m=>m.val>0);
+  const cont=document.getElementById('dias-semana');
+  cont.innerHTML=diasSemana.map((fecha,i)=>{
+    const reportes=rpf[fecha]||[];
+    const esSab=i===5;
+    const actividades=[...new Set(reportes.flatMap(r=>r.actividades||[]))];
+    const integrantes=[...new Set(reportes.flatMap(r=>r.integrantes||[]))];
+    const numP=integrantes.length||5;
+    const metaFibra=numP>=5?2000:numP===3?1500:Math.round(2000*numP/5);
+    const fibra=getMat(reportes,'Fibra Principal');
+    const cajas=getMat(reportes,'Cajas NAT');
+    const numInc=reportes.reduce((s,r)=>s+(r.numIncidencias||0),0);
+    const cuadrilla=todasLasCuadrillas.find(c=>reportes.some(r=>r.cuadrillaId===c.id));
+    const cuadrillaDia=todasLasCuadrillas.find(c=>c.fecha===fecha);
+    const allIps=reportes.flatMap(r=>r.ips||[]);
+    let badgeInfo=esSab?{badge:'Extra',color:'#854F0B',bg:'#FAEEDA'}:calcularBadge(reportes,actividades,numP,!!cuadrillaDia);
+    const obs=reportes.map(r=>r.observaciones).filter(Boolean);
+    const actsHTML=actividades.length>0?`<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px;">${actividades.map(a=>ACTIVIDADES_INFO[a]?`<span style="font-size:11px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:3px 8px;">${ACTIVIDADES_INFO[a].icon} ${ACTIVIDADES_INFO[a].label}</span>`:'').join('')}</div>`:'';
+    const todosMat=MATERIALES_STOCK.map(m=>({label:m.label,val:getMat(reportes,m.label),unidad:m.unidad})).filter(m=>m.val>0);
 
     return `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:1rem;margin-bottom:10px;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
@@ -1495,46 +1531,46 @@ function cargarIndicadores() {
     </div>`;
   }).join('');
 
-  const contMat = document.getElementById('top-materiales');
-  const totalesMat = {};
-  diasSemana.forEach(fecha => { (rpf[fecha]||[]).forEach(r => { (r.materiales||[]).forEach(m => { totalesMat[m.material]=(totalesMat[m.material]||0)+m.cantidad; }); }); });
-  const sorted = Object.entries(totalesMat).sort((a,b)=>b[1]-a[1]);
-  if (!sorted.length) { contMat.innerHTML='<p class="empty">No hay materiales esta semana.</p>'; return; }
-  const max = sorted[0][1];
-  contMat.innerHTML = sorted.map(([mat,cant])=>`<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><span style="font-size:12px;color:var(--muted);width:150px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${mat}</span><div style="flex:1;height:6px;background:var(--surface2);border-radius:3px;overflow:hidden;"><div style="width:${Math.round(cant/max*100)}%;height:100%;background:var(--accent);border-radius:3px;"></div></div><span style="font-size:12px;color:var(--muted);width:36px;text-align:right;">${cant}</span></div>`).join('');
+  const contMat=document.getElementById('top-materiales');
+  const totalesMat={};
+  diasSemana.forEach(fecha=>{(rpf[fecha]||[]).forEach(r=>{(r.materiales||[]).forEach(m=>{totalesMat[m.material]=(totalesMat[m.material]||0)+m.cantidad;});});});
+  const sorted=Object.entries(totalesMat).sort((a,b)=>b[1]-a[1]);
+  if(!sorted.length){contMat.innerHTML='<p class="empty">No hay materiales esta semana.</p>';return;}
+  const max=sorted[0][1];
+  contMat.innerHTML=sorted.map(([mat,cant])=>`<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><span style="font-size:12px;color:var(--muted);width:150px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${mat}</span><div style="flex:1;height:6px;background:var(--surface2);border-radius:3px;overflow:hidden;"><div style="width:${Math.round(cant/max*100)}%;height:100%;background:var(--accent);border-radius:3px;"></div></div><span style="font-size:12px;color:var(--muted);width:36px;text-align:right;">${cant}</span></div>`).join('');
 }
 
 function exportarInformeSemanal() {
-  if (!semanaActual) { toast('⚠ Selecciona una semana'); return; }
-  const inicio = new Date(semanaActual+'T12:00:00');
-  const diasSemana = [];
-  for (let i=0;i<6;i++) { const d=new Date(inicio); d.setDate(d.getDate()+i); diasSemana.push(d.toISOString().slice(0,10)); }
-  const rpf = {};
-  todosLosReportes.forEach(r => { if (!rpf[r.fecha]) rpf[r.fecha]=[]; rpf[r.fecha].push(r); });
-  const nombres = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
-  const wb = XLSX.utils.book_new();
-  const filas = [];
-  diasSemana.forEach((fecha,i) => {
-    const reportes = rpf[fecha]||[];
-    const actividades = [...new Set(reportes.flatMap(r=>r.actividades||[]))];
-    const integrantes = [...new Set(reportes.flatMap(r=>r.integrantes||[]))];
-    const numP = integrantes.length||5;
-    const cuadrillaDia = todasLasCuadrillas.find(c=>c.fecha===fecha);
-    const { badge } = i===5?{ badge:'Extra' }:calcularBadge(reportes, actividades, numP, !!cuadrillaDia);
-    const allIps = reportes.flatMap(r=>r.ips||[]);
+  if(!semanaActual){toast('⚠ Selecciona una semana');return;}
+  const inicio=new Date(semanaActual+'T12:00:00');
+  const diasSemana=[];
+  for(let i=0;i<6;i++){const d=new Date(inicio);d.setDate(d.getDate()+i);diasSemana.push(d.toISOString().slice(0,10));}
+  const rpf={};
+  todosLosReportes.forEach(r=>{if(!rpf[r.fecha])rpf[r.fecha]=[];rpf[r.fecha].push(r);});
+  const nombres=['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+  const wb=XLSX.utils.book_new();
+  const filas=[];
+  diasSemana.forEach((fecha,i)=>{
+    const reportes=rpf[fecha]||[];
+    const actividades=[...new Set(reportes.flatMap(r=>r.actividades||[]))];
+    const integrantes=[...new Set(reportes.flatMap(r=>r.integrantes||[]))];
+    const numP=integrantes.length||5;
+    const cuadrillaDia=todasLasCuadrillas.find(c=>c.fecha===fecha);
+    const {badge}=i===5?{badge:'Extra'}:calcularBadge(reportes,actividades,numP,!!cuadrillaDia);
+    const allIps=reportes.flatMap(r=>r.ips||[]);
     filas.push({
-      'Día':nombres[i], 'Fecha':fecha, 'Estado':badge,
-      'Cuadrilla':cuadrillaDia?cuadrillaDia.nombre:'—', 'Personas':numP,
+      'Día':nombres[i],'Fecha':fecha,'Estado':badge,
+      'Cuadrilla':cuadrillaDia?cuadrillaDia.nombre:'—','Personas':numP,
       'Actividades':actividades.map(a=>ACTIVIDADES_INFO[a]?.label||a).join(', ')||'—',
       'Integrantes':integrantes.join(', ')||'—',
-      'Fibra (m)':getMat(reportes,'Fibra Principal'), 'Cajas NAT':getMat(reportes,'Cajas NAT'),
+      'Fibra (m)':getMat(reportes,'Fibra Principal'),'Cajas NAT':getMat(reportes,'Cajas NAT'),
       'Incidencias':reportes.reduce((s,r)=>s+(r.numIncidencias||0),0),
       'IPs':allIps.map(i=>typeof i==='object'?`${i.label}: ${i.ip}`:i).join(' | ')||'—',
       'Observaciones':reportes.map(r=>r.observaciones).filter(Boolean).join(' | ')||'—'
     });
   });
-  const ws = XLSX.utils.json_to_sheet(filas);
-  XLSX.utils.book_append_sheet(wb, ws, 'Resumen semanal');
-  XLSX.writeFile(wb, `informe_semana_${semanaActual}.xlsx`);
+  const ws=XLSX.utils.json_to_sheet(filas);
+  XLSX.utils.book_append_sheet(wb,ws,'Resumen semanal');
+  XLSX.writeFile(wb,`informe_semana_${semanaActual}.xlsx`);
   toast('✓ Informe exportado');
 }
