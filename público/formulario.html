@@ -132,14 +132,12 @@
           <div class="form-group"><label>Puertos ocupados</label><input type="number" min="0" id="caja-ocupados-reg" class="inp-field" value="0" /></div>
         </div>
 
-        <!-- Distribución de hilos — solo caja principal -->
         <div id="dist-reg-panel" style="display:none;margin-top:12px;padding-top:10px;border-top:1px solid var(--border);">
           <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">📡 Hilos que reparte esta caja</div>
           <div id="dist-reg-lista"></div>
           <button onclick="agregarDistReg()" style="font-size:12px;padding:5px 12px;margin-top:4px;">+ Agregar buffer</button>
         </div>
 
-        <!-- GPS -->
         <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);">
           <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">📍 Guardar ubicación en mapa</div>
           <div id="caja-gps-status" style="font-size:12px;color:var(--muted);padding:6px 10px;background:var(--surface);border-radius:6px;margin-bottom:8px;">Sin ubicación — la caja no se guardará en el mapa</div>
@@ -257,25 +255,14 @@
       <div id="panel-incidencias" class="act-panel" style="display:none;">
         <h4>⚠️ Incidencias</h4>
         <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">Tipo de incidencia</div>
-
         <div style="margin-bottom:10px;">
           <label class="tag-check"><input type="checkbox" id="inc-cambio_equipos" onchange="toggleIncPanel('cambio_equipos')" /> 🔧 Cambio de equipos</label>
           <div id="subpanel-cambio_equipos" style="display:none;margin-top:8px;padding:10px;background:var(--surface);border-radius:8px;">
-            <div class="field-row">
-              <div class="form-group"><label>Descripción</label><input type="text" id="inc-ce-desc" class="inp-field" placeholder="Qué equipo se cambió..." /></div>
-            </div>
-            <div style="margin-top:6px;">
-              <label style="font-size:11px;color:var(--muted);">IP del cliente</label>
-              <div id="ips-lista-cambio_equipos" style="margin-top:4px;"></div>
-              <button onclick="agregarIPActividad('cambio_equipos')" style="font-size:12px;padding:4px 10px;margin-top:4px;">+ Agregar IP</button>
-            </div>
-            <div style="margin-top:8px;">
-              <label style="font-size:11px;color:var(--muted);">📷 Foto del equipo</label>
-              <input type="file" accept="image/*" id="inc-ce-foto" style="margin-top:4px;font-size:12px;color:var(--text);" />
-            </div>
+            <div class="field-row"><div class="form-group"><label>Descripción</label><input type="text" id="inc-ce-desc" class="inp-field" placeholder="Qué equipo se cambió..." /></div></div>
+            <div style="margin-top:6px;"><label style="font-size:11px;color:var(--muted);">IP del cliente</label><div id="ips-lista-cambio_equipos" style="margin-top:4px;"></div><button onclick="agregarIPActividad('cambio_equipos')" style="font-size:12px;padding:4px 10px;margin-top:4px;">+ Agregar IP</button></div>
+            <div style="margin-top:8px;"><label style="font-size:11px;color:var(--muted);">📷 Foto del equipo</label><input type="file" accept="image/*" id="inc-ce-foto" style="margin-top:4px;font-size:12px;color:var(--text);" /></div>
           </div>
         </div>
-
         <div style="margin-bottom:10px;">
           <label class="tag-check"><input type="checkbox" id="inc-foco_rojo" onchange="toggleIncPanel('foco_rojo')" /> 🔴 Foco rojo</label>
           <div id="subpanel-foco_rojo" style="display:none;margin-top:8px;padding:10px;background:var(--surface);border-radius:8px;">
@@ -289,28 +276,16 @@
               <div class="form-group"><label>Cant. UPC</label><input type="number" min="0" id="fr-upc-cant" class="inp-field" placeholder="0" /></div>
               <div class="form-group"><label>Cant. APC</label><input type="number" min="0" id="fr-apc-cant" class="inp-field" placeholder="0" /></div>
             </div>
-            <div style="margin-top:6px;">
-              <label style="font-size:11px;color:var(--muted);">IP del cliente</label>
-              <div id="ips-lista-foco_rojo" style="margin-top:4px;"></div>
-              <button onclick="agregarIPActividad('foco_rojo')" style="font-size:12px;padding:4px 10px;margin-top:4px;">+ Agregar IP</button>
-            </div>
+            <div style="margin-top:6px;"><label style="font-size:11px;color:var(--muted);">IP del cliente</label><div id="ips-lista-foco_rojo" style="margin-top:4px;"></div><button onclick="agregarIPActividad('foco_rojo')" style="font-size:12px;padding:4px 10px;margin-top:4px;">+ Agregar IP</button></div>
           </div>
         </div>
-
         <div style="margin-bottom:10px;">
           <label class="tag-check"><input type="checkbox" id="inc-actualizaciones" onchange="toggleIncPanel('actualizaciones')" /> 🔄 Actualizaciones</label>
           <div id="subpanel-actualizaciones" style="display:none;margin-top:8px;padding:10px;background:var(--surface);border-radius:8px;">
-            <div class="field-row">
-              <div class="form-group"><label>Descripción</label><input type="text" id="inc-act-desc" class="inp-field" placeholder="Qué equipo se actualizó..." /></div>
-            </div>
-            <div style="margin-top:6px;">
-              <label style="font-size:11px;color:var(--muted);">IP del cliente</label>
-              <div id="ips-lista-actualizaciones" style="margin-top:4px;"></div>
-              <button onclick="agregarIPActividad('actualizaciones')" style="font-size:12px;padding:4px 10px;margin-top:4px;">+ Agregar IP</button>
-            </div>
+            <div class="field-row"><div class="form-group"><label>Descripción</label><input type="text" id="inc-act-desc" class="inp-field" placeholder="Qué equipo se actualizó..." /></div></div>
+            <div style="margin-top:6px;"><label style="font-size:11px;color:var(--muted);">IP del cliente</label><div id="ips-lista-actualizaciones" style="margin-top:4px;"></div><button onclick="agregarIPActividad('actualizaciones')" style="font-size:12px;padding:4px 10px;margin-top:4px;">+ Agregar IP</button></div>
           </div>
         </div>
-
         <div style="margin-bottom:10px;">
           <label class="tag-check"><input type="checkbox" id="inc-cambio_domicilio" onchange="toggleIncPanel('cambio_domicilio')" /> 🏠 Cambio de domicilio</label>
           <div id="subpanel-cambio_domicilio" style="display:none;margin-top:8px;padding:10px;background:var(--surface);border-radius:8px;">
@@ -318,17 +293,10 @@
               <div class="form-group"><label>Cable Drop (m)</label><input type="number" min="0" id="cd-drop" class="inp-field" placeholder="0" /></div>
               <div class="form-group"><label>Conector UPC</label><input type="number" min="0" id="cd-upc" class="inp-field" placeholder="0" /></div>
             </div>
-            <div class="field-row">
-              <div class="form-group"><label>Conector APC</label><input type="number" min="0" id="cd-apc" class="inp-field" placeholder="0" /></div>
-            </div>
-            <div style="margin-top:6px;">
-              <label style="font-size:11px;color:var(--muted);">IP del cliente</label>
-              <div id="ips-lista-cambio_domicilio" style="margin-top:4px;"></div>
-              <button onclick="agregarIPActividad('cambio_domicilio')" style="font-size:12px;padding:4px 10px;margin-top:4px;">+ Agregar IP</button>
-            </div>
+            <div class="field-row"><div class="form-group"><label>Conector APC</label><input type="number" min="0" id="cd-apc" class="inp-field" placeholder="0" /></div></div>
+            <div style="margin-top:6px;"><label style="font-size:11px;color:var(--muted);">IP del cliente</label><div id="ips-lista-cambio_domicilio" style="margin-top:4px;"></div><button onclick="agregarIPActividad('cambio_domicilio')" style="font-size:12px;padding:4px 10px;margin-top:4px;">+ Agregar IP</button></div>
           </div>
         </div>
-
         <div class="field-row" style="margin-top:8px;">
           <div class="form-group"><label>Total incidencias atendidas</label><input type="number" min="0" id="num-incidencias" class="inp-field" placeholder="0" /></div>
         </div>
@@ -423,6 +391,7 @@
         </div>
       </div>
     </div>
+
     <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:8px;">
         <h3 style="margin:0;">Mapa de red</h3>
@@ -433,13 +402,20 @@
           <button onclick="filtrarMapa('pasante')" id="filtro-pasante" style="font-size:12px;padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:none;color:var(--muted);cursor:pointer;">➡️ Pasante</button>
         </div>
       </div>
+
+      <!-- Leyenda -->
       <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:8px;">
         <div style="display:flex;align-items:center;gap:4px;font-size:12px;color:var(--muted);"><span style="width:10px;height:10px;background:#1D9E75;border-radius:50%;display:inline-block;"></span> Principal</div>
         <div style="display:flex;align-items:center;gap:4px;font-size:12px;color:var(--muted);"><span style="width:10px;height:10px;background:#3B82F6;border-radius:50%;display:inline-block;"></span> Cliente</div>
         <div style="display:flex;align-items:center;gap:4px;font-size:12px;color:var(--muted);"><span style="width:10px;height:10px;background:#F59E0B;border-radius:50%;display:inline-block;"></span> Pasante</div>
+        <div style="display:flex;align-items:center;gap:4px;font-size:12px;color:var(--muted);">
+          <span style="width:10px;height:10px;background:#0099ff;border-radius:50%;display:inline-block;border:2px solid rgba(255,255,255,0.3);box-shadow:0 0 0 2px rgba(0,153,255,0.4);"></span> Tú
+        </div>
         <div style="font-size:11px;color:var(--accent);" id="modo-seleccion-label"></div>
       </div>
-      <div id="mapa" style="height:400px;border-radius:10px;overflow:hidden;border:1px solid var(--border);"></div>
+
+      <div id="mapa" style="height:420px;border-radius:10px;overflow:hidden;border:1px solid var(--border);"></div>
+
       <div style="margin-top:1rem;">
         <div style="font-size:11px;color:var(--muted);text-transform:uppercase;margin-bottom:8px;">Puntos registrados</div>
         <div id="lista-cajas"></div>
