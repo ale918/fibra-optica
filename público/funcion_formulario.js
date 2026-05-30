@@ -966,38 +966,74 @@ function renderMarcadores() {
 
 function renderListaCajas() {
   const cont = document.getElementById('lista-cajas'); if (!cont) return;
-  const cajasFiltradas = filtroActivo==='todos'?todasLasCajas:todasLasCajas.filter(c=>c.tipo===filtroActivo);
+  const cajasFiltradas = filtroActivo==='todos' ? todasLasCajas : todasLasCajas.filter(c=>c.tipo===filtroActivo);
   if (!cajasFiltradas.length) { cont.innerHTML='<p class="empty">No hay puntos registrados.</p>'; return; }
-  cont.innerHTML = cajasFiltradas.map(c => {
-    const libres = c.totalPuertos - c.puertosOcupados;
-    const pct = Math.round((c.puertosOcupados/c.totalPuertos)*100);
-    const colorBarra = pct>=90?'#E24B4A':pct>=60?'#F59E0B':'#1D9E75';
-    const info = TIPO_CAJA[c.tipo] || { label:c.tipo, icon:'📦' };
-    const bufColor = COLOR_BUFFER[c.buffer] || '#6b7280';
+
+  // Agrupar por tipo
+  const grupos = { principal:[], cliente:[], pasante:[] };
+  cajasFiltradas.forEach(c => { if (grupos[c.tipo]) grupos[c.tipo].push(c); else grupos.cliente.push(c); });
+
+  const renderGrupo = (tipo, lista) => {
+    if (!lista.length) return '';
+    const info = TIPO_CAJA[tipo];
     return `
-      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:6px;cursor:pointer;" onclick="irACaja(${c.lat},${c.lng})">
-        <div style="display:flex;align-items:flex-start;gap:10px;">
-          <span style="width:10px;height:10px;background:${TIPO_CAJA[c.tipo]?.color||'#6b7280'};border-radius:50%;flex-shrink:0;margin-top:3px;"></span>
-          <div style="flex:1;min-width:0;">
-            <div style="font-size:13px;font-weight:500;color:var(--text);">${info.icon} ${c.referencia}</div>
-            <div style="font-size:11px;color:var(--muted);">${info.label}</div>
-            ${c.buffer||c.hilo?`<div style="display:flex;gap:5px;margin-top:3px;flex-wrap:wrap;">
-              ${c.buffer?`<span style="font-size:10px;background:var(--surface);border-radius:3px;padding:1px 5px;display:flex;align-items:center;gap:3px;"><span style="width:6px;height:6px;background:${bufColor};border-radius:50%;display:inline-block;"></span>${c.buffer}</span>`:''}
-              ${c.hilo?`<span style="font-size:10px;background:var(--surface);border-radius:3px;padding:1px 5px;">Hilo: ${c.hilo}</span>`:''}
-            </div>`:''}
-            ${c.distribucion?.length>0?`<div style="font-size:10px;color:var(--muted);margin-top:2px;">📡 ${c.distribucion.length} hilo${c.distribucion.length>1?'s':''} distribuido${c.distribucion.length>1?'s':''}</div>`:''}
-            <div style="margin-top:4px;">
-              <div style="height:4px;background:var(--surface);border-radius:2px;overflow:hidden;"><div style="width:${pct}%;height:100%;background:${colorBarra};border-radius:2px;"></div></div>
-              <div style="font-size:10px;color:var(--muted);margin-top:2px;">${libres} libre${libres!==1?'s':''} de ${c.totalPuertos}</div>
-            </div>
+      <div style="margin-bottom:8px;">
+        <div onclick="toggleGrupoCajas('${tipo}')" style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--surface);border:1px solid var(--border);border-radius:8px;cursor:pointer;user-select:none;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="width:10px;height:10px;background:${info.color};border-radius:50%;display:inline-block;"></span>
+            <span style="font-size:13px;font-weight:500;color:var(--text);">${info.icon} ${info.label}</span>
+            <span style="font-size:11px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:1px 8px;color:var(--muted);">${lista.length}</span>
           </div>
-          ${rolActual==='trabajador'?`<div style="display:flex;flex-direction:column;gap:4px;">
-            <button onclick="event.stopPropagation();editarCaja(${c.id})" style="font-size:11px;padding:3px 8px;background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:4px;cursor:pointer;">✏️</button>
-            <button onclick="event.stopPropagation();eliminarCaja(${c.id})" style="font-size:11px;padding:3px 8px;background:none;border:1px solid var(--danger);color:var(--danger);border-radius:4px;cursor:pointer;">✕</button>
-          </div>`:''}
+          <span id="arrow-cajas-${tipo}" style="color:var(--muted);font-size:14px;">▼</span>
+        </div>
+        <div id="grupo-cajas-${tipo}" style="display:none;padding-top:4px;">
+          ${lista.map(c => {
+            const libres = c.totalPuertos - c.puertosOcupados;
+            const pct = Math.round((c.puertosOcupados/c.totalPuertos)*100);
+            const colorBarra = pct>=90?'#E24B4A':pct>=60?'#F59E0B':'#1D9E75';
+            const bufColor = COLOR_BUFFER[c.buffer] || '#6b7280';
+            return `
+              <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:4px;cursor:pointer;" onclick="irACaja(${c.lat},${c.lng})">
+                <div style="display:flex;align-items:flex-start;gap:10px;">
+                  <div style="flex:1;min-width:0;">
+                    <div style="font-size:13px;font-weight:500;color:var(--text);">${c.referencia}</div>
+                    ${c.buffer||c.hilo?`<div style="display:flex;gap:5px;margin-top:3px;flex-wrap:wrap;">
+                      ${c.buffer?`<span style="font-size:10px;background:var(--surface);border-radius:3px;padding:1px 5px;display:flex;align-items:center;gap:3px;"><span style="width:6px;height:6px;background:${bufColor};border-radius:50%;display:inline-block;"></span>${c.buffer}</span>`:''}
+                      ${c.hilo?`<span style="font-size:10px;background:var(--surface);border-radius:3px;padding:1px 5px;">Hilo: ${c.hilo}</span>`:''}
+                    </div>`:''}
+                    ${c.distribucion?.length>0?`<div style="font-size:10px;color:var(--muted);margin-top:2px;">📡 ${c.distribucion.length} hilo${c.distribucion.length>1?'s':''} distribuido${c.distribucion.length>1?'s':''}</div>`:''}
+                    <div style="margin-top:4px;">
+                      <div style="height:4px;background:var(--surface);border-radius:2px;overflow:hidden;"><div style="width:${pct}%;height:100%;background:${colorBarra};border-radius:2px;"></div></div>
+                      <div style="font-size:10px;color:var(--muted);margin-top:2px;">${libres} libre${libres!==1?'s':''} de ${c.totalPuertos}</div>
+                    </div>
+                  </div>
+                  ${rolActual==='trabajador'?`<div style="display:flex;flex-direction:column;gap:4px;">
+                    <button onclick="event.stopPropagation();editarCaja(${c.id})" style="font-size:11px;padding:3px 8px;background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:4px;cursor:pointer;">✏️</button>
+                    <button onclick="event.stopPropagation();eliminarCaja(${c.id})" style="font-size:11px;padding:3px 8px;background:none;border:1px solid var(--danger);color:var(--danger);border-radius:4px;cursor:pointer;">✕</button>
+                  </div>`:''}
+                </div>
+              </div>`;
+          }).join('')}
         </div>
       </div>`;
-  }).join('');
+  };
+
+  cont.innerHTML = `
+    <div style="font-size:11px;color:var(--muted);margin-bottom:8px;">
+      Total: ${cajasFiltradas.length} punto${cajasFiltradas.length!==1?'s':''} registrado${cajasFiltradas.length!==1?'s':''}
+    </div>
+    ${renderGrupo('principal', grupos.principal)}
+    ${renderGrupo('cliente', grupos.cliente)}
+    ${renderGrupo('pasante', grupos.pasante)}`;
+}
+
+function toggleGrupoCajas(tipo) {
+  const grupo = document.getElementById(`grupo-cajas-${tipo}`);
+  const arrow = document.getElementById(`arrow-cajas-${tipo}`);
+  if (!grupo) return;
+  const visible = grupo.style.display !== 'none';
+  grupo.style.display = visible ? 'none' : 'block';
+  arrow.textContent = visible ? '▼' : '▲';
 }
 
 function irACaja(lat,lng) { if (mapaLeaflet) mapaLeaflet.setView([lat,lng],18); }
