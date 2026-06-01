@@ -210,6 +210,80 @@ function getDistribucionReg() {
   return resultado;
 }
 
+// ── Distribución mapa (mismo sistema buffer+checkboxes) ──
+let distMapaContador = 0;
+
+function agregarDistMapa(bufferPreset = '') {
+  distMapaContador++;
+  const id = distMapaContador;
+  const lista = document.getElementById('distribucion-lista');
+  const div = document.createElement('div');
+  div.id = `dmapa-grupo-${id}`;
+  div.style.cssText = 'background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;';
+  div.innerHTML = `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+      <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;flex-shrink:0;">Buffer</label>
+      <select id="dmapa-buf-${id}" class="sel-field" style="flex:1;" onchange="renderHilosMapaBuffer(${id})">
+        <option value="">Seleccionar buffer...</option>
+        ${BUFFERS.map(b => `<option value="${b}" ${b===bufferPreset?'selected':''}>${b}</option>`).join('')}
+      </select>
+      <button onclick="document.getElementById('dmapa-grupo-${id}').remove()"
+        style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;flex-shrink:0;line-height:1;">✕</button>
+    </div>
+    <div id="dmapa-hilos-${id}" style="padding-left:4px;">
+      <div style="font-size:12px;color:var(--muted);">Selecciona un buffer para ver los hilos disponibles</div>
+    </div>`;
+  lista.appendChild(div);
+  if (bufferPreset) renderHilosMapaBuffer(id);
+}
+
+function renderHilosMapaBuffer(grupoId) {
+  const buffer = document.getElementById(`dmapa-buf-${grupoId}`)?.value;
+  const cont = document.getElementById(`dmapa-hilos-${grupoId}`);
+  if (!cont) return;
+  if (!buffer) {
+    cont.innerHTML = '<div style="font-size:12px;color:var(--muted);">Selecciona un buffer para ver los hilos</div>';
+    return;
+  }
+  const bufColor = COLOR_BUFFER[buffer] || '#6b7280';
+  cont.innerHTML = `
+    <div style="font-size:11px;color:var(--muted);margin-bottom:8px;display:flex;align-items:center;gap:5px;">
+      <span style="width:8px;height:8px;background:${bufColor};border-radius:50%;display:inline-block;"></span>
+      Hilos del buffer ${buffer} — marca los que salen de esta caja
+    </div>
+    ${HILOS.map(h => {
+      const hColor = COLOR_BUFFER[h] || '#6b7280';
+      return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap;">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;min-width:110px;">
+          <input type="checkbox" id="dmapa-check-${grupoId}-${h}" style="accent-color:var(--accent);width:14px;height:14px;" />
+          <span style="display:flex;align-items:center;gap:4px;font-size:12px;color:var(--text);">
+            <span style="width:8px;height:8px;background:${hColor};border-radius:50%;display:inline-block;border:1px solid rgba(255,255,255,0.2);"></span>
+            ${h}
+          </span>
+        </label>
+        <input type="text" id="dmapa-dest-${grupoId}-${h}" placeholder="Destino (Caja 01, Pasante...)"
+          style="flex:1;min-width:130px;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;padding:5px 8px;outline:none;" />
+      </div>`;
+    }).join('')}`;
+}
+
+function getDistribucionMapa() {
+  const resultado = [];
+  document.querySelectorAll('[id^="dmapa-grupo-"]').forEach(grupo => {
+    const id = grupo.id.replace('dmapa-grupo-', '');
+    const buffer = document.getElementById(`dmapa-buf-${id}`)?.value;
+    if (!buffer) return;
+    HILOS.forEach(h => {
+      const check = document.getElementById(`dmapa-check-${id}-${h}`);
+      if (check?.checked) {
+        const destino = document.getElementById(`dmapa-dest-${id}-${h}`)?.value.trim() || '';
+        resultado.push({ buffer, hilo: h, destino });
+      }
+    });
+  });
+  return resultado;
+}
+
 // ── GPS de caja en registro ──────────────────────────────
 function obtenerGPSCaja() {
   const status = document.getElementById('caja-gps-status');
@@ -439,7 +513,7 @@ async function guardarReporte() {
       await fetch('/api/cajas', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          tipo: det.tipo||'cliente', referencia:`${tipoLabel} — ${fecha}`,
+          tipo: det.tipo||'cliente', referencia: document.getElementById('caja-referencia-reg')?.value.trim() || `${tipoLabel} — ${fecha}`,
           lat: cajaGpsLat, lng: cajaGpsLng,
           totalPuertos: det.totalPuertos, puertosOcupados: det.puertosOcupados,
           buffer: det.buffer, hilo: det.hilo, distribucion: det.distribucion||[]
@@ -478,6 +552,8 @@ function limpiarFormulario() {
   document.querySelectorAll('[id^="ips-lista-"]').forEach(l => l.innerHTML = '');
   ipCounters = {};
   cajaGpsLat = null; cajaGpsLng = null;
+  const refReg = document.getElementById('caja-referencia-reg');
+if (refReg) refReg.value = '';
   const gpsStatus = document.getElementById('caja-gps-status');
   if (gpsStatus) { gpsStatus.textContent = 'Sin ubicación — la caja no se guardará en el mapa'; gpsStatus.style.color = 'var(--muted)'; }
   distRegContador = 0;
@@ -1066,7 +1142,7 @@ async function registrarCaja() {
   const puertosOcupados=parseInt(document.getElementById('caja-puertos-ocupados').value)||0;
   const buffer=document.getElementById('caja-buffer').value;
   const hilo=document.getElementById('caja-hilo').value;
-  const distribucion=tipo==='principal'?getDistribucion():[];
+  const distribucion = tipo==='principal' ? getDistribucionMapa() : [];
   if(!referencia){toast('⚠ Ingresa una referencia');return;}
   try {
     const res=await fetch('/api/cajas',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tipo,referencia,lat:gpsLat,lng:gpsLng,totalPuertos,puertosOcupados,buffer,hilo,distribucion})});
@@ -1080,6 +1156,8 @@ async function registrarCaja() {
       document.getElementById('caja-hilo').value='';
       document.getElementById('distribucion-lista').innerHTML='';
       distContador=0;
+      document.getElementById('distribucion-lista').innerHTML = '';
+      distMapaContador = 0;
       await cargarCajas(); renderMarcadores(); renderListaCajas();
       if(mapaLeaflet) mapaLeaflet.setView([gpsLat,gpsLng],17);
     }else{toast('Error: '+data.error);}
