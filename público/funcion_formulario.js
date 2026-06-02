@@ -68,6 +68,7 @@ let modoSeleccionMapa = false;
 let modoSeleccionMapaCaja = false;
 let distContador = 0;
 let distRegContador = 0;
+let distMapaContador = 0;
 let editDistMap = {};
 
 // ── Fecha local ──────────────────────────────────────────
@@ -132,132 +133,118 @@ function toggleIncPanel(tipo) {
   if (panel) panel.style.display = cb.checked ? 'block' : 'none';
 }
 
-// ── Distribución de hilos por buffer ─────────────────────
+// ── Helper: render checkboxes de hilos ───────────────────
+function renderCheckboxesHilos(prefijo, grupoId) {
+  return HILOS.map(h => {
+    const hColor = COLOR_BUFFER[h] || '#6b7280';
+    return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap;">
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;min-width:110px;">
+        <input type="checkbox" id="${prefijo}-check-${grupoId}-${h}" style="accent-color:var(--accent);width:14px;height:14px;" />
+        <span style="display:flex;align-items:center;gap:4px;font-size:12px;color:var(--text);">
+          <span style="width:8px;height:8px;background:${hColor};border-radius:50%;display:inline-block;border:1px solid rgba(255,255,255,0.2);"></span>
+          ${h}
+        </span>
+      </label>
+      <input type="text" id="${prefijo}-dest-${grupoId}-${h}" placeholder="Destino (Caja 01, Pasante...)"
+        style="flex:1;min-width:130px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;padding:5px 8px;outline:none;" />
+    </div>`;
+  }).join('');
+}
+
+function renderGrupoBuffer(prefijo, id, bufferPreset = '', idPreset = '') {
+  const bufColor = COLOR_BUFFER[bufferPreset] || '#6b7280';
+  return `
+    <div id="${prefijo}-grupo-${id}" style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
+        <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;flex-shrink:0;">Buffer</label>
+        <select id="${prefijo}-buf-${id}" class="sel-field" style="flex:1;min-width:100px;"
+          onchange="actualizarHeaderBuffer('${prefijo}',${id})">
+          <option value="">Seleccionar...</option>
+          ${BUFFERS.map(b => `<option value="${b}" ${b===bufferPreset?'selected':''}>${b}</option>`).join('')}
+        </select>
+        <input type="text" id="${prefijo}-id-${id}" placeholder="ID (Ej: #1, Cable A...)" value="${idPreset}"
+          style="flex:1;min-width:90px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;padding:6px 8px;outline:none;"
+          oninput="actualizarHeaderBuffer('${prefijo}',${id})" />
+        <button onclick="document.getElementById('${prefijo}-grupo-${id}').remove()"
+          style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;flex-shrink:0;line-height:1;">✕</button>
+      </div>
+      <div id="${prefijo}-info-${id}" style="font-size:11px;color:var(--muted);margin-bottom:8px;display:flex;align-items:center;gap:5px;">
+        <span style="width:8px;height:8px;background:${bufColor};border-radius:50%;display:inline-block;"></span>
+        ${bufferPreset ? `Buffer ${bufferPreset}${idPreset?' '+idPreset:''} — marca los hilos que salen` : 'Selecciona un buffer para ver los hilos'}
+      </div>
+      <div id="${prefijo}-hilos-${id}" style="padding-left:4px;">
+        ${bufferPreset ? renderCheckboxesHilos(prefijo, id) : '<div style="font-size:12px;color:var(--muted);">Selecciona un buffer para continuar</div>'}
+      </div>
+    </div>`;
+}
+
+function actualizarHeaderBuffer(prefijo, grupoId) {
+  const buffer = document.getElementById(`${prefijo}-buf-${grupoId}`)?.value;
+  const bufferId = document.getElementById(`${prefijo}-id-${grupoId}`)?.value.trim() || '';
+  const infoEl = document.getElementById(`${prefijo}-info-${grupoId}`);
+  const hilosEl = document.getElementById(`${prefijo}-hilos-${grupoId}`);
+  if (!infoEl || !hilosEl) return;
+
+  if (!buffer) {
+    infoEl.innerHTML = `<span style="font-size:12px;color:var(--muted);">Selecciona un buffer para ver los hilos</span>`;
+    hilosEl.innerHTML = '<div style="font-size:12px;color:var(--muted);">Selecciona un buffer para continuar</div>';
+    return;
+  }
+
+  const bufColor = COLOR_BUFFER[buffer] || '#6b7280';
+  const label = bufferId ? `${buffer} ${bufferId}` : buffer;
+  infoEl.innerHTML = `
+    <span style="width:8px;height:8px;background:${bufColor};border-radius:50%;display:inline-block;"></span>
+    <strong style="color:var(--text);">Buffer ${label}</strong> — marca los hilos que salen de esta caja`;
+  hilosEl.innerHTML = renderCheckboxesHilos(prefijo, grupoId);
+}
+
+function getDistribucionDePrefijo(prefijo) {
+  const resultado = [];
+  document.querySelectorAll(`[id^="${prefijo}-grupo-"]`).forEach(grupo => {
+    const id = grupo.id.replace(`${prefijo}-grupo-`, '');
+    const buffer = document.getElementById(`${prefijo}-buf-${id}`)?.value;
+    const bufferId = document.getElementById(`${prefijo}-id-${id}`)?.value.trim() || '';
+    if (!buffer) return;
+    HILOS.forEach(h => {
+      const check = document.getElementById(`${prefijo}-check-${id}-${h}`);
+      if (check?.checked) {
+        const destino = document.getElementById(`${prefijo}-dest-${id}-${h}`)?.value.trim() || '';
+        resultado.push({ buffer, bufferId, hilo: h, destino });
+      }
+    });
+  });
+  return resultado;
+}
+
+// ── Distribución en REGISTRO ─────────────────────────────
 function toggleDistribucionReg() {
   const tipo = document.getElementById('caja-tipo-reg')?.value;
   const panel = document.getElementById('dist-reg-panel');
   if (panel) panel.style.display = tipo === 'principal' ? 'block' : 'none';
 }
 
-function agregarDistReg(bufferPreset = '') {
+function agregarDistReg() {
   distRegContador++;
-  const id = distRegContador;
   const lista = document.getElementById('dist-reg-lista');
-  const div = document.createElement('div');
-  div.id = `dreg-grupo-${id}`;
-  div.style.cssText = 'background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;';
-  div.innerHTML = `
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
-      <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;flex-shrink:0;">Buffer</label>
-      <select id="dreg-buf-${id}" class="sel-field" style="flex:1;min-width:100px;" onchange="renderHilosBuffer(${id})">
-        <option value="">Seleccionar...</option>
-        ${BUFFERS.map(b => `<option value="${b}" ${b===bufferPreset?'selected':''}>${b}</option>`).join('')}
-      </select>
-      <input type="text" id="dreg-id-${id}" placeholder="ID (Ej: #1, Fibra A...)"
-        style="flex:1;min-width:100px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;padding:6px 8px;outline:none;" />
-      <button onclick="document.getElementById('dreg-grupo-${id}').remove()"
-        style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;flex-shrink:0;line-height:1;">✕</button>
-    </div>
-    <div id="dreg-hilos-${id}" style="padding-left:4px;">
-      <div style="font-size:12px;color:var(--muted);">Selecciona un buffer para ver los hilos</div>
-    </div>`;
-  lista.appendChild(div);
-  if (bufferPreset) renderHilosBuffer(id);
-}
-function renderHilosBuffer(grupoId) {
-  const buffer = document.getElementById(`dreg-buf-${grupoId}`)?.value;
-  const cont = document.getElementById(`dreg-hilos-${grupoId}`);
-  if (!cont) return;
-  if (!buffer) {
-    cont.innerHTML = '<div style="font-size:12px;color:var(--muted);">Selecciona un buffer para ver los hilos</div>';
-    return;
-  }
-  const bufColor = COLOR_BUFFER[buffer] || '#6b7280';
-  cont.innerHTML = `
-    <div style="font-size:11px;color:var(--muted);margin-bottom:8px;display:flex;align-items:center;gap:5px;">
-      <span style="width:8px;height:8px;background:${bufColor};border-radius:50%;display:inline-block;"></span>
-      Hilos del buffer ${buffer} — marca los que salen de esta caja
-    </div>
-    ${HILOS.map(h => {
-      const hColor = COLOR_BUFFER[h] || '#6b7280';
-      return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap;">
-        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;min-width:110px;">
-          <input type="checkbox" id="dreg-check-${grupoId}-${h}" style="accent-color:var(--accent);width:14px;height:14px;" />
-          <span style="display:flex;align-items:center;gap:4px;font-size:12px;color:var(--text);">
-            <span style="width:8px;height:8px;background:${hColor};border-radius:50%;display:inline-block;border:1px solid rgba(255,255,255,0.2);"></span>
-            ${h}
-          </span>
-        </label>
-        <input type="text" id="dreg-dest-${grupoId}-${h}" placeholder="Destino (Caja 01, Pasante...)"
-          style="flex:1;min-width:130px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;padding:5px 8px;outline:none;" />
-      </div>`;
-    }).join('')}`;
+  lista.insertAdjacentHTML('beforeend', renderGrupoBuffer('dreg', distRegContador));
 }
 
 function getDistribucionReg() {
-  const resultado = [];
-  document.querySelectorAll('[id^="dreg-grupo-"]').forEach(grupo => {
-    const id = grupo.id.replace('dreg-grupo-', '');
-    const buffer = document.getElementById(`dreg-buf-${id}`)?.value;
-    const bufferId = document.getElementById(`dreg-id-${id}`)?.value.trim() || '';
-    if (!buffer) return;
-    HILOS.forEach(h => {
-      const check = document.getElementById(`dreg-check-${id}-${h}`);
-      if (check?.checked) {
-        const destino = document.getElementById(`dreg-dest-${id}-${h}`)?.value.trim() || '';
-        resultado.push({ buffer, bufferId, hilo: h, destino });
-      }
-    });
-  });
-  return resultado;
+  return getDistribucionDePrefijo('dreg');
 }
 
-// ── Distribución mapa (mismo sistema buffer+checkboxes) ──
-let distMapaContador = 0;
-
-function agregarDistMapa(bufferPreset = '') {
+// ── Distribución en MAPA ─────────────────────────────────
+function agregarDistMapa() {
   distMapaContador++;
-  const id = distMapaContador;
   const lista = document.getElementById('distribucion-lista');
-  const div = document.createElement('div');
-  div.id = `dmapa-grupo-${id}`;
-  div.style.cssText = 'background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;';
-  div.innerHTML = `
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
-      <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;flex-shrink:0;">Buffer</label>
-      <select id="dmapa-buf-${id}" class="sel-field" style="flex:1;min-width:100px;" onchange="renderHilosMapaBuffer(${id})">
-        <option value="">Seleccionar...</option>
-        ${BUFFERS.map(b => `<option value="${b}" ${b===bufferPreset?'selected':''}>${b}</option>`).join('')}
-      </select>
-      <input type="text" id="dmapa-id-${id}" placeholder="ID (Ej: #1, Fibra A...)"
-        style="flex:1;min-width:100px;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;padding:6px 8px;outline:none;" />
-      <button onclick="document.getElementById('dmapa-grupo-${id}').remove()"
-        style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;flex-shrink:0;line-height:1;">✕</button>
-    </div>
-    <div id="dmapa-hilos-${id}" style="padding-left:4px;">
-      <div style="font-size:12px;color:var(--muted);">Selecciona un buffer para ver los hilos</div>
-    </div>`;
-  lista.appendChild(div);
-  if (bufferPreset) renderHilosMapaBuffer(id);
+  lista.insertAdjacentHTML('beforeend', renderGrupoBuffer('dmapa', distMapaContador));
 }
 
 function getDistribucionMapa() {
-  const resultado = [];
-  document.querySelectorAll('[id^="dmapa-grupo-"]').forEach(grupo => {
-    const id = grupo.id.replace('dmapa-grupo-', '');
-    const buffer = document.getElementById(`dmapa-buf-${id}`)?.value;
-    const bufferId = document.getElementById(`dmapa-id-${id}`)?.value.trim() || '';
-    if (!buffer) return;
-    HILOS.forEach(h => {
-      const check = document.getElementById(`dmapa-check-${id}-${h}`);
-      if (check?.checked) {
-        const destino = document.getElementById(`dmapa-dest-${id}-${h}`)?.value.trim() || '';
-        resultado.push({ buffer, bufferId, hilo: h, destino });
-      }
-    });
-  });
-  return resultado;
+  return getDistribucionDePrefijo('dmapa');
 }
+
 // ── GPS de caja en registro ──────────────────────────────
 function obtenerGPSCaja() {
   const status = document.getElementById('caja-gps-status');
@@ -483,11 +470,13 @@ async function guardarReporte() {
   if (actividadesSeleccionadas.has('cajas') && cajaGpsLat !== null && cajaGpsLng !== null) {
     const det = datos.detalles.cajas;
     const tipoLabel = det.tipo==='principal'?'Caja Principal':det.tipo==='cliente'?'Caja Cliente':'Pasante';
+    const refIngresada = document.getElementById('caja-referencia-reg')?.value.trim();
     try {
       await fetch('/api/cajas', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          tipo: det.tipo||'cliente', referencia: document.getElementById('caja-referencia-reg')?.value.trim() || `${tipoLabel} — ${fecha}`,
+          tipo: det.tipo||'cliente',
+          referencia: refIngresada || `${tipoLabel} — ${fecha}`,
           lat: cajaGpsLat, lng: cajaGpsLng,
           totalPuertos: det.totalPuertos, puertosOcupados: det.puertosOcupados,
           buffer: det.buffer, hilo: det.hilo, distribucion: det.distribucion||[]
@@ -526,8 +515,6 @@ function limpiarFormulario() {
   document.querySelectorAll('[id^="ips-lista-"]').forEach(l => l.innerHTML = '');
   ipCounters = {};
   cajaGpsLat = null; cajaGpsLng = null;
-  const refReg = document.getElementById('caja-referencia-reg');
-if (refReg) refReg.value = '';
   const gpsStatus = document.getElementById('caja-gps-status');
   if (gpsStatus) { gpsStatus.textContent = 'Sin ubicación — la caja no se guardará en el mapa'; gpsStatus.style.color = 'var(--muted)'; }
   distRegContador = 0;
@@ -535,6 +522,8 @@ if (refReg) refReg.value = '';
   if (drl) drl.innerHTML = '';
   const dp = document.getElementById('dist-reg-panel');
   if (dp) dp.style.display = 'none';
+  const refReg = document.getElementById('caja-referencia-reg');
+  if (refReg) refReg.value = '';
 }
 
 // ── Historial ────────────────────────────────────────────
@@ -551,6 +540,36 @@ function filtrarHistorial() {
   renderHistorial(todosLosReportes.filter(r => r.fecha.includes(q)));
 }
 
+// ── Helper: render distribución agrupada por buffer ──────
+function renderDistribucionAgrupada(distribucion) {
+  if (!distribucion?.length) return '';
+  const porBuffer = {};
+  distribucion.forEach(d => {
+    const key = d.bufferId ? `${d.buffer} ${d.bufferId}` : d.buffer;
+    if (!porBuffer[key]) porBuffer[key] = { color: d.buffer, hilos: [] };
+    porBuffer[key].hilos.push(d);
+  });
+  return `<div style="margin-top:4px;padding:6px 10px;background:var(--surface2);border-radius:6px;">
+    <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);margin-bottom:4px;">📡 Distribución</div>
+    ${Object.entries(porBuffer).map(([label, grupo]) => {
+      const bc = COLOR_BUFFER[grupo.color] || '#6b7280';
+      return `<div style="margin-bottom:4px;font-size:11px;">
+        <span style="display:inline-flex;align-items:center;gap:3px;">
+          <span style="width:7px;height:7px;background:${bc};border-radius:50%;display:inline-block;"></span>
+          <strong style="color:var(--text);">Buffer ${label}:</strong>
+        </span>
+        ${grupo.hilos.map(d => {
+          const hc = COLOR_BUFFER[d.hilo]||'#6b7280';
+          return `<span style="display:inline-flex;align-items:center;gap:2px;margin-left:6px;">
+            <span style="width:6px;height:6px;background:${hc};border-radius:50%;display:inline-block;"></span>
+            <span style="color:var(--text);">${d.hilo}</span>${d.destino?`<span style="color:var(--muted);"> → ${d.destino}</span>`:''}
+          </span>`;
+        }).join('')}
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
 function renderDetallesHistorial(detalles) {
   if (!detalles) return '';
   let html = '';
@@ -560,7 +579,7 @@ function renderDetallesHistorial(detalles) {
   if (detalles.cajas) {
     const c = detalles.cajas;
     const bufColor = COLOR_BUFFER[c.buffer] || '#6b7280';
-    html += `<div style="font-size:12px;color:var(--muted);margin-bottom:6px;">
+    html += `<div style="font-size:12px;color:var(--muted);margin-bottom:4px;">
       📦 Caja: <strong style="color:var(--text);">${c.tipo||'—'}</strong>
       ${c.buffer?`· <span style="display:inline-flex;align-items:center;gap:3px;"><span style="width:8px;height:8px;background:${bufColor};border-radius:50%;display:inline-block;"></span>Buffer ${c.buffer}</span>`:''}
       ${c.hilo?`· Hilo: <strong style="color:var(--text);">${c.hilo}</strong>`:''}
@@ -568,21 +587,7 @@ function renderDetallesHistorial(detalles) {
       ${c.lat?'· 📍 En mapa':''}
     </div>`;
     if (c.distribucion?.length > 0) {
-      const porBuffer = {};
-      c.distribucion.forEach(d => { if (!porBuffer[d.buffer]) porBuffer[d.buffer]=[]; porBuffer[d.buffer].push(d); });
-      html += `<div style="font-size:11px;color:var(--muted);margin-bottom:6px;margin-left:12px;padding:6px 10px;background:var(--surface2);border-radius:6px;">
-        <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px;">📡 Distribución</div>
-        ${Object.entries(porBuffer).map(([buf,hilos]) => {
-          const bc = COLOR_BUFFER[buf]||'#6b7280';
-          return `<div style="margin-bottom:3px;">
-            <span style="display:inline-flex;align-items:center;gap:3px;font-size:11px;">
-              <span style="width:7px;height:7px;background:${bc};border-radius:50%;display:inline-block;"></span>
-              <strong>Buffer ${buf}:</strong>
-            </span>
-            ${hilos.map(d=>{const hc=COLOR_BUFFER[d.hilo]||'#6b7280';return `<span style="display:inline-flex;align-items:center;gap:2px;font-size:11px;margin-left:6px;"><span style="width:6px;height:6px;background:${hc};border-radius:50%;display:inline-block;"></span>${d.hilo}${d.destino?` → ${d.destino}`:''}</span>`;}).join('')}
-          </div>`;
-        }).join('')}
-      </div>`;
+      html += renderDistribucionAgrupada(c.distribucion);
     }
   }
   if (detalles.mudanza) {
@@ -726,7 +731,7 @@ async function eliminarReporte(id) {
 }
 
 function editarReporte(id) {
-  const r=todosLosReportes.find(x=>x.id===id); if (!r) return;
+  const r=todosLosReportes.find(x=>x.id===id); if(!r) return;
   const overlay=document.createElement('div');
   overlay.style.cssText='position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);z-index:500;display:flex;align-items:center;justify-content:center;padding:1rem;';
   overlay.innerHTML=`
@@ -755,7 +760,7 @@ async function guardarEdicion(id) {
     const res=await fetch('/api/reportes/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({fecha,observaciones})});
     const data=await res.json();
     if(data.ok){toast('✓ Reporte editado');document.querySelector('div[style*="position:fixed"]')?.remove();await cargarHistorial();}
-  } catch(e){toast('Error al editar');}
+  }catch(e){toast('Error al editar');}
 }
 
 function exportarReporteExcel(id) {
@@ -825,43 +830,23 @@ async function iniciarMapa() {
     mapaLeaflet=L.map('mapa').setView([lat,lng],15);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap',maxZoom:19}).addTo(mapaLeaflet);
 
-    // ── Ubicación en vivo ──
+    // Ubicación en vivo
     if (navigator.geolocation) {
-      const iconoYo = L.divIcon({
-        html:`<div style="width:16px;height:16px;background:#0099ff;border:3px solid #fff;border-radius:50%;box-shadow:0 0 0 4px rgba(0,153,255,0.25);"></div>`,
-        className:'', iconSize:[16,16], iconAnchor:[8,8]
-      });
-
-      const actualizarPosicion = (pos) => {
-        const lat=pos.coords.latitude;
-        const lng=pos.coords.longitude;
-        const precision=pos.coords.accuracy;
-        if (marcadorYo) {
-          marcadorYo.setLatLng([lat,lng]);
-          circuloYo.setLatLng([lat,lng]);
-          circuloYo.setRadius(precision);
-        } else {
-          marcadorYo = L.marker([lat,lng],{icon:iconoYo,zIndexOffset:1000})
-            .addTo(mapaLeaflet)
-            .bindPopup(`<div style="font-family:'IBM Plex Sans',sans-serif;font-size:12px;">
-              <strong>📍 Tu ubicación</strong><br>
-              <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;">${lat.toFixed(5)}, ${lng.toFixed(5)}</span><br>
-              <span style="color:#6b7280;">Precisión: ±${Math.round(precision)}m</span>
-            </div>`);
-          circuloYo = L.circle([lat,lng],{
-            radius:precision, color:'#0099ff',
-            fillColor:'#0099ff', fillOpacity:0.08, weight:1
-          }).addTo(mapaLeaflet);
+      const iconoYo=L.divIcon({html:`<div style="width:16px;height:16px;background:#0099ff;border:3px solid #fff;border-radius:50%;box-shadow:0 0 0 4px rgba(0,153,255,0.25);"></div>`,className:'',iconSize:[16,16],iconAnchor:[8,8]});
+      const actualizarPosicion=(pos)=>{
+        const lat=pos.coords.latitude, lng=pos.coords.longitude, precision=pos.coords.accuracy;
+        if(marcadorYo){marcadorYo.setLatLng([lat,lng]);circuloYo.setLatLng([lat,lng]);circuloYo.setRadius(precision);}
+        else{
+          marcadorYo=L.marker([lat,lng],{icon:iconoYo,zIndexOffset:1000}).addTo(mapaLeaflet)
+            .bindPopup(`<div style="font-family:'IBM Plex Sans',sans-serif;font-size:12px;"><strong>📍 Tu ubicación</strong><br><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;">${lat.toFixed(5)}, ${lng.toFixed(5)}</span><br><span style="color:#6b7280;">Precisión: ±${Math.round(precision)}m</span></div>`);
+          circuloYo=L.circle([lat,lng],{radius:precision,color:'#0099ff',fillColor:'#0099ff',fillOpacity:0.08,weight:1}).addTo(mapaLeaflet);
         }
       };
-
-      navigator.geolocation.watchPosition(actualizarPosicion, null, {
-        enableHighAccuracy:true, maximumAge:10000
-      });
+      navigator.geolocation.watchPosition(actualizarPosicion,null,{enableHighAccuracy:true,maximumAge:10000});
     }
 
-    mapaLeaflet.on('click', e => {
-      if (modoSeleccionMapaCaja) {
+    mapaLeaflet.on('click',e=>{
+      if(modoSeleccionMapaCaja){
         cajaGpsLat=e.latlng.lat; cajaGpsLng=e.latlng.lng;
         modoSeleccionMapaCaja=false;
         const lbl=document.getElementById('modo-seleccion-label');
@@ -871,14 +856,11 @@ async function iniciarMapa() {
         mostrarTab('registro');
         setTimeout(()=>{
           const status=document.getElementById('caja-gps-status');
-          if(status){
-            status.innerHTML=`✅ Ubicación en mapa: <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;">${cajaGpsLat.toFixed(5)}, ${cajaGpsLng.toFixed(5)}</span>`;
-            status.style.color='var(--accent)';
-          }
+          if(status){status.innerHTML=`✅ Ubicación en mapa: <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;">${cajaGpsLat.toFixed(5)}, ${cajaGpsLng.toFixed(5)}</span>`;status.style.color='var(--accent)';}
         },400);
         return;
       }
-      if (!modoSeleccionMapa) return;
+      if(!modoSeleccionMapa) return;
       gpsLat=e.latlng.lat; gpsLng=e.latlng.lng;
       actualizarStatusGPS();
       modoSeleccionMapa=false;
@@ -889,7 +871,7 @@ async function iniciarMapa() {
     });
   }
   renderMarcadores(); renderListaCajas();
-  if (rolActual==='trabajador') {
+  if(rolActual==='trabajador'){
     const form=document.getElementById('mapa-trabajador-form');
     if(form) form.style.display='block';
     obtenerGPS();
@@ -914,10 +896,7 @@ function actualizarStatusGPS() {
 
 function obtenerGPS() {
   const status=document.getElementById('gps-status');
-  if(!navigator.geolocation){
-    if(status) status.innerHTML=`❌ GPS no disponible. <button onclick="activarSeleccionMapa()" style="font-size:11px;padding:2px 8px;border-radius:4px;border:1px solid var(--accent);color:var(--accent);background:none;cursor:pointer;">🗺️ Seleccionar</button>`;
-    return;
-  }
+  if(!navigator.geolocation){if(status) status.innerHTML=`❌ GPS no disponible. <button onclick="activarSeleccionMapa()" style="font-size:11px;padding:2px 8px;border-radius:4px;border:1px solid var(--accent);color:var(--accent);background:none;cursor:pointer;">🗺️ Seleccionar</button>`;return;}
   if(status) status.textContent='⏳ Obteniendo GPS...';
   navigator.geolocation.getCurrentPosition(
     pos=>{gpsLat=pos.coords.latitude;gpsLng=pos.coords.longitude;actualizarStatusGPS();if(mapaLeaflet)mapaLeaflet.setView([gpsLat,gpsLng],17);},
@@ -940,6 +919,7 @@ function selBuffers(id,val='') {
   return `<select id="${id}" class="sel-field" style="flex:1;min-width:80px;"><option value="">Buffer...</option>${BUFFERS.map(b=>`<option value="${b}" ${val===b?'selected':''}>${b}</option>`).join('')}</select>`;
 }
 
+// agregarDistribucion se mantiene para edición de cajas existentes (formato simple)
 function agregarDistribucion(buf='',hil='',dest='') {
   distContador++;
   const id=distContador;
@@ -957,7 +937,7 @@ function agregarDistribucion(buf='',hil='',dest='') {
 function getDistribucion() {
   return [...document.querySelectorAll('[id^="dist-row-"]')].map(row=>{
     const id=row.id.replace('dist-row-','');
-    return {buffer:document.getElementById(`dist-buf-${id}`)?.value||'',hilo:document.getElementById(`dist-hil-${id}`)?.value||'',destino:document.getElementById(`dist-dest-${id}`)?.value.trim()||''};
+    return{buffer:document.getElementById(`dist-buf-${id}`)?.value||'',hilo:document.getElementById(`dist-hil-${id}`)?.value||'',destino:document.getElementById(`dist-dest-${id}`)?.value.trim()||''};
   }).filter(d=>d.buffer||d.hilo||d.destino);
 }
 
@@ -977,32 +957,27 @@ function renderMarcadores() {
     const colorBarra=pct>=90?'#E24B4A':pct>=60?'#F59E0B':'#1D9E75';
     const info=TIPO_CAJA[caja.tipo]||{label:caja.tipo,icon:'📦'};
     const bufColor=COLOR_BUFFER[caja.buffer]||'#6b7280';
-
-    const porBuffer = {};
-caja.distribucion.forEach(d => {
-  const key = d.bufferId ? `${d.buffer} ${d.bufferId}` : d.buffer;
-  if (!porBuffer[key]) porBuffer[key] = { color: d.buffer, hilos: [] };
-  porBuffer[key].hilos.push(d);
-});
-distHTML = `<div style="margin-top:8px;border-top:1px solid #e5e7eb;padding-top:6px;">
-  <div style="font-size:11px;font-weight:600;margin-bottom:4px;">📡 Hilos distribuidos</div>
-  ${Object.entries(porBuffer).map(([label, grupo]) => {
-    const bc = COLOR_BUFFER[grupo.color] || '#6b7280';
-    return `<div style="margin-bottom:4px;">
-      <span style="font-size:11px;display:inline-flex;align-items:center;gap:3px;">
-        <span style="width:7px;height:7px;background:${bc};border-radius:50%;display:inline-block;"></span>
-        <strong>Buffer ${label}:</strong>
-      </span>
-      ${grupo.hilos.map(d => {
-        const hc = COLOR_BUFFER[d.hilo]||'#6b7280';
-        return `<span style="font-size:11px;display:inline-flex;align-items:center;gap:2px;margin-left:8px;">
-          <span style="width:6px;height:6px;background:${hc};border-radius:50%;display:inline-block;"></span>
-          ${d.hilo}${d.destino?` → ${d.destino}`:''}
-        </span>`;
-      }).join('')}
-    </div>`;
-  }).join('')}
-</div>`;
+    const distPopup = caja.tipo==='principal'&&caja.distribucion?.length>0 ? (() => {
+      const porBuffer={};
+      caja.distribucion.forEach(d=>{
+        const key=d.bufferId?`${d.buffer} ${d.bufferId}`:d.buffer;
+        if(!porBuffer[key]) porBuffer[key]={color:d.buffer,hilos:[]};
+        porBuffer[key].hilos.push(d);
+      });
+      return `<div style="margin-top:8px;border-top:1px solid #e5e7eb;padding-top:6px;">
+        <div style="font-size:11px;font-weight:600;margin-bottom:4px;">📡 Hilos distribuidos</div>
+        ${Object.entries(porBuffer).map(([label,grupo])=>{
+          const bc=COLOR_BUFFER[grupo.color]||'#6b7280';
+          return `<div style="margin-bottom:4px;">
+            <span style="font-size:11px;display:inline-flex;align-items:center;gap:3px;">
+              <span style="width:7px;height:7px;background:${bc};border-radius:50%;display:inline-block;"></span>
+              <strong>Buffer ${label}:</strong>
+            </span>
+            ${grupo.hilos.map(d=>{const hc=COLOR_BUFFER[d.hilo]||'#6b7280';return `<span style="font-size:11px;display:inline-flex;align-items:center;gap:2px;margin-left:8px;"><span style="width:6px;height:6px;background:${hc};border-radius:50%;display:inline-block;"></span>${d.hilo}${d.destino?` → ${d.destino}`:''}</span>`;}).join('')}
+          </div>`;
+        }).join('')}
+      </div>`;
+    })() : '';
 
     const popup=`<div style="font-family:'IBM Plex Sans',sans-serif;min-width:200px;">
       <div style="font-weight:600;font-size:14px;margin-bottom:2px;">${info.icon} ${caja.referencia}</div>
@@ -1016,7 +991,7 @@ distHTML = `<div style="margin-top:8px;border-top:1px solid #e5e7eb;padding-top:
         <div style="height:6px;background:#e5e7eb;border-radius:3px;overflow:hidden;"><div style="width:${pct}%;height:100%;background:${colorBarra};border-radius:3px;"></div></div>
         <div style="font-size:11px;color:#6b7280;margin-top:2px;">${libres} libre${libres!==1?'s':''}</div>
       </div>
-      ${distHTML}
+      ${distPopup}
       <div style="font-size:11px;color:#6b7280;margin-top:6px;">Por: ${caja.registrado_por||'—'}</div>
       ${rolActual==='trabajador'?`<div style="margin-top:8px;display:flex;gap:6px;">
         <button onclick="editarCaja(${caja.id})" style="flex:1;font-size:11px;padding:4px;background:#1D9E75;color:#fff;border:none;border-radius:4px;cursor:pointer;">Editar</button>
@@ -1033,11 +1008,10 @@ function renderListaCajas() {
   const cont=document.getElementById('lista-cajas'); if(!cont) return;
   const cajasFiltradas=filtroActivo==='todos'?todasLasCajas:todasLasCajas.filter(c=>c.tipo===filtroActivo);
   if(!cajasFiltradas.length){cont.innerHTML='<p class="empty">No hay puntos registrados.</p>';return;}
-
   const grupos={principal:[],cliente:[],pasante:[]};
   cajasFiltradas.forEach(c=>{if(grupos[c.tipo])grupos[c.tipo].push(c);else grupos.cliente.push(c);});
 
-  const renderGrupo=(tipo,lista)=>{
+  const renderGrupoLista=(tipo,lista)=>{
     if(!lista.length) return '';
     const info=TIPO_CAJA[tipo];
     return `
@@ -1083,12 +1057,10 @@ function renderListaCajas() {
   };
 
   cont.innerHTML=`
-    <div style="font-size:11px;color:var(--muted);margin-bottom:8px;">
-      Total: ${cajasFiltradas.length} punto${cajasFiltradas.length!==1?'s':''} registrado${cajasFiltradas.length!==1?'s':''}
-    </div>
-    ${renderGrupo('principal',grupos.principal)}
-    ${renderGrupo('cliente',grupos.cliente)}
-    ${renderGrupo('pasante',grupos.pasante)}`;
+    <div style="font-size:11px;color:var(--muted);margin-bottom:8px;">Total: ${cajasFiltradas.length} punto${cajasFiltradas.length!==1?'s':''} registrado${cajasFiltradas.length!==1?'s':''}</div>
+    ${renderGrupoLista('principal',grupos.principal)}
+    ${renderGrupoLista('cliente',grupos.cliente)}
+    ${renderGrupoLista('pasante',grupos.pasante)}`;
 }
 
 function toggleGrupoCajas(tipo) {
@@ -1100,7 +1072,7 @@ function toggleGrupoCajas(tipo) {
   arrow.textContent=visible?'▼':'▲';
 }
 
-function irACaja(lat,lng) { if(mapaLeaflet) mapaLeaflet.setView([lat,lng],18); }
+function irACaja(lat,lng){if(mapaLeaflet)mapaLeaflet.setView([lat,lng],18);}
 
 function filtrarMapa(tipo) {
   filtroActivo=tipo;
@@ -1110,7 +1082,7 @@ function filtrarMapa(tipo) {
   renderMarcadores(); renderListaCajas();
 }
 
-async function cargarCajas() {
+async function cargarCajas(){
   try{const res=await fetch('/api/cajas');todasLasCajas=await res.json();}
   catch(e){todasLasCajas=[];}
 }
@@ -1123,9 +1095,9 @@ async function registrarCaja() {
   const puertosOcupados=parseInt(document.getElementById('caja-puertos-ocupados').value)||0;
   const buffer=document.getElementById('caja-buffer').value;
   const hilo=document.getElementById('caja-hilo').value;
-  const distribucion = tipo==='principal' ? getDistribucionMapa() : [];
+  const distribucion=tipo==='principal'?getDistribucionMapa():[];
   if(!referencia){toast('⚠ Ingresa una referencia');return;}
-  try {
+  try{
     const res=await fetch('/api/cajas',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tipo,referencia,lat:gpsLat,lng:gpsLng,totalPuertos,puertosOcupados,buffer,hilo,distribucion})});
     const data=await res.json();
     if(data.ok){
@@ -1136,11 +1108,9 @@ async function registrarCaja() {
       document.getElementById('caja-buffer').value='';
       document.getElementById('caja-hilo').value='';
       document.getElementById('distribucion-lista').innerHTML='';
-      distContador=0;
-      document.getElementById('distribucion-lista').innerHTML = '';
-      distMapaContador = 0;
-      await cargarCajas(); renderMarcadores(); renderListaCajas();
-      if(mapaLeaflet) mapaLeaflet.setView([gpsLat,gpsLng],17);
+      distMapaContador=0;
+      await cargarCajas();renderMarcadores();renderListaCajas();
+      if(mapaLeaflet)mapaLeaflet.setView([gpsLat,gpsLng],17);
     }else{toast('Error: '+data.error);}
   }catch(e){toast('Error de conexión');}
 }
@@ -1150,8 +1120,12 @@ function editarCaja(id) {
   const esPrincipal=c.tipo==='principal';
   const distFilas=(c.distribucion||[]).map((d,i)=>{
     const iid=`edit-dist-${id}-${i}`;
+    const bufferId=d.bufferId||'';
     return `<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;flex-wrap:wrap;" id="${iid}">
-      ${selBuffers(`edit-db-${id}-${i}`,d.buffer)}${selHilos(`edit-dh-${id}-${i}`,d.hilo)}
+      ${selBuffers(`edit-db-${id}-${i}`,d.buffer)}
+      <input type="text" id="edit-dbid-${id}-${i}" placeholder="ID buffer..." value="${bufferId}"
+        style="width:80px;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;padding:5px 8px;outline:none;" />
+      ${selHilos(`edit-dh-${id}-${i}`,d.hilo)}
       <input type="text" id="edit-dd-${id}-${i}" placeholder="Destino..." value="${d.destino||''}"
         style="flex:2;min-width:100px;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;padding:6px 8px;outline:none;" />
       <button onclick="document.getElementById('${iid}').remove()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;">✕</button>
@@ -1161,39 +1135,33 @@ function editarCaja(id) {
   const overlay=document.createElement('div');
   overlay.style.cssText='position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);z-index:500;display:flex;align-items:center;justify-content:center;padding:1rem;';
   overlay.innerHTML=`
-    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.5rem;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;">
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.5rem;width:100%;max-width:500px;max-height:90vh;overflow-y:auto;">
       <h3 style="color:var(--accent);font-size:13px;margin-bottom:1rem;font-family:'IBM Plex Mono',monospace;">✏️ Editar punto</h3>
       <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
-        <div style="flex:1;min-width:120px;">
-          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:4px;">Tipo</label>
+        <div style="flex:1;min-width:120px;"><label style="font-size:11px;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:4px;">Tipo</label>
           <select id="edit-caja-tipo" style="background:var(--surface2);border:1px solid var(--border);border-radius:7px;color:var(--text);font-size:13px;padding:7px;outline:none;width:100%;">
             <option value="principal" ${c.tipo==='principal'?'selected':''}>📦 Principal</option>
             <option value="cliente" ${c.tipo==='cliente'?'selected':''}>🔌 Cliente</option>
             <option value="pasante" ${c.tipo==='pasante'?'selected':''}>➡️ Pasante</option>
           </select>
         </div>
-        <div style="flex:2;min-width:140px;">
-          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:4px;">Referencia</label>
+        <div style="flex:2;min-width:140px;"><label style="font-size:11px;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:4px;">Referencia</label>
           <input type="text" id="edit-caja-ref" value="${c.referencia}" style="background:var(--surface2);border:1px solid var(--border);border-radius:7px;color:var(--text);font-size:13px;padding:7px;outline:none;width:100%;" />
         </div>
       </div>
       <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
-        <div style="flex:1;min-width:100px;">
-          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:4px;">Total puertos</label>
+        <div style="flex:1;min-width:100px;"><label style="font-size:11px;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:4px;">Total puertos</label>
           <input type="number" id="edit-caja-total" value="${c.totalPuertos}" style="background:var(--surface2);border:1px solid var(--border);border-radius:7px;color:var(--text);font-size:13px;padding:7px;outline:none;width:100%;" />
         </div>
-        <div style="flex:1;min-width:100px;">
-          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:4px;">Ocupados</label>
+        <div style="flex:1;min-width:100px;"><label style="font-size:11px;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:4px;">Ocupados</label>
           <input type="number" id="edit-caja-ocupados" value="${c.puertosOcupados}" style="background:var(--surface2);border:1px solid var(--border);border-radius:7px;color:var(--text);font-size:13px;padding:7px;outline:none;width:100%;" />
         </div>
       </div>
       <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
-        <div style="flex:1;min-width:100px;">
-          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:4px;">Buffer</label>
+        <div style="flex:1;min-width:100px;"><label style="font-size:11px;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:4px;">Buffer</label>
           <select id="edit-caja-buffer" class="sel-field"><option value="">Sin buffer</option>${BUFFERS.map(b=>`<option value="${b}" ${c.buffer===b?'selected':''}>${b}</option>`).join('')}</select>
         </div>
-        <div style="flex:1;min-width:100px;">
-          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:4px;">Hilo</label>
+        <div style="flex:1;min-width:100px;"><label style="font-size:11px;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:4px;">Hilo</label>
           <select id="edit-caja-hilo" class="sel-field"><option value="">Sin hilo</option>${HILOS.map(h=>`<option value="${h}" ${c.hilo===h?'selected':''}>${h}</option>`).join('')}</select>
         </div>
       </div>
@@ -1218,7 +1186,10 @@ function agregarDistEdit(cajaId) {
   const div=document.createElement('div');
   div.style.cssText='display:flex;gap:6px;align-items:center;margin-bottom:6px;flex-wrap:wrap;';
   div.id=`edit-dist-${cajaId}-${idx}`;
-  div.innerHTML=`${selBuffers(`edit-db-${cajaId}-${idx}`,'')}${selHilos(`edit-dh-${cajaId}-${idx}`,'')}
+  div.innerHTML=`${selBuffers(`edit-db-${cajaId}-${idx}`,'')}
+    <input type="text" id="edit-dbid-${cajaId}-${idx}" placeholder="ID buffer..."
+      style="width:80px;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;padding:5px 8px;outline:none;" />
+    ${selHilos(`edit-dh-${cajaId}-${idx}`,'')}
     <input type="text" id="edit-dd-${cajaId}-${idx}" placeholder="Destino..."
       style="flex:2;min-width:100px;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;padding:6px 8px;outline:none;" />
     <button onclick="document.getElementById('edit-dist-${cajaId}-${idx}').remove()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;">✕</button>`;
@@ -1237,7 +1208,12 @@ async function guardarEdicionCaja(id) {
   if(distLista){
     distribucion=[...distLista.querySelectorAll('[id^="edit-dist-"]')].map(row=>{
       const rid=row.id.replace(`edit-dist-${id}-`,'');
-      return{buffer:document.getElementById(`edit-db-${id}-${rid}`)?.value||'',hilo:document.getElementById(`edit-dh-${id}-${rid}`)?.value||'',destino:document.getElementById(`edit-dd-${id}-${rid}`)?.value.trim()||''};
+      return{
+        buffer:document.getElementById(`edit-db-${id}-${rid}`)?.value||'',
+        bufferId:document.getElementById(`edit-dbid-${id}-${rid}`)?.value.trim()||'',
+        hilo:document.getElementById(`edit-dh-${id}-${rid}`)?.value||'',
+        destino:document.getElementById(`edit-dd-${id}-${rid}`)?.value.trim()||''
+      };
     }).filter(d=>d.buffer||d.hilo||d.destino);
   }
   if(!referencia){toast('⚠ Ingresa una referencia');return;}
@@ -1248,19 +1224,19 @@ async function guardarEdicionCaja(id) {
   }catch(e){toast('Error al guardar');}
 }
 
-async function eliminarCaja(id) {
+async function eliminarCaja(id){
   if(!confirm('¿Eliminar este punto?')) return;
   try{await fetch('/api/cajas/'+id,{method:'DELETE'});toast('Punto eliminado');await cargarCajas();renderMarcadores();renderListaCajas();}
   catch(e){toast('Error al eliminar');}
 }
 
 // ── Cuadrillas ───────────────────────────────────────────
-async function cargarTodasLasCuadrillas() {
+async function cargarTodasLasCuadrillas(){
   try{const res=await fetch('/api/cuadrillas');todasLasCuadrillas=await res.json();}
   catch(e){todasLasCuadrillas=[];}
 }
 
-async function cargarCuadrillaHoy() {
+async function cargarCuadrillaHoy(){
   const hoy=fechaLocal();
   const cuadrilla=todasLasCuadrillas.find(c=>c.fecha===hoy);
   const box=document.getElementById('cuadrilla-hoy-box'); if(!box) return;
@@ -1280,7 +1256,7 @@ async function cargarCuadrillaHoy() {
   }
 }
 
-async function cargarCuadrillas() {
+async function cargarCuadrillas(){
   await cargarTodasLasCuadrillas();
   const cont=document.getElementById('lista-cuadrillas'); if(!cont) return;
   const originales=todasLasCuadrillas.filter(c=>!c.reutilizada);
@@ -1303,7 +1279,7 @@ async function cargarCuadrillas() {
   }).join('');
 }
 
-async function crearCuadrilla() {
+async function crearCuadrilla(){
   const nombre=document.getElementById('cuadrilla-nombre').value.trim();
   const fecha=document.getElementById('cuadrilla-fecha').value;
   const integrantes=[...document.querySelectorAll('.cuadrilla-int:checked')].map(i=>i.value);
@@ -1318,7 +1294,7 @@ async function crearCuadrilla() {
   }catch(e){toast('Error de conexión');}
 }
 
-async function eliminarCuadrilla(id) {
+async function eliminarCuadrilla(id){
   if(!confirm('¿Eliminar esta cuadrilla y sus reusos?')) return;
   try{
     const c=todasLasCuadrillas.find(x=>x.id===id);
@@ -1328,7 +1304,7 @@ async function eliminarCuadrilla(id) {
   }catch(e){toast('Error al eliminar');}
 }
 
-function reutilizarCuadrilla(id) {
+function reutilizarCuadrilla(id){
   const c=todasLasCuadrillas.find(x=>x.id===id); if(!c) return;
   const overlay=document.createElement('div');
   overlay.style.cssText='position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);z-index:500;display:flex;align-items:center;justify-content:center;padding:1rem;';
@@ -1350,7 +1326,7 @@ function reutilizarCuadrilla(id) {
   document.body.appendChild(overlay);
 }
 
-async function confirmarReutilizar(id) {
+async function confirmarReutilizar(id){
   const c=todasLasCuadrillas.find(x=>x.id===id); if(!c) return;
   const fecha=document.getElementById('reutilizar-fecha').value;
   if(!fecha){toast('⚠ Selecciona una fecha');return;}
@@ -1363,7 +1339,7 @@ async function confirmarReutilizar(id) {
 }
 
 // ── Tabs ─────────────────────────────────────────────────
-function mostrarTab(tab) {
+function mostrarTab(tab){
   ['registro','mapa','historial','bodega','indicadores','cuadrillas'].forEach(t=>{
     const el=document.getElementById('tab-'+t); if(el) el.style.display=t===tab?'block':'none';
   });
@@ -1376,7 +1352,7 @@ function mostrarTab(tab) {
 }
 
 // ── Conectados ───────────────────────────────────────────
-async function cargarConectados() {
+async function cargarConectados(){
   try{
     const res=await fetch('/api/conectados');
     const conectados=await res.json();
@@ -1387,7 +1363,7 @@ async function cargarConectados() {
   }catch(e){}
 }
 
-function toggleConectados() {
+function toggleConectados(){
   const popup=document.getElementById('conectados-popup');
   popup.style.display=popup.style.display==='none'?'block':'none';
   if(popup.style.display==='block') cargarConectados();
@@ -1399,37 +1375,37 @@ document.addEventListener('click',e=>{
   if(popup&&badge&&!badge.contains(e.target)&&!popup.contains(e.target)) popup.style.display='none';
 });
 
-function toast(msg) {
+function toast(msg){
   const t=document.getElementById('toast');
   t.textContent=msg; t.classList.add('show');
   setTimeout(()=>t.classList.remove('show'),2500);
 }
 
-async function cerrarSesion() {
+async function cerrarSesion(){
   await fetch('/api/logout',{method:'POST'});
   window.location.href='/';
 }
 
 // ── Bodega ───────────────────────────────────────────────
-async function cargarBodega() {
+async function cargarBodega(){
   try{
     const res=await fetch('/api/bodega'); stockActual=await res.json();
     renderStock(); setTimeout(()=>llenarSelectMaterial(),100); cargarMovimientos();
   }catch(e){document.getElementById('tabla-stock').innerHTML='<p class="empty">Error.</p>';}
 }
 
-function renderStock() {
+function renderStock(){
   const cont=document.getElementById('tabla-stock');
   if(!stockActual.length){cont.innerHTML='<p class="empty">No hay stock registrado.</p>';return;}
   cont.innerHTML=`<table class="mat-table"><thead><tr><th>Material</th><th>Stock</th><th>Estado</th></tr></thead><tbody>${stockActual.map(s=>`<tr><td>${s.material}</td><td class="cant">${s.cantidad}</td><td><span style="color:${s.cantidad>5?'var(--accent)':s.cantidad>0?'#f59e0b':'var(--danger)'};font-size:12px;">${s.cantidad>5?'✓ Disponible':s.cantidad>0?'⚠ Poco':'✕ Sin stock'}</span></td></tr>`).join('')}</tbody></table>`;
 }
 
-function llenarSelectMaterial() {
+function llenarSelectMaterial(){
   const sel=document.getElementById('mov-material'); if(!sel) return;
   sel.innerHTML=MATERIALES_STOCK.map(m=>`<option value="${m.label}">${m.label}</option>`).join('');
 }
 
-function mostrarModalStock() {
+function mostrarModalStock(){
   const cont=document.getElementById('modal-stock-items');
   cont.innerHTML=MATERIALES_STOCK.map(m=>{const item=stockActual.find(s=>s.material===m.label);return `<div class="mat-row" style="margin-bottom:8px;"><label style="color:var(--text);font-size:12px;text-transform:none;letter-spacing:0;">${m.label}</label><input type="number" min="0" id="stock-${m.id}" value="${item?item.cantidad:0}" style="width:70px;text-align:right;" /><span class="unidad">${m.unidad}</span></div>`;}).join('');
   document.getElementById('modal-stock').style.display='flex';
@@ -1437,7 +1413,7 @@ function mostrarModalStock() {
 
 function cerrarModalStock(){document.getElementById('modal-stock').style.display='none';}
 
-async function guardarStock() {
+async function guardarStock(){
   try{
     for(const m of MATERIALES_STOCK){
       const el=document.getElementById('stock-'+m.id);
@@ -1450,7 +1426,7 @@ async function guardarStock() {
   }catch(e){toast('Error: '+e.message);}
 }
 
-async function registrarMovimiento() {
+async function registrarMovimiento(){
   const tipo=document.getElementById('mov-tipo').value;
   const material=document.getElementById('mov-material').value;
   const cantidad=parseFloat(document.getElementById('mov-cantidad').value);
@@ -1466,7 +1442,7 @@ async function registrarMovimiento() {
   }catch(e){toast('Error de conexión');}
 }
 
-async function cargarMovimientos() {
+async function cargarMovimientos(){
   try{
     const res=await fetch('/api/bodega/movimientos');
     const movimientos=await res.json();
@@ -1477,7 +1453,7 @@ async function cargarMovimientos() {
   }catch(e){}
 }
 
-async function eliminarMovimiento(id) {
+async function eliminarMovimiento(id){
   if(!confirm('¿Eliminar este movimiento?')) return;
   try{
     const res=await fetch('/api/bodega/movimientos/'+id,{method:'DELETE'});
@@ -1486,7 +1462,7 @@ async function eliminarMovimiento(id) {
   }catch(e){toast('Error al eliminar');}
 }
 
-function exportarBodegaExcel() {
+function exportarBodegaExcel(){
   if(!stockActual.length){toast('⚠ No hay stock');return;}
   const datos=stockActual.map(s=>({'Material':s.material,'Stock disponible':s.cantidad}));
   const ws=XLSX.utils.json_to_sheet(datos);
@@ -1495,23 +1471,23 @@ function exportarBodegaExcel() {
 }
 
 // ── Indicadores ──────────────────────────────────────────
-function getLunes(fecha) {
+function getLunes(fecha){
   const d=new Date(fecha+'T12:00:00'); const dia=d.getDay();
   const diff=dia===0?-6:1-dia; d.setDate(d.getDate()+diff);
   return d.toISOString().slice(0,10);
 }
 
-function getMat(reportes,label) {
+function getMat(reportes,label){
   return reportes.reduce((s,r)=>{const m=(r.materiales||[]).find(m=>m.material===label);return s+(m?m.cantidad:0);},0);
 }
 
-function barMeta(valor,meta) {
+function barMeta(valor,meta){
   const pct=Math.min(Math.round(valor/meta*100),100);
   const c=valor>=meta?'#1D9E75':valor>=meta/2?'#BA7517':'#E24B4A';
   return `<div style="display:flex;align-items:center;gap:8px;"><div style="flex:1;height:7px;background:var(--surface2);border-radius:4px;overflow:hidden;"><div style="width:${pct}%;height:100%;background:${c};border-radius:4px;"></div></div><span style="font-size:11px;color:var(--muted);width:70px;text-align:right;">${valor} / ${meta}</span></div>`;
 }
 
-function calcularBadge(reportes,actividades,numPersonas=5,cuadrillaAsignada=false) {
+function calcularBadge(reportes,actividades,numPersonas=5,cuadrillaAsignada=false){
   if(reportes.length===0){
     if(cuadrillaAsignada) return{badge:'Sin reporte',color:'#fff',bg:'#A32D2D'};
     return{badge:'Sin registro',color:'var(--muted)',bg:'var(--surface2)'};
@@ -1534,7 +1510,7 @@ function calcularBadge(reportes,actividades,numPersonas=5,cuadrillaAsignada=fals
   return{badge:'Bajo',color:'#A32D2D',bg:'#FCEBEB'};
 }
 
-async function iniciarIndicadores() {
+async function iniciarIndicadores(){
   try{
     const res=await fetch('/api/reportes'); todosLosReportes=await res.json();
     const semanas={};
@@ -1550,7 +1526,7 @@ async function iniciarIndicadores() {
   }catch(e){document.getElementById('dias-semana').innerHTML='<p class="empty">Error al cargar.</p>';}
 }
 
-function cargarIndicadores() {
+function cargarIndicadores(){
   semanaActual=document.getElementById('semana-select').value;
   if(!semanaActual) return;
   const inicio=new Date(semanaActual+'T12:00:00');
@@ -1642,7 +1618,7 @@ function cargarIndicadores() {
   contMat.innerHTML=sorted.map(([mat,cant])=>`<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><span style="font-size:12px;color:var(--muted);width:150px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${mat}</span><div style="flex:1;height:6px;background:var(--surface2);border-radius:3px;overflow:hidden;"><div style="width:${Math.round(cant/max*100)}%;height:100%;background:var(--accent);border-radius:3px;"></div></div><span style="font-size:12px;color:var(--muted);width:36px;text-align:right;">${cant}</span></div>`).join('');
 }
 
-function exportarInformeSemanal() {
+function exportarInformeSemanal(){
   if(!semanaActual){toast('⚠ Selecciona una semana');return;}
   const inicio=new Date(semanaActual+'T12:00:00');
   const diasSemana=[];
