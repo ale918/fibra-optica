@@ -147,22 +147,23 @@ function agregarDistReg(bufferPreset = '') {
   div.id = `dreg-grupo-${id}`;
   div.style.cssText = 'background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;';
   div.innerHTML = `
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
       <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;flex-shrink:0;">Buffer</label>
-      <select id="dreg-buf-${id}" class="sel-field" style="flex:1;" onchange="renderHilosBuffer(${id})">
-        <option value="">Seleccionar buffer...</option>
+      <select id="dreg-buf-${id}" class="sel-field" style="flex:1;min-width:100px;" onchange="renderHilosBuffer(${id})">
+        <option value="">Seleccionar...</option>
         ${BUFFERS.map(b => `<option value="${b}" ${b===bufferPreset?'selected':''}>${b}</option>`).join('')}
       </select>
+      <input type="text" id="dreg-id-${id}" placeholder="ID (Ej: #1, Fibra A...)"
+        style="flex:1;min-width:100px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;padding:6px 8px;outline:none;" />
       <button onclick="document.getElementById('dreg-grupo-${id}').remove()"
         style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;flex-shrink:0;line-height:1;">✕</button>
     </div>
     <div id="dreg-hilos-${id}" style="padding-left:4px;">
-      <div style="font-size:12px;color:var(--muted);">Selecciona un buffer para ver los hilos disponibles</div>
+      <div style="font-size:12px;color:var(--muted);">Selecciona un buffer para ver los hilos</div>
     </div>`;
   lista.appendChild(div);
   if (bufferPreset) renderHilosBuffer(id);
 }
-
 function renderHilosBuffer(grupoId) {
   const buffer = document.getElementById(`dreg-buf-${grupoId}`)?.value;
   const cont = document.getElementById(`dreg-hilos-${grupoId}`);
@@ -198,12 +199,13 @@ function getDistribucionReg() {
   document.querySelectorAll('[id^="dreg-grupo-"]').forEach(grupo => {
     const id = grupo.id.replace('dreg-grupo-', '');
     const buffer = document.getElementById(`dreg-buf-${id}`)?.value;
+    const bufferId = document.getElementById(`dreg-id-${id}`)?.value.trim() || '';
     if (!buffer) return;
     HILOS.forEach(h => {
       const check = document.getElementById(`dreg-check-${id}-${h}`);
       if (check?.checked) {
         const destino = document.getElementById(`dreg-dest-${id}-${h}`)?.value.trim() || '';
-        resultado.push({ buffer, hilo: h, destino });
+        resultado.push({ buffer, bufferId, hilo: h, destino });
       }
     });
   });
@@ -221,50 +223,22 @@ function agregarDistMapa(bufferPreset = '') {
   div.id = `dmapa-grupo-${id}`;
   div.style.cssText = 'background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;';
   div.innerHTML = `
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
       <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;flex-shrink:0;">Buffer</label>
-      <select id="dmapa-buf-${id}" class="sel-field" style="flex:1;" onchange="renderHilosMapaBuffer(${id})">
-        <option value="">Seleccionar buffer...</option>
+      <select id="dmapa-buf-${id}" class="sel-field" style="flex:1;min-width:100px;" onchange="renderHilosMapaBuffer(${id})">
+        <option value="">Seleccionar...</option>
         ${BUFFERS.map(b => `<option value="${b}" ${b===bufferPreset?'selected':''}>${b}</option>`).join('')}
       </select>
+      <input type="text" id="dmapa-id-${id}" placeholder="ID (Ej: #1, Fibra A...)"
+        style="flex:1;min-width:100px;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;padding:6px 8px;outline:none;" />
       <button onclick="document.getElementById('dmapa-grupo-${id}').remove()"
         style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;flex-shrink:0;line-height:1;">✕</button>
     </div>
     <div id="dmapa-hilos-${id}" style="padding-left:4px;">
-      <div style="font-size:12px;color:var(--muted);">Selecciona un buffer para ver los hilos disponibles</div>
+      <div style="font-size:12px;color:var(--muted);">Selecciona un buffer para ver los hilos</div>
     </div>`;
   lista.appendChild(div);
   if (bufferPreset) renderHilosMapaBuffer(id);
-}
-
-function renderHilosMapaBuffer(grupoId) {
-  const buffer = document.getElementById(`dmapa-buf-${grupoId}`)?.value;
-  const cont = document.getElementById(`dmapa-hilos-${grupoId}`);
-  if (!cont) return;
-  if (!buffer) {
-    cont.innerHTML = '<div style="font-size:12px;color:var(--muted);">Selecciona un buffer para ver los hilos</div>';
-    return;
-  }
-  const bufColor = COLOR_BUFFER[buffer] || '#6b7280';
-  cont.innerHTML = `
-    <div style="font-size:11px;color:var(--muted);margin-bottom:8px;display:flex;align-items:center;gap:5px;">
-      <span style="width:8px;height:8px;background:${bufColor};border-radius:50%;display:inline-block;"></span>
-      Hilos del buffer ${buffer} — marca los que salen de esta caja
-    </div>
-    ${HILOS.map(h => {
-      const hColor = COLOR_BUFFER[h] || '#6b7280';
-      return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap;">
-        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;min-width:110px;">
-          <input type="checkbox" id="dmapa-check-${grupoId}-${h}" style="accent-color:var(--accent);width:14px;height:14px;" />
-          <span style="display:flex;align-items:center;gap:4px;font-size:12px;color:var(--text);">
-            <span style="width:8px;height:8px;background:${hColor};border-radius:50%;display:inline-block;border:1px solid rgba(255,255,255,0.2);"></span>
-            ${h}
-          </span>
-        </label>
-        <input type="text" id="dmapa-dest-${grupoId}-${h}" placeholder="Destino (Caja 01, Pasante...)"
-          style="flex:1;min-width:130px;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;padding:5px 8px;outline:none;" />
-      </div>`;
-    }).join('')}`;
 }
 
 function getDistribucionMapa() {
@@ -272,18 +246,18 @@ function getDistribucionMapa() {
   document.querySelectorAll('[id^="dmapa-grupo-"]').forEach(grupo => {
     const id = grupo.id.replace('dmapa-grupo-', '');
     const buffer = document.getElementById(`dmapa-buf-${id}`)?.value;
+    const bufferId = document.getElementById(`dmapa-id-${id}`)?.value.trim() || '';
     if (!buffer) return;
     HILOS.forEach(h => {
       const check = document.getElementById(`dmapa-check-${id}-${h}`);
       if (check?.checked) {
         const destino = document.getElementById(`dmapa-dest-${id}-${h}`)?.value.trim() || '';
-        resultado.push({ buffer, hilo: h, destino });
+        resultado.push({ buffer, bufferId, hilo: h, destino });
       }
     });
   });
   return resultado;
 }
-
 // ── GPS de caja en registro ──────────────────────────────
 function obtenerGPSCaja() {
   const status = document.getElementById('caja-gps-status');
@@ -1004,24 +978,31 @@ function renderMarcadores() {
     const info=TIPO_CAJA[caja.tipo]||{label:caja.tipo,icon:'📦'};
     const bufColor=COLOR_BUFFER[caja.buffer]||'#6b7280';
 
-    let distHTML='';
-    if(caja.tipo==='principal'&&caja.distribucion?.length>0){
-      const porBuffer={};
-      caja.distribucion.forEach(d=>{if(!porBuffer[d.buffer])porBuffer[d.buffer]=[];porBuffer[d.buffer].push(d);});
-      distHTML=`<div style="margin-top:8px;border-top:1px solid #e5e7eb;padding-top:6px;">
-        <div style="font-size:11px;font-weight:600;margin-bottom:4px;">📡 Hilos distribuidos</div>
-        ${Object.entries(porBuffer).map(([buf,hilos])=>{
-          const bc=COLOR_BUFFER[buf]||'#6b7280';
-          return `<div style="margin-bottom:4px;">
-            <span style="font-size:11px;display:inline-flex;align-items:center;gap:3px;">
-              <span style="width:7px;height:7px;background:${bc};border-radius:50%;display:inline-block;"></span>
-              <strong>Buffer ${buf}:</strong>
-            </span>
-            ${hilos.map(d=>{const hc=COLOR_BUFFER[d.hilo]||'#6b7280';return `<span style="font-size:11px;display:inline-flex;align-items:center;gap:2px;margin-left:8px;"><span style="width:6px;height:6px;background:${hc};border-radius:50%;display:inline-block;"></span>${d.hilo}${d.destino?` → ${d.destino}`:''}</span>`;}).join('')}
-          </div>`;
-        }).join('')}
-      </div>`;
-    }
+    const porBuffer = {};
+caja.distribucion.forEach(d => {
+  const key = d.bufferId ? `${d.buffer} ${d.bufferId}` : d.buffer;
+  if (!porBuffer[key]) porBuffer[key] = { color: d.buffer, hilos: [] };
+  porBuffer[key].hilos.push(d);
+});
+distHTML = `<div style="margin-top:8px;border-top:1px solid #e5e7eb;padding-top:6px;">
+  <div style="font-size:11px;font-weight:600;margin-bottom:4px;">📡 Hilos distribuidos</div>
+  ${Object.entries(porBuffer).map(([label, grupo]) => {
+    const bc = COLOR_BUFFER[grupo.color] || '#6b7280';
+    return `<div style="margin-bottom:4px;">
+      <span style="font-size:11px;display:inline-flex;align-items:center;gap:3px;">
+        <span style="width:7px;height:7px;background:${bc};border-radius:50%;display:inline-block;"></span>
+        <strong>Buffer ${label}:</strong>
+      </span>
+      ${grupo.hilos.map(d => {
+        const hc = COLOR_BUFFER[d.hilo]||'#6b7280';
+        return `<span style="font-size:11px;display:inline-flex;align-items:center;gap:2px;margin-left:8px;">
+          <span style="width:6px;height:6px;background:${hc};border-radius:50%;display:inline-block;"></span>
+          ${d.hilo}${d.destino?` → ${d.destino}`:''}
+        </span>`;
+      }).join('')}
+    </div>`;
+  }).join('')}
+</div>`;
 
     const popup=`<div style="font-family:'IBM Plex Sans',sans-serif;min-width:200px;">
       <div style="font-weight:600;font-size:14px;margin-bottom:2px;">${info.icon} ${caja.referencia}</div>
