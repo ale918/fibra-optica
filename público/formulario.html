@@ -132,6 +132,13 @@
           <div class="form-group"><label>Puertos ocupados</label><input type="number" min="0" id="caja-ocupados-reg" class="inp-field" value="0" /></div>
         </div>
 
+        <div class="field-row" style="margin-top:8px;">
+  <div class="form-group">
+    <label>Referencia de la caja</label>
+    <input type="text" id="caja-referencia-reg" class="inp-field" placeholder="Ej. Caja 01, NAT Norte..." />
+  </div>
+</div>
+
         <div id="dist-reg-panel" style="display:none;margin-top:12px;padding-top:10px;border-top:1px solid var(--border);">
           <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">📡 Hilos que reparte esta caja</div>
           <div id="dist-reg-lista"></div>
@@ -379,11 +386,12 @@
             </select>
           </div>
         </div>
-        <div id="distribucion-panel" style="display:none;margin-top:1rem;">
-          <div style="font-size:11px;color:var(--muted);text-transform:uppercase;margin-bottom:8px;">📡 Hilos que distribuye</div>
-          <div id="distribucion-lista"></div>
-          <button onclick="agregarDistribucion()" style="font-size:12px;padding:5px 12px;margin-top:4px;">+ Agregar hilo</button>
-        </div>
+        
+       <div id="distribucion-panel" style="display:none;margin-top:1rem;">
+  <div style="font-size:11px;color:var(--muted);text-transform:uppercase;margin-bottom:8px;">📡 Hilos que distribuye</div>
+  <div id="distribucion-lista"></div>
+  <button onclick="agregarDistMapa()" style="font-size:12px;padding:5px 12px;margin-top:4px;">+ Agregar buffer</button>
+</div>
         <div id="gps-status" style="font-size:12px;color:var(--muted);margin-top:12px;padding:8px;background:var(--surface2);border-radius:6px;">📍 Esperando ubicación...</div>
         <div class="btn-row" style="margin-top:1rem;">
           <button class="btn-primary" onclick="registrarCaja()">📍 Registrar punto</button>
