@@ -1,6 +1,6 @@
 import express from 'express';
 import session from 'express-session';
-import { JSONFileSync, LowSync } from 'lowdb';
+import { Low, JSONFileSync } from 'lowdb';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import multer from 'multer';
