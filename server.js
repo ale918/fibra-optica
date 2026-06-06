@@ -1,26 +1,22 @@
 import express from 'express';
 import session from 'express-session';
-import { Low } from 'lowdb';
-import { JSONFileSync } from 'lowdb/adapters';
+import { Low, JSONFileSync } from 'lowdb';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import multer from 'multer';
 import { v2 as cloudinary } from 'cloudinary';
 import { Readable } from 'stream';
 
-
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = process.env.PORT || 8080;
 
-// ── Cloudinary ───────────────────────────────────────────
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key:    process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-// ── Base de datos ────────────────────────────────────────
 const dbPath = process.env.RAILWAY_VOLUME_MOUNT_PATH
   ? join(process.env.RAILWAY_VOLUME_MOUNT_PATH, 'database.json')
   : join(__dirname, 'database.json');
@@ -32,7 +28,6 @@ db.data ||= { reportes:[], cajas:[], mangas:[], cuadrillas:[], bodega:[], movimi
 if (!db.data.mangas) db.data.mangas = [];
 db.write();
 
-// ── Middleware ───────────────────────────────────────────
 app.use(express.json());
 app.use(express.static(join(__dirname, 'público')));
 app.use(session({
@@ -44,15 +39,13 @@ app.use(session({
 
 const upload = multer({ storage: multer.memoryStorage() });
 
-// ── Usuarios ─────────────────────────────────────────────
 const USUARIOS = {
   [process.env.ADMIN_USER || 'Telecomadmin']: { pass: process.env.ADMIN_PASS || 'Airnet2024$', rol: 'admin', nombre: 'Administrador' },
-  Efrain:    { pass: process.env.USER_EFRAIN_PASS    || 'Ef#2024!rain', rol: 'trabajador', nombre: 'Efrain' },
-  Alejandro: { pass: process.env.USER_ALEJANDRO_PASS || 'Al@2024!ejo',  rol: 'trabajador', nombre: 'Alejandro' },
+  Efrain:    { pass: process.env.USER_EFRAIN_PASS    || 'Ef#2024!rain',   rol: 'trabajador', nombre: 'Efrain' },
+  Alejandro: { pass: process.env.USER_ALEJANDRO_PASS || 'Al@2024!ejo',    rol: 'trabajador', nombre: 'Alejandro' },
   DavidG:    { pass: process.env.USER_DAVIDG_PASS    || 'Dg*2024!garcia', rol: 'trabajador', nombre: 'David Garcia' },
 };
 
-// Track sesiones activas
 const sesionesActivas = new Map();
 
 function fechaLocal() {
@@ -86,7 +79,7 @@ app.get('/api/conectados', (req, res) => {
   res.json([...sesionesActivas.values()]);
 });
 
-// ── Reportes ─────────────────────────────────────────────
+// ── Reportes ──────────────────────────────────────────────
 app.get('/api/reportes', (req, res) => {
   if (!req.session?.usuario) return res.status(401).json({ error: 'No autorizado' });
   const reportes = [...(db.data.reportes || [])].sort((a, b) => b.fecha.localeCompare(a.fecha));
@@ -117,7 +110,6 @@ app.delete('/api/reportes/:id', (req, res) => {
   res.json({ ok: true });
 });
 
-// Fotos
 app.post('/api/reportes/:id/fotos', upload.array('fotos'), async (req, res) => {
   if (!req.session?.usuario) return res.status(401).json({ error: 'No autorizado' });
   const idx = db.data.reportes.findIndex(r => r.id === parseInt(req.params.id));
@@ -148,7 +140,7 @@ app.delete('/api/reportes/:id/fotos/:public_id', async (req, res) => {
   } catch(e) { res.json({ ok: false, error: e.message }); }
 });
 
-// ── Cajas (mapa) ─────────────────────────────────────────
+// ── Cajas ─────────────────────────────────────────────────
 app.get('/api/cajas', (req, res) => {
   if (!req.session?.usuario) return res.status(401).json({ error: 'No autorizado' });
   res.json(db.data.cajas || []);
@@ -179,7 +171,7 @@ app.delete('/api/cajas/:id', (req, res) => {
   res.json({ ok: true });
 });
 
-// ── Mangas (mapa) ────────────────────────────────────────
+// ── Mangas ────────────────────────────────────────────────
 app.get('/api/mangas', (req, res) => {
   if (!req.session?.usuario) return res.status(401).json({ error: 'No autorizado' });
   res.json(db.data.mangas || []);
@@ -219,7 +211,7 @@ app.delete('/api/mangas/:id', (req, res) => {
   res.json({ ok: true });
 });
 
-// ── Cuadrillas ───────────────────────────────────────────
+// ── Cuadrillas ────────────────────────────────────────────
 app.get('/api/cuadrillas', (req, res) => {
   if (!req.session?.usuario) return res.status(401).json({ error: 'No autorizado' });
   res.json(db.data.cuadrillas || []);
@@ -241,7 +233,7 @@ app.delete('/api/cuadrillas/:id', (req, res) => {
   res.json({ ok: true });
 });
 
-// ── Bodega ───────────────────────────────────────────────
+// ── Bodega ────────────────────────────────────────────────
 app.get('/api/bodega', (req, res) => {
   if (!req.session?.usuario) return res.status(401).json({ error: 'No autorizado' });
   res.json(db.data.bodega || []);
@@ -287,13 +279,12 @@ app.delete('/api/bodega/movimientos/:id', (req, res) => {
   res.json({ ok: true });
 });
 
-// ── Debug ────────────────────────────────────────────────
+// ── Debug ─────────────────────────────────────────────────
 app.get('/api/debug/db', (req, res) => {
   if (!req.session?.usuario || req.session.rol !== 'admin') return res.status(403).json({ error: 'No autorizado' });
   res.json(db.data);
 });
 
-// ── Servir login ─────────────────────────────────────────
 app.get('/', (req, res) => {
   res.sendFile(join(__dirname, 'público', 'login.html'));
 });

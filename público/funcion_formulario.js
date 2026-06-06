@@ -21,10 +21,10 @@ const TIPO_CAJA = {
   manga:    { label:'Manga',          icon:'🔴', color:'#E24B4A' },
 };
 const BUFFERS = ['Azul','Naranja','Verde','Café','Gris','Blanco','Rojo','Negro'];
-const HILOS   = ['Azul','Naranja','Verde','Café','Gris','Blanco','Rojo','Negro','Amarillo','Violeta','Rosado','Aqua'];
+const HILOS = ['Azul','Naranja','Verde','Café','Gris','Blanco','Rojo','Negro','Amarillo','Violeta','Rosado','Aqua'];
 const COLOR_BUFFER = {
-  Azul:'#3B82F6',Naranja:'#F97316',Verde:'#22C55E',Café:'#92400E',
-  Gris:'#6B7280',Blanco:'#E5E7EB',Rojo:'#EF4444',Negro:'#111827'
+  Azul:'#3B82F6', Naranja:'#F97316', Verde:'#22C55E', Café:'#92400E',
+  Gris:'#6B7280', Blanco:'#E5E7EB', Rojo:'#EF4444', Negro:'#111827'
 };
 const MATERIALES_STOCK = [
   { id:'herrajesA',      label:'Herrajes A',            unidad:'und' },
@@ -46,32 +46,32 @@ const MATERIALES_STOCK = [
 ];
 
 let actividadesSeleccionadas = new Set();
-let todosLosReportes=[], todasLasCuadrillas=[], todasLasCajas=[], todasLasMangas=[];
-let stockActual=[], semanaActual='', rolActual='', cuadrillaHoyId=null, ipCounters={};
-let gpsLat=null, gpsLng=null;
-let cajaGpsLat=null, cajaGpsLng=null;
-let mangaGpsLat=null, mangaGpsLng=null;
-let mapaLeaflet=null, marcadoresMapa=[], marcadorYo=null, circuloYo=null;
-let filtroActivo='todos';
-let modoSeleccionMapa=false, modoSeleccionMapaCaja=false, modoSeleccionMapaManga=false;
-let distContador=0, distRegContador=0, distMapaContador=0, distMangaContador=0, editDistMap={};
+let todosLosReportes = [], todasLasCuadrillas = [], todasLasCajas = [], todasLasMangas = [];
+let stockActual = [], semanaActual = '', rolActual = '', cuadrillaHoyId = null, ipCounters = {};
+let gpsLat = null, gpsLng = null;
+let cajaGpsLat = null, cajaGpsLng = null;
+let mangaGpsLat = null, mangaGpsLng = null;
+let mapaLeaflet = null, marcadoresMapa = [], marcadorYo = null, circuloYo = null;
+let filtroActivo = 'todos';
+let modoSeleccionMapa = false, modoSeleccionMapaCaja = false, modoSeleccionMapaManga = false;
+let distContador = 0, distRegContador = 0, distMapaContador = 0, mangaBufContador = 0, editDistMap = {};
 
 function fechaLocal() {
-  const a=new Date();
+  const a = new Date();
   return `${a.getFullYear()}-${String(a.getMonth()+1).padStart(2,'0')}-${String(a.getDate()).padStart(2,'0')}`;
 }
 
-// ── Init ─────────────────────────────────────────────────
+// ── Init ──────────────────────────────────────────────────
 async function init() {
   try {
-    const res=await fetch('/api/me');
-    const data=await res.json();
-    if (!data.loggedIn) { window.location.href='/'; return; }
-    rolActual=data.rol;
+    const res = await fetch('/api/me');
+    const data = await res.json();
+    if (!data.loggedIn) { window.location.href = '/'; return; }
+    rolActual = data.rol;
     await cargarTodasLasCuadrillas();
-    const tabs=document.getElementById('nav-tabs');
-    if (rolActual==='admin') {
-      tabs.innerHTML=`
+    const tabs = document.getElementById('nav-tabs');
+    if (rolActual === 'admin') {
+      tabs.innerHTML = `
         <button class="tab active" onclick="mostrarTab('historial')">Historial</button>
         <button class="tab" onclick="mostrarTab('mapa')">Mapa</button>
         <button class="tab" onclick="mostrarTab('bodega')">Bodega</button>
@@ -79,26 +79,27 @@ async function init() {
         <button class="tab" onclick="mostrarTab('cuadrillas')">Cuadrillas</button>`;
       mostrarTab('historial');
     } else {
-      tabs.innerHTML=`
+      tabs.innerHTML = `
         <button class="tab active" onclick="mostrarTab('registro')">Nuevo registro</button>
         <button class="tab" onclick="mostrarTab('mapa')">Mapa</button>
         <button class="tab" onclick="mostrarTab('historial')">Historial</button>
         <button class="tab" onclick="mostrarTab('bodega')">Bodega</button>
         <button class="tab" onclick="mostrarTab('indicadores')">Indicadores</button>`;
-      const f=document.getElementById('fecha'); if(f) f.value=fechaLocal();
+      const f = document.getElementById('fecha');
+      if (f) f.value = fechaLocal();
       await cargarCuadrillaHoy();
       mostrarTab('registro');
     }
     cargarConectados();
-    setInterval(cargarConectados,30000);
-  } catch(e) { console.error('Init error:',e); }
+    setInterval(cargarConectados, 30000);
+  } catch(e) { console.error('Init error:', e); }
 }
 init();
 
 // ── Helpers buffer+checkboxes ─────────────────────────────
 function renderCheckboxesHilos(prefijo, grupoId) {
   return HILOS.map(h => {
-    const hc=COLOR_BUFFER[h]||'#6b7280';
+    const hc = COLOR_BUFFER[h] || '#6b7280';
     return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap;">
       <label style="display:flex;align-items:center;gap:6px;cursor:pointer;min-width:110px;">
         <input type="checkbox" id="${prefijo}-check-${grupoId}-${h}" style="accent-color:var(--accent);width:14px;height:14px;" />
@@ -112,14 +113,14 @@ function renderCheckboxesHilos(prefijo, grupoId) {
   }).join('');
 }
 
-function renderGrupoBuffer(prefijo, id, bufferPreset='', idPreset='') {
-  const bufColor=COLOR_BUFFER[bufferPreset]||'#6b7280';
+function renderGrupoBuffer(prefijo, id, bufferPreset = '', idPreset = '') {
+  const bufColor = COLOR_BUFFER[bufferPreset] || '#6b7280';
   return `<div id="${prefijo}-grupo-${id}" style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
       <label style="font-size:11px;color:var(--muted);text-transform:uppercase;flex-shrink:0;">Buffer</label>
       <select id="${prefijo}-buf-${id}" class="sel-field" style="flex:1;min-width:100px;" onchange="actualizarHeaderBuffer('${prefijo}',${id})">
         <option value="">Seleccionar...</option>
-        ${BUFFERS.map(b=>`<option value="${b}" ${b===bufferPreset?'selected':''}>${b}</option>`).join('')}
+        ${BUFFERS.map(b => `<option value="${b}" ${b===bufferPreset?'selected':''}>${b}</option>`).join('')}
       </select>
       <input type="text" id="${prefijo}-id-${id}" placeholder="ID (Ej: #1, Cable A...)" value="${idPreset}"
         style="flex:1;min-width:90px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;padding:6px 8px;outline:none;"
@@ -129,44 +130,44 @@ function renderGrupoBuffer(prefijo, id, bufferPreset='', idPreset='') {
     </div>
     <div id="${prefijo}-info-${id}" style="font-size:11px;color:var(--muted);margin-bottom:8px;display:flex;align-items:center;gap:5px;">
       <span style="width:8px;height:8px;background:${bufColor};border-radius:50%;display:inline-block;"></span>
-      ${bufferPreset?`Buffer ${bufferPreset}${idPreset?' '+idPreset:''} — marca los hilos fusionados`:'Selecciona un buffer para ver los hilos'}
+      ${bufferPreset ? `Buffer ${bufferPreset}${idPreset?' '+idPreset:''} — marca los hilos` : 'Selecciona un buffer para ver los hilos'}
     </div>
     <div id="${prefijo}-hilos-${id}" style="padding-left:4px;">
-      ${bufferPreset?renderCheckboxesHilos(prefijo,id):'<div style="font-size:12px;color:var(--muted);">Selecciona un buffer para continuar</div>'}
+      ${bufferPreset ? renderCheckboxesHilos(prefijo, id) : '<div style="font-size:12px;color:var(--muted);">Selecciona un buffer para continuar</div>'}
     </div>
   </div>`;
 }
 
 function actualizarHeaderBuffer(prefijo, grupoId) {
-  const buffer=document.getElementById(`${prefijo}-buf-${grupoId}`)?.value;
-  const bufferId=document.getElementById(`${prefijo}-id-${grupoId}`)?.value.trim()||'';
-  const infoEl=document.getElementById(`${prefijo}-info-${grupoId}`);
-  const hilosEl=document.getElementById(`${prefijo}-hilos-${grupoId}`);
-  if (!infoEl||!hilosEl) return;
+  const buffer = document.getElementById(`${prefijo}-buf-${grupoId}`)?.value;
+  const bufferId = document.getElementById(`${prefijo}-id-${grupoId}`)?.value.trim() || '';
+  const infoEl = document.getElementById(`${prefijo}-info-${grupoId}`);
+  const hilosEl = document.getElementById(`${prefijo}-hilos-${grupoId}`);
+  if (!infoEl || !hilosEl) return;
   if (!buffer) {
-    infoEl.innerHTML=`<span style="font-size:12px;color:var(--muted);">Selecciona un buffer</span>`;
-    hilosEl.innerHTML='<div style="font-size:12px;color:var(--muted);">Selecciona un buffer para continuar</div>';
+    infoEl.innerHTML = `<span style="font-size:12px;color:var(--muted);">Selecciona un buffer</span>`;
+    hilosEl.innerHTML = '<div style="font-size:12px;color:var(--muted);">Selecciona un buffer para continuar</div>';
     return;
   }
-  const bufColor=COLOR_BUFFER[buffer]||'#6b7280';
-  const label=bufferId?`${buffer} ${bufferId}`:buffer;
-  infoEl.innerHTML=`<span style="width:8px;height:8px;background:${bufColor};border-radius:50%;display:inline-block;"></span>
-    <strong style="color:var(--text);">Buffer ${label}</strong> — marca los hilos fusionados`;
-  hilosEl.innerHTML=renderCheckboxesHilos(prefijo,grupoId);
+  const bufColor = COLOR_BUFFER[buffer] || '#6b7280';
+  const label = bufferId ? `${buffer} ${bufferId}` : buffer;
+  infoEl.innerHTML = `<span style="width:8px;height:8px;background:${bufColor};border-radius:50%;display:inline-block;"></span>
+    <strong style="color:var(--text);">Buffer ${label}</strong> — marca los hilos`;
+  hilosEl.innerHTML = renderCheckboxesHilos(prefijo, grupoId);
 }
 
 function getDistribucionDePrefijo(prefijo) {
-  const resultado=[];
-  document.querySelectorAll(`[id^="${prefijo}-grupo-"]`).forEach(grupo=>{
-    const id=grupo.id.replace(`${prefijo}-grupo-`,'');
-    const buffer=document.getElementById(`${prefijo}-buf-${id}`)?.value;
-    const bufferId=document.getElementById(`${prefijo}-id-${id}`)?.value.trim()||'';
+  const resultado = [];
+  document.querySelectorAll(`[id^="${prefijo}-grupo-"]`).forEach(grupo => {
+    const id = grupo.id.replace(`${prefijo}-grupo-`, '');
+    const buffer = document.getElementById(`${prefijo}-buf-${id}`)?.value;
+    const bufferId = document.getElementById(`${prefijo}-id-${id}`)?.value.trim() || '';
     if (!buffer) return;
-    HILOS.forEach(h=>{
-      const check=document.getElementById(`${prefijo}-check-${id}-${h}`);
+    HILOS.forEach(h => {
+      const check = document.getElementById(`${prefijo}-check-${id}-${h}`);
       if (check?.checked) {
-        const destino=document.getElementById(`${prefijo}-dest-${id}-${h}`)?.value.trim()||'';
-        resultado.push({buffer,bufferId,hilo:h,destino});
+        const destino = document.getElementById(`${prefijo}-dest-${id}-${h}`)?.value.trim() || '';
+        resultado.push({ buffer, bufferId, hilo: h, destino });
       }
     });
   });
@@ -175,372 +176,387 @@ function getDistribucionDePrefijo(prefijo) {
 
 // ── Distribuciones ────────────────────────────────────────
 function toggleDistribucionReg() {
-  const tipo=document.getElementById('caja-tipo-reg')?.value;
-  const panel=document.getElementById('dist-reg-panel');
-  if (panel) panel.style.display=tipo==='principal'?'block':'none';
+  const tipo = document.getElementById('caja-tipo-reg')?.value;
+  const panel = document.getElementById('dist-reg-panel');
+  if (panel) panel.style.display = tipo === 'principal' ? 'block' : 'none';
 }
-function agregarDistReg() { distRegContador++; document.getElementById('dist-reg-lista').insertAdjacentHTML('beforeend',renderGrupoBuffer('dreg',distRegContador)); }
+function agregarDistReg() {
+  distRegContador++;
+  document.getElementById('dist-reg-lista').insertAdjacentHTML('beforeend', renderGrupoBuffer('dreg', distRegContador));
+}
 function getDistribucionReg() { return getDistribucionDePrefijo('dreg'); }
 
-function agregarDistMapa() { distMapaContador++; document.getElementById('distribucion-lista').insertAdjacentHTML('beforeend',renderGrupoBuffer('dmapa',distMapaContador)); }
+function agregarDistMapa() {
+  distMapaContador++;
+  document.getElementById('distribucion-lista').insertAdjacentHTML('beforeend', renderGrupoBuffer('dmapa', distMapaContador));
+}
 function getDistribucionMapa() { return getDistribucionDePrefijo('dmapa'); }
 
-// ── Manga GPS ─────────────────────────────────────────────
-function obtenerGPSManga() {
-  const status=document.getElementById('manga-gps-status');
-  if (!navigator.geolocation) { if(status) status.textContent='❌ GPS no disponible'; return; }
-  if (status) status.textContent='⏳ Obteniendo GPS...';
-  navigator.geolocation.getCurrentPosition(
-    pos=>{
-      mangaGpsLat=pos.coords.latitude; mangaGpsLng=pos.coords.longitude;
-      if(status){status.innerHTML=`✅ GPS listo: <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;">${mangaGpsLat.toFixed(5)}, ${mangaGpsLng.toFixed(5)}</span>`;status.style.color='var(--accent)';}
-    },
-    ()=>{ if(status) status.textContent='❌ No se pudo obtener GPS. Usa "Marcar en mapa".'; },
-    {enableHighAccuracy:true,timeout:10000}
-  );
-}
-
-function activarSeleccionMapaManga() {
-  if (!mapaLeaflet) { iniciarMapa(); setTimeout(()=>_activarModoManga(),800); return; }
-  _activarModoManga();
-}
-function _activarModoManga() {
-  modoSeleccionMapaManga=true;
-  const lbl=document.getElementById('modo-seleccion-label');
-  if(lbl) lbl.textContent='🔴 Haz clic en el mapa para ubicar la manga';
-  mapaLeaflet.getContainer().style.cursor='crosshair';
-  toast('Haz clic en el mapa para ubicar la manga');
-}
-
-// ── Buffers manga (con tipo de fibra) ────────────────────
-let mangaBufContador = 0;
-
 function actualizarBuffersManga() {
-  const tipo=document.getElementById('manga-mapa-tipo')?.value;
-  const lista=document.getElementById('manga-buffers-lista');
+  const tipo = document.getElementById('manga-mapa-tipo')?.value;
+  const lista = document.getElementById('manga-buffers-lista');
   if (!lista) return;
-  lista.innerHTML='';
-  mangaBufContador=0;
-  // Agregar buffers por defecto según tipo
-  const numBufs=tipo==='24'?2:1;
-  for(let i=0;i<numBufs;i++) agregarBufferManga();
+  lista.innerHTML = '';
+  mangaBufContador = 0;
+  const numBufs = tipo === '24' ? 2 : 1;
+  for (let i = 0; i < numBufs; i++) agregarBufferManga();
 }
-
 function agregarBufferManga() {
   mangaBufContador++;
-  const id=mangaBufContador;
-  const lista=document.getElementById('manga-buffers-lista');
-  lista.insertAdjacentHTML('beforeend',renderGrupoBuffer('manga',id));
+  document.getElementById('manga-buffers-lista').insertAdjacentHTML('beforeend', renderGrupoBuffer('manga', mangaBufContador));
 }
-
 function getDistribucionManga() { return getDistribucionDePrefijo('manga'); }
 
-// ── Registrar manga ───────────────────────────────────────
-async function registrarManga() {
-  const nombre=document.getElementById('manga-mapa-nombre')?.value.trim();
-  const sector=document.getElementById('manga-mapa-sector')?.value.trim();
-  const tipoFibra=document.getElementById('manga-mapa-tipo')?.value;
-  if (!nombre) { toast('⚠ Ingresa un nombre para la manga'); return; }
-  if (mangaGpsLat===null||mangaGpsLng===null) { toast('⚠ GPS obligatorio — obtén la ubicación primero'); return; }
-  const distribucion=getDistribucionManga();
-  try {
-    const res=await fetch('/api/mangas',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({nombre,sector,tipoFibra,distribucion,lat:mangaGpsLat,lng:mangaGpsLng})});
-    const data=await res.json();
-    if (data.ok) {
-      toast('✓ Manga registrada');
-      document.getElementById('manga-mapa-nombre').value='';
-      document.getElementById('manga-mapa-sector').value='';
-      document.getElementById('manga-buffers-lista').innerHTML='';
-      mangaBufContador=0; mangaGpsLat=null; mangaGpsLng=null;
-      const st=document.getElementById('manga-gps-status');
-      if(st){st.textContent='📍 GPS obligatorio — usa el botón o haz clic en el mapa';st.style.color='var(--muted)';}
-      await cargarMangas(); renderMarcadores(); renderListaCajas();
-      if(mapaLeaflet) mapaLeaflet.setView([data.manga.lat,data.manga.lng],17);
-    } else { toast('Error: '+data.error); }
-  } catch(e) { toast('Error de conexión'); }
-}
-
-async function cargarMangas() {
-  try { const res=await fetch('/api/mangas'); todasLasMangas=await res.json(); }
-  catch(e) { todasLasMangas=[]; }
-}
-
-async function eliminarManga(id) {
-  if (!confirm('¿Eliminar esta manga?')) return;
-  try { await fetch('/api/mangas/'+id,{method:'DELETE'}); toast('Manga eliminada'); await cargarMangas(); renderMarcadores(); renderListaCajas(); }
-  catch(e) { toast('Error al eliminar'); }
-}
-
-// ── GPS caja registro ─────────────────────────────────────
+// ── GPS ───────────────────────────────────────────────────
 function obtenerGPSCaja() {
-  const status=document.getElementById('caja-gps-status');
-  if (!navigator.geolocation) { if(status) status.textContent='❌ GPS no disponible'; return; }
-  if (status) status.textContent='⏳ Obteniendo GPS...';
+  const status = document.getElementById('caja-gps-status');
+  if (!navigator.geolocation) { if (status) status.textContent = '❌ GPS no disponible'; return; }
+  if (status) status.textContent = '⏳ Obteniendo GPS...';
   navigator.geolocation.getCurrentPosition(
-    pos=>{cajaGpsLat=pos.coords.latitude;cajaGpsLng=pos.coords.longitude;
-      if(status){status.innerHTML=`✅ GPS listo: <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;">${cajaGpsLat.toFixed(5)}, ${cajaGpsLng.toFixed(5)}</span>`;status.style.color='var(--accent)';}},
-    ()=>{if(status) status.textContent='❌ No se pudo obtener GPS.';},{enableHighAccuracy:true,timeout:10000}
+    pos => {
+      cajaGpsLat = pos.coords.latitude; cajaGpsLng = pos.coords.longitude;
+      if (status) { status.innerHTML = `✅ GPS listo: <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;">${cajaGpsLat.toFixed(5)}, ${cajaGpsLng.toFixed(5)}</span>`; status.style.color = 'var(--accent)'; }
+    },
+    () => { if (status) status.textContent = '❌ No se pudo obtener GPS.'; },
+    { enableHighAccuracy: true, timeout: 10000 }
   );
 }
 function activarSeleccionMapaCaja() {
   mostrarTab('mapa');
-  setTimeout(()=>{
-    if(!mapaLeaflet) return;
-    modoSeleccionMapaCaja=true;
-    const lbl=document.getElementById('modo-seleccion-label');
-    if(lbl) lbl.textContent='👆 Haz clic en el mapa para ubicar la caja del reporte';
-    mapaLeaflet.getContainer().style.cursor='crosshair';
+  setTimeout(() => {
+    if (!mapaLeaflet) return;
+    modoSeleccionMapaCaja = true;
+    const lbl = document.getElementById('modo-seleccion-label');
+    if (lbl) lbl.textContent = '👆 Haz clic en el mapa para ubicar la caja';
+    mapaLeaflet.getContainer().style.cursor = 'crosshair';
     toast('Haz clic en el mapa para ubicar la caja');
-  },600);
+  }, 600);
 }
 function limpiarGPSCaja() {
-  cajaGpsLat=null;cajaGpsLng=null;
-  const st=document.getElementById('caja-gps-status');
-  if(st){st.textContent='Sin ubicación — la caja no se guardará en el mapa';st.style.color='var(--muted)';}
+  cajaGpsLat = null; cajaGpsLng = null;
+  const st = document.getElementById('caja-gps-status');
+  if (st) { st.textContent = 'Sin ubicación — la caja no se guardará en el mapa'; st.style.color = 'var(--muted)'; }
+}
+function obtenerGPSManga() {
+  const status = document.getElementById('manga-gps-status');
+  if (!navigator.geolocation) { if (status) status.textContent = '❌ GPS no disponible'; return; }
+  if (status) status.textContent = '⏳ Obteniendo GPS...';
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      mangaGpsLat = pos.coords.latitude; mangaGpsLng = pos.coords.longitude;
+      if (status) { status.innerHTML = `✅ GPS listo: <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;">${mangaGpsLat.toFixed(5)}, ${mangaGpsLng.toFixed(5)}</span>`; status.style.color = 'var(--accent)'; }
+    },
+    () => { if (status) status.textContent = '❌ No se pudo obtener GPS. Usa marcar en mapa.'; },
+    { enableHighAccuracy: true, timeout: 10000 }
+  );
+}
+function activarSeleccionMapaManga() {
+  if (!mapaLeaflet) { mostrarTab('mapa'); setTimeout(() => _activarModoManga(), 800); return; }
+  mostrarTab('mapa');
+  setTimeout(() => _activarModoManga(), 300);
+}
+function _activarModoManga() {
+  modoSeleccionMapaManga = true;
+  const lbl = document.getElementById('modo-seleccion-label');
+  if (lbl) lbl.textContent = '🔴 Haz clic en el mapa para ubicar la manga';
+  mapaLeaflet.getContainer().style.cursor = 'crosshair';
+  toast('Haz clic en el mapa para ubicar la manga');
 }
 
-// ── IPs ──────────────────────────────────────────────────
+// ── IPs ───────────────────────────────────────────────────
 function agregarIPActividad(contexto) {
-  if (!ipCounters[contexto]) ipCounters[contexto]=0;
+  if (!ipCounters[contexto]) ipCounters[contexto] = 0;
   ipCounters[contexto]++;
-  const id=`${contexto}-${ipCounters[contexto]}`;
-  const lista=document.getElementById(`ips-lista-${contexto}`); if(!lista) return;
-  const div=document.createElement('div'); div.id=`ip-row-${id}`; div.style.cssText='display:flex;gap:8px;margin-bottom:6px;align-items:center;';
-  div.innerHTML=`<input type="text" placeholder="Ej. 192.168.1.100" id="ip-input-${id}"
+  const id = `${contexto}-${ipCounters[contexto]}`;
+  const lista = document.getElementById(`ips-lista-${contexto}`); if (!lista) return;
+  const div = document.createElement('div');
+  div.id = `ip-row-${id}`; div.style.cssText = 'display:flex;gap:8px;margin-bottom:6px;align-items:center;';
+  div.innerHTML = `<input type="text" placeholder="Ej. 192.168.1.100" id="ip-input-${id}"
     style="flex:1;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;padding:7px 10px;outline:none;" />
     <button onclick="document.getElementById('ip-row-${id}').remove()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;">✕</button>`;
   lista.appendChild(div);
 }
 function getIPsDeContexto(contexto) {
-  const lista=document.getElementById(`ips-lista-${contexto}`); if(!lista) return [];
-  return [...lista.querySelectorAll('input')].map(el=>el.value.trim()).filter(Boolean);
+  const lista = document.getElementById(`ips-lista-${contexto}`); if (!lista) return [];
+  return [...lista.querySelectorAll('input')].map(el => el.value.trim()).filter(Boolean);
 }
 
 // ── Recopilar datos ───────────────────────────────────────
 function recopilarDatos() {
-  const datos={actividades:[...actividadesSeleccionadas],materiales:[],ips:[],detalles:{}};
+  const datos = { actividades: [...actividadesSeleccionadas], materiales: [], ips: [], detalles: {} };
+
   if (actividadesSeleccionadas.has('fibra')) {
-    const metros=parseFloat(document.getElementById('fibra-metros')?.value)||0;
-    const chupones=parseFloat(document.getElementById('fibra-chupones')?.value)||0;
-    const herrajesA=parseFloat(document.getElementById('fibra-herrajesA')?.value)||0;
-    const herrajesU=parseFloat(document.getElementById('fibra-herrajesU')?.value)||0;
-    const heb34=parseFloat(document.getElementById('fibra-hebilla34')?.value)||0;
-    const heb32=parseFloat(document.getElementById('fibra-hebilla32')?.value)||0;
-    const preformados=parseFloat(document.getElementById('fibra-preformados')?.value)||0;
-    const cinta34=parseFloat(document.getElementById('fibra-cinta34')?.value)||0;
-    if(metros>0) datos.materiales.push({material:'Fibra Principal',cantidad:metros,unidad:'m'});
-    if(chupones>0) datos.materiales.push({material:'Chupones',cantidad:chupones,unidad:'und'});
-    if(herrajesA>0) datos.materiales.push({material:'Herrajes A',cantidad:herrajesA,unidad:'und'});
-    if(herrajesU>0) datos.materiales.push({material:'Herrajes U',cantidad:herrajesU,unidad:'und'});
-    if(heb34>0) datos.materiales.push({material:'Hebilla metálica 3/4"',cantidad:heb34,unidad:'und'});
-    if(heb32>0) datos.materiales.push({material:'Hebilla metálica 3/2"',cantidad:heb32,unidad:'und'});
-    if(preformados>0) datos.materiales.push({material:'Preformados',cantidad:preformados,unidad:'und'});
-    if(cinta34>0) datos.materiales.push({material:'Cinta 3/4"',cantidad:cinta34,unidad:'m'});
-    datos.detalles.fibra={metros};
+    const metros = parseFloat(document.getElementById('fibra-metros')?.value) || 0;
+    const chupones = parseFloat(document.getElementById('fibra-chupones')?.value) || 0;
+    const herrajesA = parseFloat(document.getElementById('fibra-herrajesA')?.value) || 0;
+    const herrajesU = parseFloat(document.getElementById('fibra-herrajesU')?.value) || 0;
+    const heb34 = parseFloat(document.getElementById('fibra-hebilla34')?.value) || 0;
+    const heb32 = parseFloat(document.getElementById('fibra-hebilla32')?.value) || 0;
+    const preformados = parseFloat(document.getElementById('fibra-preformados')?.value) || 0;
+    const cinta34 = parseFloat(document.getElementById('fibra-cinta34')?.value) || 0;
+    if (metros > 0) datos.materiales.push({ material:'Fibra Principal', cantidad:metros, unidad:'m' });
+    if (chupones > 0) datos.materiales.push({ material:'Chupones', cantidad:chupones, unidad:'und' });
+    if (herrajesA > 0) datos.materiales.push({ material:'Herrajes A', cantidad:herrajesA, unidad:'und' });
+    if (herrajesU > 0) datos.materiales.push({ material:'Herrajes U', cantidad:herrajesU, unidad:'und' });
+    if (heb34 > 0) datos.materiales.push({ material:'Hebilla metálica 3/4"', cantidad:heb34, unidad:'und' });
+    if (heb32 > 0) datos.materiales.push({ material:'Hebilla metálica 3/2"', cantidad:heb32, unidad:'und' });
+    if (preformados > 0) datos.materiales.push({ material:'Preformados', cantidad:preformados, unidad:'und' });
+    if (cinta34 > 0) datos.materiales.push({ material:'Cinta 3/4"', cantidad:cinta34, unidad:'m' });
+    datos.detalles.fibra = { metros };
   }
+
   if (actividadesSeleccionadas.has('cajas')) {
-    const cajasnat=parseFloat(document.getElementById('caja-cajasnat')?.value)||0;
-    const sp16=parseFloat(document.getElementById('caja-sp16')?.value)||0;
-    const sp4=parseFloat(document.getElementById('caja-sp4')?.value)||0;
-    const heb34=parseFloat(document.getElementById('caja-heb34')?.value)||0;
-    const cinta32=parseFloat(document.getElementById('caja-cinta32')?.value)||0;
-    if(cajasnat>0) datos.materiales.push({material:'Cajas NAT',cantidad:cajasnat,unidad:'und'});
-    if(sp16>0) datos.materiales.push({material:'Splitter 1/16',cantidad:sp16,unidad:'und'});
-    if(sp4>0) datos.materiales.push({material:'Splitter 1/4',cantidad:sp4,unidad:'und'});
-    if(heb34>0) datos.materiales.push({material:'Hebilla metálica 3/4"',cantidad:heb34,unidad:'und'});
-    if(cinta32>0) datos.materiales.push({material:'Cinta 3/2"',cantidad:cinta32,unidad:'m'});
-    datos.detalles.cajas={
-      tipo:document.getElementById('caja-tipo-reg')?.value,
-      buffer:document.getElementById('caja-buffer-reg')?.value,
-      hilo:document.getElementById('caja-hilo-reg')?.value,
-      totalPuertos:parseInt(document.getElementById('caja-total-reg')?.value)||16,
-      puertosOcupados:parseInt(document.getElementById('caja-ocupados-reg')?.value)||0,
-      distribucion:getDistribucionReg(),lat:cajaGpsLat,lng:cajaGpsLng
+    const cajasnat = parseFloat(document.getElementById('caja-cajasnat')?.value) || 0;
+    const sp16 = parseFloat(document.getElementById('caja-sp16')?.value) || 0;
+    const sp4 = parseFloat(document.getElementById('caja-sp4')?.value) || 0;
+    const heb34 = parseFloat(document.getElementById('caja-heb34')?.value) || 0;
+    const cinta32 = parseFloat(document.getElementById('caja-cinta32')?.value) || 0;
+    if (cajasnat > 0) datos.materiales.push({ material:'Cajas NAT', cantidad:cajasnat, unidad:'und' });
+    if (sp16 > 0) datos.materiales.push({ material:'Splitter 1/16', cantidad:sp16, unidad:'und' });
+    if (sp4 > 0) datos.materiales.push({ material:'Splitter 1/4', cantidad:sp4, unidad:'und' });
+    if (heb34 > 0) datos.materiales.push({ material:'Hebilla metálica 3/4"', cantidad:heb34, unidad:'und' });
+    if (cinta32 > 0) datos.materiales.push({ material:'Cinta 3/2"', cantidad:cinta32, unidad:'m' });
+    datos.detalles.cajas = {
+      tipo: document.getElementById('caja-tipo-reg')?.value,
+      buffer: document.getElementById('caja-buffer-reg')?.value,
+      hilo: document.getElementById('caja-hilo-reg')?.value,
+      totalPuertos: parseInt(document.getElementById('caja-total-reg')?.value) || 16,
+      puertosOcupados: parseInt(document.getElementById('caja-ocupados-reg')?.value) || 0,
+      distribucion: getDistribucionReg(), lat: cajaGpsLat, lng: cajaGpsLng
     };
   }
+
   if (actividadesSeleccionadas.has('instalacion')) {
-    const ganchos=parseFloat(document.getElementById('inst-ganchos')?.value)||0;
-    const drop=parseFloat(document.getElementById('inst-drop')?.value)||0;
-    const upc=parseFloat(document.getElementById('inst-upc')?.value)||0;
-    const apc=parseFloat(document.getElementById('inst-apc')?.value)||0;
-    if(ganchos>0) datos.materiales.push({material:'Ganchos telefónicos',cantidad:ganchos,unidad:'und'});
-    if(drop>0) datos.materiales.push({material:'Cable Drop',cantidad:drop,unidad:'m'});
-    if(upc>0) datos.materiales.push({material:'Conector UPC',cantidad:upc,unidad:'und'});
-    if(apc>0) datos.materiales.push({material:'Conector APC',cantidad:apc,unidad:'und'});
-    getIPsDeContexto('instalacion').forEach(ip=>datos.ips.push({ip,tipo:'instalacion',label:'Instalación cliente',icon:'🔌'}));
+    const ganchos = parseFloat(document.getElementById('inst-ganchos')?.value) || 0;
+    const drop = parseFloat(document.getElementById('inst-drop')?.value) || 0;
+    const upc = parseFloat(document.getElementById('inst-upc')?.value) || 0;
+    const apc = parseFloat(document.getElementById('inst-apc')?.value) || 0;
+    if (ganchos > 0) datos.materiales.push({ material:'Ganchos telefónicos', cantidad:ganchos, unidad:'und' });
+    if (drop > 0) datos.materiales.push({ material:'Cable Drop', cantidad:drop, unidad:'m' });
+    if (upc > 0) datos.materiales.push({ material:'Conector UPC', cantidad:upc, unidad:'und' });
+    if (apc > 0) datos.materiales.push({ material:'Conector APC', cantidad:apc, unidad:'und' });
+    getIPsDeContexto('instalacion').forEach(ip => datos.ips.push({ ip, tipo:'instalacion', label:'Instalación cliente', icon:'🔌' }));
   }
+
   if (actividadesSeleccionadas.has('mudanza')) {
-    const drop=parseFloat(document.getElementById('mud-drop')?.value)||0;
-    const upc=parseFloat(document.getElementById('mud-upc')?.value)||0;
-    const apc=parseFloat(document.getElementById('mud-apc')?.value)||0;
-    if(drop>0) datos.materiales.push({material:'Cable Drop',cantidad:drop,unidad:'m'});
-    if(upc>0) datos.materiales.push({material:'Conector UPC',cantidad:upc,unidad:'und'});
-    if(apc>0) datos.materiales.push({material:'Conector APC',cantidad:apc,unidad:'und'});
-    datos.detalles.mudanza={antenas:parseInt(document.getElementById('mud-antenas')?.value)||0,routers:parseInt(document.getElementById('mud-routers')?.value)||0};
-    getIPsDeContexto('mudanza').forEach(ip=>datos.ips.push({ip,tipo:'mudanza',label:'Mudanza radio a fibra',icon:'🔄'}));
+    const drop = parseFloat(document.getElementById('mud-drop')?.value) || 0;
+    const upc = parseFloat(document.getElementById('mud-upc')?.value) || 0;
+    const apc = parseFloat(document.getElementById('mud-apc')?.value) || 0;
+    if (drop > 0) datos.materiales.push({ material:'Cable Drop', cantidad:drop, unidad:'m' });
+    if (upc > 0) datos.materiales.push({ material:'Conector UPC', cantidad:upc, unidad:'und' });
+    if (apc > 0) datos.materiales.push({ material:'Conector APC', cantidad:apc, unidad:'und' });
+    datos.detalles.mudanza = {
+      antenas: parseInt(document.getElementById('mud-antenas')?.value) || 0,
+      routers: parseInt(document.getElementById('mud-routers')?.value) || 0
+    };
+    getIPsDeContexto('mudanza').forEach(ip => datos.ips.push({ ip, tipo:'mudanza', label:'Mudanza radio a fibra', icon:'🔄' }));
   }
+
   if (actividadesSeleccionadas.has('odf')) {
-    datos.detalles.odf={nodo:document.getElementById('odf-nodo')?.value,hilos:parseInt(document.getElementById('odf-hilos')?.value)||0,linea:document.getElementById('odf-linea')?.value.trim(),obs:document.getElementById('odf-obs')?.value.trim()};
+    datos.detalles.odf = {
+      nodo: document.getElementById('odf-nodo')?.value,
+      hilos: parseInt(document.getElementById('odf-hilos')?.value) || 0,
+      linea: document.getElementById('odf-linea')?.value.trim(),
+      obs: document.getElementById('odf-obs')?.value.trim()
+    };
   }
+
   if (actividadesSeleccionadas.has('mangas')) {
-    datos.detalles.mangas={hilos:parseInt(document.getElementById('manga-hilos')?.value)||0,sector:document.getElementById('manga-sector')?.value.trim(),buffer:document.getElementById('manga-buffer')?.value};
+    datos.detalles.mangas = {
+      hilos: parseInt(document.getElementById('manga-hilos')?.value) || 0,
+      sector: document.getElementById('manga-sector')?.value.trim(),
+      buffer: document.getElementById('manga-buffer')?.value
+    };
   }
+
   if (actividadesSeleccionadas.has('incidencias')) {
-    const incTipos=[];
-    if(document.getElementById('inc-cambio_equipos')?.checked){incTipos.push({tipo:'cambio_equipos',desc:document.getElementById('inc-ce-desc')?.value.trim()});getIPsDeContexto('cambio_equipos').forEach(ip=>datos.ips.push({ip,tipo:'cambio_equipos',label:'Cambio de equipos',icon:'🔧'}));}
-    if(document.getElementById('inc-foco_rojo')?.checked){
-      const upcFR=parseInt(document.getElementById('fr-upc-cant')?.value)||0;
-      const apcFR=parseInt(document.getElementById('fr-apc-cant')?.value)||0;
-      incTipos.push({tipo:'foco_rojo',daños:{conectorUpc:document.getElementById('fr-conector-upc')?.checked,conectorApc:document.getElementById('fr-conector-apc')?.checked,fibra:document.getElementById('fr-fibra')?.checked},upc:upcFR,apc:apcFR});
-      if(upcFR>0) datos.materiales.push({material:'Conector UPC',cantidad:upcFR,unidad:'und'});
-      if(apcFR>0) datos.materiales.push({material:'Conector APC',cantidad:apcFR,unidad:'und'});
-      getIPsDeContexto('foco_rojo').forEach(ip=>datos.ips.push({ip,tipo:'foco_rojo',label:'Foco rojo',icon:'🔴'}));
+    const incTipos = [];
+    if (document.getElementById('inc-cambio_equipos')?.checked) {
+      incTipos.push({ tipo:'cambio_equipos', desc: document.getElementById('inc-ce-desc')?.value.trim() });
+      getIPsDeContexto('cambio_equipos').forEach(ip => datos.ips.push({ ip, tipo:'cambio_equipos', label:'Cambio de equipos', icon:'🔧' }));
     }
-    if(document.getElementById('inc-actualizaciones')?.checked){incTipos.push({tipo:'actualizaciones',desc:document.getElementById('inc-act-desc')?.value.trim()});getIPsDeContexto('actualizaciones').forEach(ip=>datos.ips.push({ip,tipo:'actualizaciones',label:'Actualizaciones',icon:'🔄'}));}
-    if(document.getElementById('inc-cambio_domicilio')?.checked){
-      const drop=parseFloat(document.getElementById('cd-drop')?.value)||0;
-      const upc=parseFloat(document.getElementById('cd-upc')?.value)||0;
-      const apc=parseFloat(document.getElementById('cd-apc')?.value)||0;
-      incTipos.push({tipo:'cambio_domicilio',drop,upc,apc});
-      if(drop>0) datos.materiales.push({material:'Cable Drop',cantidad:drop,unidad:'m'});
-      if(upc>0) datos.materiales.push({material:'Conector UPC',cantidad:upc,unidad:'und'});
-      if(apc>0) datos.materiales.push({material:'Conector APC',cantidad:apc,unidad:'und'});
-      getIPsDeContexto('cambio_domicilio').forEach(ip=>datos.ips.push({ip,tipo:'cambio_domicilio',label:'Cambio de domicilio',icon:'🏠'}));
+    if (document.getElementById('inc-foco_rojo')?.checked) {
+      const upcFR = parseInt(document.getElementById('fr-upc-cant')?.value) || 0;
+      const apcFR = parseInt(document.getElementById('fr-apc-cant')?.value) || 0;
+      incTipos.push({ tipo:'foco_rojo', daños:{ conectorUpc:document.getElementById('fr-conector-upc')?.checked, conectorApc:document.getElementById('fr-conector-apc')?.checked, fibra:document.getElementById('fr-fibra')?.checked }, upc:upcFR, apc:apcFR });
+      if (upcFR > 0) datos.materiales.push({ material:'Conector UPC', cantidad:upcFR, unidad:'und' });
+      if (apcFR > 0) datos.materiales.push({ material:'Conector APC', cantidad:apcFR, unidad:'und' });
+      getIPsDeContexto('foco_rojo').forEach(ip => datos.ips.push({ ip, tipo:'foco_rojo', label:'Foco rojo', icon:'🔴' }));
     }
-    datos.detalles.incidencias={tipos:incTipos,total:parseInt(document.getElementById('num-incidencias')?.value)||0};
-    datos.incidencias=incTipos.map(t=>t.tipo);
-    datos.numIncidencias=parseInt(document.getElementById('num-incidencias')?.value)||0;
+    if (document.getElementById('inc-actualizaciones')?.checked) {
+      incTipos.push({ tipo:'actualizaciones', desc: document.getElementById('inc-act-desc')?.value.trim() });
+      getIPsDeContexto('actualizaciones').forEach(ip => datos.ips.push({ ip, tipo:'actualizaciones', label:'Actualizaciones', icon:'🔄' }));
+    }
+    if (document.getElementById('inc-cambio_domicilio')?.checked) {
+      const drop = parseFloat(document.getElementById('cd-drop')?.value) || 0;
+      const upc = parseFloat(document.getElementById('cd-upc')?.value) || 0;
+      const apc = parseFloat(document.getElementById('cd-apc')?.value) || 0;
+      incTipos.push({ tipo:'cambio_domicilio', drop, upc, apc });
+      if (drop > 0) datos.materiales.push({ material:'Cable Drop', cantidad:drop, unidad:'m' });
+      if (upc > 0) datos.materiales.push({ material:'Conector UPC', cantidad:upc, unidad:'und' });
+      if (apc > 0) datos.materiales.push({ material:'Conector APC', cantidad:apc, unidad:'und' });
+      getIPsDeContexto('cambio_domicilio').forEach(ip => datos.ips.push({ ip, tipo:'cambio_domicilio', label:'Cambio de domicilio', icon:'🏠' }));
+    }
+    datos.detalles.incidencias = { tipos: incTipos, total: parseInt(document.getElementById('num-incidencias')?.value) || 0 };
+    datos.incidencias = incTipos.map(t => t.tipo);
+    datos.numIncidencias = parseInt(document.getElementById('num-incidencias')?.value) || 0;
   }
+
   if (actividadesSeleccionadas.has('reparacion')) {
-    datos.detalles.reparacion={ardilla:document.getElementById('rep-ardilla')?.checked,arrancada:document.getElementById('rep-arrancada')?.checked,atenuacion:document.getElementById('rep-atenuacion')?.checked,sector:document.getElementById('rep-sector')?.value.trim(),hilos:parseInt(document.getElementById('rep-hilos')?.value)||0,buffer:document.getElementById('rep-buffer')?.value,up:document.getElementById('rep-up')?.value.trim()};
+    datos.detalles.reparacion = {
+      ardilla: document.getElementById('rep-ardilla')?.checked,
+      arrancada: document.getElementById('rep-arrancada')?.checked,
+      atenuacion: document.getElementById('rep-atenuacion')?.checked,
+      sector: document.getElementById('rep-sector')?.value.trim(),
+      hilos: parseInt(document.getElementById('rep-hilos')?.value) || 0,
+      buffer: document.getElementById('rep-buffer')?.value,
+      up: document.getElementById('rep-up')?.value.trim()
+    };
   }
-  const matMap={};
-  datos.materiales.forEach(m=>{if(matMap[m.material])matMap[m.material].cantidad+=m.cantidad;else matMap[m.material]={...m};});
-  datos.materiales=Object.values(matMap);
+
+  const matMap = {};
+  datos.materiales.forEach(m => {
+    if (matMap[m.material]) matMap[m.material].cantidad += m.cantidad;
+    else matMap[m.material] = { ...m };
+  });
+  datos.materiales = Object.values(matMap);
   return datos;
 }
 
 // ── Guardar Reporte ───────────────────────────────────────
 async function guardarReporte() {
-  const fecha=document.getElementById('fecha')?.value;
-  if(!fecha){toast('⚠ Selecciona la fecha');return;}
-  if(actividadesSeleccionadas.size===0){toast('⚠ Selecciona al menos una actividad');return;}
-  const observaciones=document.getElementById('observaciones')?.value.trim()||'';
-  const cuadrilla=todasLasCuadrillas.find(c=>c.id===cuadrillaHoyId);
-  const integrantes=cuadrilla?cuadrilla.integrantes:[];
-  const datos=recopilarDatos();
-  if(actividadesSeleccionadas.has('cajas')&&cajaGpsLat!==null&&cajaGpsLng!==null){
-    const det=datos.detalles.cajas;
-    const tipoLabel=det.tipo==='principal'?'Caja Principal':det.tipo==='cliente'?'Caja Cliente':'Pasante';
-    const refIngresada=document.getElementById('caja-referencia-reg')?.value.trim();
-    try { await fetch('/api/cajas',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tipo:det.tipo||'cliente',referencia:refIngresada||`${tipoLabel} — ${fecha}`,lat:cajaGpsLat,lng:cajaGpsLng,totalPuertos:det.totalPuertos,puertosOcupados:det.puertosOcupados,buffer:det.buffer,hilo:det.hilo,distribucion:det.distribucion||[]})}); }
-    catch(e){console.error('Error guardando caja:',e);}
+  const fecha = document.getElementById('fecha')?.value;
+  if (!fecha) { toast('⚠ Selecciona la fecha'); return; }
+  if (actividadesSeleccionadas.size === 0) { toast('⚠ Selecciona al menos una actividad'); return; }
+  const observaciones = document.getElementById('observaciones')?.value.trim() || '';
+  const cuadrilla = todasLasCuadrillas.find(c => c.id === cuadrillaHoyId);
+  const integrantes = cuadrilla ? cuadrilla.integrantes : [];
+  const datos = recopilarDatos();
+
+  if (actividadesSeleccionadas.has('cajas') && cajaGpsLat !== null && cajaGpsLng !== null) {
+    const det = datos.detalles.cajas;
+    const tipoLabel = det.tipo==='principal'?'Caja Principal':det.tipo==='cliente'?'Caja Cliente':'Pasante';
+    const refIngresada = document.getElementById('caja-referencia-reg')?.value.trim();
+    try {
+      await fetch('/api/cajas', { method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ tipo:det.tipo||'cliente', referencia:refIngresada||`${tipoLabel} — ${fecha}`, lat:cajaGpsLat, lng:cajaGpsLng, totalPuertos:det.totalPuertos, puertosOcupados:det.puertosOcupados, buffer:det.buffer, hilo:det.hilo, distribucion:det.distribucion||[] })
+      });
+    } catch(e) { console.error('Error guardando caja:', e); }
   }
+
   try {
-    const res=await fetch('/api/reportes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({fecha,integrantes,observaciones,materiales:datos.materiales,actividades:datos.actividades,incidencias:datos.incidencias||[],numIncidencias:datos.numIncidencias||0,ips:datos.ips,detalles:datos.detalles,cuadrillaId:cuadrillaHoyId})});
-    const data=await res.json();
-    if(data.ok){toast('✓ Reporte guardado');limpiarFormulario();}
-    else toast('Error: '+data.error);
-  }catch(e){toast('Error de conexión: '+e.message);}
+    const res = await fetch('/api/reportes', { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ fecha, integrantes, observaciones, materiales:datos.materiales, actividades:datos.actividades, incidencias:datos.incidencias||[], numIncidencias:datos.numIncidencias||0, ips:datos.ips, detalles:datos.detalles, cuadrillaId:cuadrillaHoyId })
+    });
+    const data = await res.json();
+    if (data.ok) { toast('✓ Reporte guardado'); limpiarFormulario(); }
+    else toast('Error: ' + data.error);
+  } catch(e) { toast('Error de conexión: ' + e.message); }
 }
 
 function limpiarFormulario() {
-  document.getElementById('observaciones').value='';
-  const f=document.getElementById('fecha'); if(f) f.value=fechaLocal();
+  document.getElementById('observaciones').value = '';
+  const f = document.getElementById('fecha'); if (f) f.value = fechaLocal();
   actividadesSeleccionadas.clear();
-  document.querySelectorAll('.actividad-btn').forEach(b=>b.classList.remove('selected'));
-  document.querySelectorAll('.act-panel').forEach(p=>p.style.display='none');
-  document.querySelectorAll('.inp-field').forEach(el=>el.value='');
-  document.querySelectorAll('.sel-field').forEach(el=>el.selectedIndex=0);
-  document.querySelectorAll('.tag-check input[type="checkbox"]').forEach(cb=>cb.checked=false);
-  document.querySelectorAll('#rep-ardilla,#rep-arrancada,#rep-atenuacion,#fr-conector-upc,#fr-conector-apc,#fr-fibra').forEach(cb=>cb.checked=false);
-  document.querySelectorAll('[id^="subpanel-"]').forEach(p=>p.style.display='none');
-  document.querySelectorAll('[id^="ips-lista-"]').forEach(l=>l.innerHTML='');
-  ipCounters={};cajaGpsLat=null;cajaGpsLng=null;
-  const gpsStatus=document.getElementById('caja-gps-status');
-  if(gpsStatus){gpsStatus.textContent='Sin ubicación — la caja no se guardará en el mapa';gpsStatus.style.color='var(--muted)';}
-  distRegContador=0;
-  const drl=document.getElementById('dist-reg-lista'); if(drl) drl.innerHTML='';
-  const dp=document.getElementById('dist-reg-panel'); if(dp) dp.style.display='none';
-  const refReg=document.getElementById('caja-referencia-reg'); if(refReg) refReg.value='';
+  document.querySelectorAll('.actividad-btn').forEach(b => b.classList.remove('selected'));
+  document.querySelectorAll('.act-panel').forEach(p => p.style.display = 'none');
+  document.querySelectorAll('.inp-field').forEach(el => el.value = '');
+  document.querySelectorAll('.sel-field').forEach(el => el.selectedIndex = 0);
+  document.querySelectorAll('.tag-check input[type="checkbox"]').forEach(cb => cb.checked = false);
+  document.querySelectorAll('#rep-ardilla,#rep-arrancada,#rep-atenuacion,#fr-conector-upc,#fr-conector-apc,#fr-fibra').forEach(cb => cb.checked = false);
+  document.querySelectorAll('[id^="subpanel-"]').forEach(p => p.style.display = 'none');
+  document.querySelectorAll('[id^="ips-lista-"]').forEach(l => l.innerHTML = '');
+  ipCounters = {}; cajaGpsLat = null; cajaGpsLng = null;
+  const gs = document.getElementById('caja-gps-status');
+  if (gs) { gs.textContent = 'Sin ubicación — la caja no se guardará en el mapa'; gs.style.color = 'var(--muted)'; }
+  distRegContador = 0;
+  const drl = document.getElementById('dist-reg-lista'); if (drl) drl.innerHTML = '';
+  const dp = document.getElementById('dist-reg-panel'); if (dp) dp.style.display = 'none';
+  const rr = document.getElementById('caja-referencia-reg'); if (rr) rr.value = '';
 }
 
 function toggleActividad(id) {
-  const btn=document.getElementById('act-'+id); const panel=document.getElementById('panel-'+id);
-  if(actividadesSeleccionadas.has(id)){actividadesSeleccionadas.delete(id);btn.classList.remove('selected');if(panel)panel.style.display='none';}
-  else{actividadesSeleccionadas.add(id);btn.classList.add('selected');if(panel)panel.style.display='block';}
+  const btn = document.getElementById('act-' + id);
+  const panel = document.getElementById('panel-' + id);
+  if (actividadesSeleccionadas.has(id)) { actividadesSeleccionadas.delete(id); btn.classList.remove('selected'); if (panel) panel.style.display = 'none'; }
+  else { actividadesSeleccionadas.add(id); btn.classList.add('selected'); if (panel) panel.style.display = 'block'; }
 }
 function toggleIncPanel(tipo) {
-  const cb=document.getElementById(`inc-${tipo}`); const panel=document.getElementById(`subpanel-${tipo}`);
-  if(panel) panel.style.display=cb.checked?'block':'none';
+  const cb = document.getElementById(`inc-${tipo}`);
+  const panel = document.getElementById(`subpanel-${tipo}`);
+  if (panel) panel.style.display = cb.checked ? 'block' : 'none';
 }
 
 // ── Historial ─────────────────────────────────────────────
 async function cargarHistorial() {
-  try{const res=await fetch('/api/reportes');todosLosReportes=await res.json();renderHistorial(todosLosReportes);}
-  catch(e){document.getElementById('lista-reportes').innerHTML='<p class="empty">Error al conectar.</p>';}
+  try { const res = await fetch('/api/reportes'); todosLosReportes = await res.json(); renderHistorial(todosLosReportes); }
+  catch(e) { document.getElementById('lista-reportes').innerHTML = '<p class="empty">Error al conectar.</p>'; }
 }
 function filtrarHistorial() {
-  const q=document.getElementById('buscar-fecha').value.trim().toLowerCase();
-  renderHistorial(todosLosReportes.filter(r=>r.fecha.includes(q)));
+  const q = document.getElementById('buscar-fecha').value.trim().toLowerCase();
+  renderHistorial(todosLosReportes.filter(r => r.fecha.includes(q)));
 }
 
 function renderDistribucionAgrupada(distribucion) {
-  if(!distribucion?.length) return '';
-  const porBuffer={};
-  distribucion.forEach(d=>{const key=d.bufferId?`${d.buffer} ${d.bufferId}`:d.buffer;if(!porBuffer[key])porBuffer[key]={color:d.buffer,hilos:[]};porBuffer[key].hilos.push(d);});
+  if (!distribucion?.length) return '';
+  const porBuffer = {};
+  distribucion.forEach(d => { const key = d.bufferId ? `${d.buffer} ${d.bufferId}` : d.buffer; if (!porBuffer[key]) porBuffer[key] = { color:d.buffer, hilos:[] }; porBuffer[key].hilos.push(d); });
   return `<div style="margin-top:4px;padding:6px 10px;background:var(--surface2);border-radius:6px;">
     <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);margin-bottom:4px;">📡 Distribución</div>
-    ${Object.entries(porBuffer).map(([label,grupo])=>{
-      const bc=COLOR_BUFFER[grupo.color]||'#6b7280';
+    ${Object.entries(porBuffer).map(([label, grupo]) => {
+      const bc = COLOR_BUFFER[grupo.color] || '#6b7280';
       return `<div style="margin-bottom:3px;font-size:11px;">
         <span style="display:inline-flex;align-items:center;gap:3px;"><span style="width:7px;height:7px;background:${bc};border-radius:50%;display:inline-block;"></span><strong style="color:var(--text);">Buffer ${label}:</strong></span>
-        ${grupo.hilos.map(d=>{const hc=COLOR_BUFFER[d.hilo]||'#6b7280';return `<span style="display:inline-flex;align-items:center;gap:2px;margin-left:6px;"><span style="width:6px;height:6px;background:${hc};border-radius:50%;display:inline-block;"></span><span style="color:var(--text);">${d.hilo}</span>${d.destino?`<span style="color:var(--muted);"> → ${d.destino}</span>`:''}</span>`;}).join('')}
+        ${grupo.hilos.map(d => { const hc = COLOR_BUFFER[d.hilo]||'#6b7280'; return `<span style="display:inline-flex;align-items:center;gap:2px;margin-left:6px;"><span style="width:6px;height:6px;background:${hc};border-radius:50%;display:inline-block;"></span><span style="color:var(--text);">${d.hilo}</span>${d.destino?`<span style="color:var(--muted);"> → ${d.destino}</span>`:''}</span>`; }).join('')}
       </div>`;
     }).join('')}
   </div>`;
 }
 
 function renderDetallesHistorial(detalles) {
-  if(!detalles) return '';
-  let html='';
-  if(detalles.fibra?.metros>0) html+=`<div style="font-size:12px;color:var(--muted);margin-bottom:6px;">📡 Fibra: <strong style="color:var(--text);">${detalles.fibra.metros}m pasados</strong></div>`;
-  if(detalles.cajas){
-    const c=detalles.cajas; const bufColor=COLOR_BUFFER[c.buffer]||'#6b7280';
-    html+=`<div style="font-size:12px;color:var(--muted);margin-bottom:4px;">📦 Caja: <strong style="color:var(--text);">${c.tipo||'—'}</strong>
-      ${c.buffer?`· <span style="display:inline-flex;align-items:center;gap:3px;"><span style="width:8px;height:8px;background:${bufColor};border-radius:50%;display:inline-block;"></span>Buffer ${c.buffer}</span>`:''}
-      ${c.hilo?`· Hilo: <strong style="color:var(--text);">${c.hilo}</strong>`:''}
-      · Puertos: <strong style="color:var(--text);">${c.puertosOcupados||0}/${c.totalPuertos||16}</strong>${c.lat?'· 📍 En mapa':''}</div>`;
-    if(c.distribucion?.length>0) html+=renderDistribucionAgrupada(c.distribucion);
+  if (!detalles) return '';
+  let html = '';
+  if (detalles.fibra?.metros > 0) html += `<div style="font-size:12px;color:var(--muted);margin-bottom:6px;">📡 Fibra: <strong style="color:var(--text);">${detalles.fibra.metros}m pasados</strong></div>`;
+  if (detalles.cajas) {
+    const c = detalles.cajas; const bufColor = COLOR_BUFFER[c.buffer] || '#6b7280';
+    html += `<div style="font-size:12px;color:var(--muted);margin-bottom:4px;">📦 Caja: <strong style="color:var(--text);">${c.tipo||'—'}</strong>${c.buffer?`· <span style="display:inline-flex;align-items:center;gap:3px;"><span style="width:8px;height:8px;background:${bufColor};border-radius:50%;display:inline-block;"></span>Buffer ${c.buffer}</span>`:''}${c.hilo?`· Hilo: <strong style="color:var(--text);">${c.hilo}</strong>`:''}· Puertos: <strong style="color:var(--text);">${c.puertosOcupados||0}/${c.totalPuertos||16}</strong>${c.lat?'· 📍 En mapa':''}</div>`;
+    if (c.distribucion?.length > 0) html += renderDistribucionAgrupada(c.distribucion);
   }
-  if(detalles.mudanza) html+=`<div style="font-size:12px;color:var(--muted);margin-bottom:6px;">🔄 Mudanza: <strong style="color:var(--text);">${detalles.mudanza.antenas}</strong> antenas · <strong style="color:var(--text);">${detalles.mudanza.routers}</strong> routers retirados</div>`;
-  if(detalles.odf){const o=detalles.odf;html+=`<div style="font-size:12px;color:var(--muted);margin-bottom:6px;">🗄️ ODF — Nodo: <strong style="color:var(--text);">${o.nodo||'—'}</strong> · ${o.hilos} hilos ${o.linea?`· Línea: ${o.linea}`:''} ${o.obs?`· ${o.obs}`:''}</div>`;}
-  if(detalles.mangas){const m=detalles.mangas;html+=`<div style="font-size:12px;color:var(--muted);margin-bottom:6px;">🔧 Manga: <strong style="color:var(--text);">${m.hilos} hilos</strong> ${m.sector?`· Sector: ${m.sector}`:''} ${m.buffer?`· Buffer: ${m.buffer}`:''}</div>`;}
-  if(detalles.incidencias?.tipos?.length>0){detalles.incidencias.tipos.forEach(t=>{const info=INCIDENCIAS_TIPOS[t.tipo]||{label:t.tipo,icon:'⚠️'};html+=`<div style="font-size:12px;color:var(--muted);margin-bottom:4px;">${info.icon} ${info.label}${t.desc?`· <em style="color:var(--text);">${t.desc}</em>`:''}${t.daños?`· Daños: ${[t.daños.conectorUpc?'UPC':'',t.daños.conectorApc?'APC':'',t.daños.fibra?'Fibra':''].filter(Boolean).join(', ')}`:''}</div>`;});}
-  if(detalles.reparacion){const r=detalles.reparacion;const daños=[r.ardilla?'🐿️ Ardilla':'',r.arrancada?'✂️ Arrancada':'',r.atenuacion?'📉 Atenuación':''].filter(Boolean).join(', ');html+=`<div style="font-size:12px;color:var(--muted);margin-bottom:6px;">🛠️ Reparación: ${daños||'—'} ${r.sector?`· Sector: <strong style="color:var(--text);">${r.sector}</strong>`:''} · ${r.hilos} hilos ${r.buffer?`· Buffer: ${r.buffer}`:''} ${r.up?`· Quedó up: <strong style="color:var(--accent);">${r.up}</strong>`:''}</div>`;}
-  return html?`<div style="background:var(--surface);border-radius:8px;padding:10px 12px;margin-bottom:10px;border:1px solid var(--border);">${html}</div>`:'';
+  if (detalles.mudanza) html += `<div style="font-size:12px;color:var(--muted);margin-bottom:6px;">🔄 Mudanza: <strong style="color:var(--text);">${detalles.mudanza.antenas}</strong> antenas · <strong style="color:var(--text);">${detalles.mudanza.routers}</strong> routers</div>`;
+  if (detalles.odf) { const o = detalles.odf; html += `<div style="font-size:12px;color:var(--muted);margin-bottom:6px;">🗄️ ODF — Nodo: <strong style="color:var(--text);">${o.nodo||'—'}</strong> · ${o.hilos} hilos${o.linea?` · Línea: ${o.linea}`:''}${o.obs?` · ${o.obs}`:''}</div>`; }
+  if (detalles.mangas) { const m = detalles.mangas; html += `<div style="font-size:12px;color:var(--muted);margin-bottom:6px;">🔧 Manga: <strong style="color:var(--text);">${m.hilos} hilos</strong>${m.sector?` · Sector: ${m.sector}`:''}${m.buffer?` · Buffer: ${m.buffer}`:''}</div>`; }
+  if (detalles.incidencias?.tipos?.length > 0) {
+    detalles.incidencias.tipos.forEach(t => {
+      const info = INCIDENCIAS_TIPOS[t.tipo] || { label:t.tipo, icon:'⚠️' };
+      html += `<div style="font-size:12px;color:var(--muted);margin-bottom:4px;">${info.icon} ${info.label}${t.desc?`· <em style="color:var(--text);">${t.desc}</em>`:''}${t.daños?`· Daños: ${[t.daños.conectorUpc?'UPC':'',t.daños.conectorApc?'APC':'',t.daños.fibra?'Fibra':''].filter(Boolean).join(', ')}`:''}</div>`;
+    });
+  }
+  if (detalles.reparacion) {
+    const r = detalles.reparacion;
+    const daños = [r.ardilla?'🐿️ Ardilla':'',r.arrancada?'✂️ Arrancada':'',r.atenuacion?'📉 Atenuación':''].filter(Boolean).join(', ');
+    html += `<div style="font-size:12px;color:var(--muted);margin-bottom:6px;">🛠️ Reparación: ${daños||'—'}${r.sector?` · Sector: <strong style="color:var(--text);">${r.sector}</strong>`:''}· ${r.hilos} hilos${r.buffer?` · Buffer: ${r.buffer}`:''}${r.up?` · Quedó up: <strong style="color:var(--accent);">${r.up}</strong>`:''}</div>`;
+  }
+  return html ? `<div style="background:var(--surface);border-radius:8px;padding:10px 12px;margin-bottom:10px;border:1px solid var(--border);">${html}</div>` : '';
 }
 
 function renderIPsHistorial(ips) {
-  if(!ips?.length) return '';
-  const grupos={};
-  ips.forEach(item=>{const key=item.tipo||'otro';if(!grupos[key])grupos[key]={label:item.label||key,icon:item.icon||'🌐',ips:[]};grupos[key].ips.push(item.ip||item);});
-  return `<div style="margin-bottom:10px;">
-    <div style="font-size:11px;color:var(--muted);text-transform:uppercase;margin-bottom:6px;">🌐 IPs de clientes</div>
-    ${Object.values(grupos).map(g=>`<div style="margin-bottom:6px;"><div style="font-size:11px;color:var(--muted);margin-bottom:3px;">${g.icon} ${g.label}</div>
-      <div style="display:flex;flex-wrap:wrap;gap:5px;">${g.ips.map(ip=>`<a href="http://${ip}" target="_blank" rel="noopener" style="font-size:12px;font-family:'IBM Plex Mono',monospace;background:var(--surface);border:1px solid var(--accent);border-radius:6px;padding:3px 10px;color:var(--accent);text-decoration:none;">${ip} ↗</a>`).join('')}</div></div>`).join('')}
+  if (!ips?.length) return '';
+  const grupos = {};
+  ips.forEach(item => { const key = item.tipo||'otro'; if (!grupos[key]) grupos[key] = { label:item.label||key, icon:item.icon||'🌐', ips:[] }; grupos[key].ips.push(item.ip||item); });
+  return `<div style="margin-bottom:10px;"><div style="font-size:11px;color:var(--muted);text-transform:uppercase;margin-bottom:6px;">🌐 IPs de clientes</div>
+    ${Object.values(grupos).map(g => `<div style="margin-bottom:6px;"><div style="font-size:11px;color:var(--muted);margin-bottom:3px;">${g.icon} ${g.label}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:5px;">${g.ips.map(ip => `<a href="http://${ip}" target="_blank" rel="noopener" style="font-size:12px;font-family:'IBM Plex Mono',monospace;background:var(--surface);border:1px solid var(--accent);border-radius:6px;padding:3px 10px;color:var(--accent);text-decoration:none;">${ip} ↗</a>`).join('')}</div></div>`).join('')}
   </div>`;
 }
 
 function renderHistorial(reportes) {
-  const cont=document.getElementById('lista-reportes');
-  if(!reportes.length){cont.innerHTML='<p class="empty">No hay reportes registrados.</p>';return;}
-  const dias=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
-  cont.innerHTML=reportes.map(r=>{
-    const d=new Date(r.fecha+'T12:00:00'); const dia=dias[d.getDay()];
-    const acts=(r.actividades||[]).map(a=>ACTIVIDADES_INFO[a]?`${ACTIVIDADES_INFO[a].icon} ${ACTIVIDADES_INFO[a].label}`:a).join(' · ');
-    const fotos=r.fotos||[]; const cuadrilla=todasLasCuadrillas.find(c=>c.id===r.cuadrillaId); const ips=r.ips||[];
+  const cont = document.getElementById('lista-reportes');
+  if (!reportes.length) { cont.innerHTML = '<p class="empty">No hay reportes registrados.</p>'; return; }
+  const dias = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+  cont.innerHTML = reportes.map(r => {
+    const d = new Date(r.fecha+'T12:00:00'); const dia = dias[d.getDay()];
+    const acts = (r.actividades||[]).map(a => ACTIVIDADES_INFO[a]?`${ACTIVIDADES_INFO[a].icon} ${ACTIVIDADES_INFO[a].label}`:a).join(' · ');
+    const fotos = r.fotos||[]; const cuadrilla = todasLasCuadrillas.find(c => c.id===r.cuadrillaId); const ips = r.ips||[];
     return `<div class="reporte-card">
       <div class="reporte-header" onclick="toggleReporte(${r.id})">
         <div>
@@ -585,113 +601,100 @@ function renderHistorial(reportes) {
   }).join('');
 }
 
-function toggleReporte(id){const body=document.getElementById('body-'+id),arrow=document.getElementById('arrow-'+id);const visible=body.style.display!=='none';body.style.display=visible?'none':'block';arrow.textContent=visible?'▼':'▲';}
-async function eliminarReporte(id){if(!confirm('¿Eliminar este reporte?'))return;await fetch('/api/reportes/'+id,{method:'DELETE'});toast('Reporte eliminado');cargarHistorial();}
-
-function editarReporte(id){
-  const r=todosLosReportes.find(x=>x.id===id);if(!r)return;
-  const overlay=document.createElement('div');overlay.style.cssText='position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);z-index:500;display:flex;align-items:center;justify-content:center;padding:1rem;';
+function toggleReporte(id) { const body=document.getElementById('body-'+id),arrow=document.getElementById('arrow-'+id); const visible=body.style.display!=='none'; body.style.display=visible?'none':'block'; arrow.textContent=visible?'▼':'▲'; }
+async function eliminarReporte(id) { if(!confirm('¿Eliminar este reporte?'))return; await fetch('/api/reportes/'+id,{method:'DELETE'}); toast('Reporte eliminado'); cargarHistorial(); }
+function editarReporte(id) {
+  const r=todosLosReportes.find(x=>x.id===id); if(!r)return;
+  const overlay=document.createElement('div'); overlay.style.cssText='position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);z-index:500;display:flex;align-items:center;justify-content:center;padding:1rem;';
   overlay.innerHTML=`<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.5rem;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;">
     <h3 style="color:var(--accent);font-size:13px;margin-bottom:1rem;font-family:'IBM Plex Mono',monospace;">✏️ Editar reporte</h3>
     <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:10px;"><label style="font-size:11px;color:var(--muted);text-transform:uppercase;">Fecha</label><input type="date" id="edit-fecha" value="${r.fecha}" style="background:var(--surface2);border:1px solid var(--border);border-radius:7px;color:var(--text);font-size:13px;padding:8px;outline:none;" /></div>
     <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:10px;"><label style="font-size:11px;color:var(--muted);text-transform:uppercase;">Observaciones</label><textarea id="edit-obs" style="background:var(--surface2);border:1px solid var(--border);border-radius:7px;color:var(--text);font-size:13px;padding:8px;outline:none;min-height:80px;resize:vertical;">${r.observaciones||''}</textarea></div>
     <div style="display:flex;gap:8px;"><button onclick="guardarEdicion(${id})" style="flex:1;background:var(--accent);color:#000;border:none;border-radius:8px;font-size:13px;font-weight:600;padding:10px;cursor:pointer;">Guardar</button><button onclick="this.closest('div[style*=fixed]').remove()" style="flex:1;background:none;border:1px solid var(--border);border-radius:8px;font-size:13px;color:var(--text);padding:10px;cursor:pointer;">Cancelar</button></div>
-  </div>`;
-  document.body.appendChild(overlay);
+  </div>`; document.body.appendChild(overlay);
 }
-async function guardarEdicion(id){const fecha=document.getElementById('edit-fecha').value;const observaciones=document.getElementById('edit-obs').value.trim();try{const res=await fetch('/api/reportes/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({fecha,observaciones})});const data=await res.json();if(data.ok){toast('✓ Reporte editado');document.querySelector('div[style*="position:fixed"]')?.remove();await cargarHistorial();}}catch(e){toast('Error al editar');}}
-
-function exportarReporteExcel(id){const r=todosLosReportes.find(x=>x.id===id);if(!r)return;const dias=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];const d=new Date(r.fecha+'T12:00:00');const acts=(r.actividades||[]).map(a=>ACTIVIDADES_INFO[a]?.label||a).join(', ');const ipsTexto=(r.ips||[]).map(i=>typeof i==='object'?`${i.label}: ${i.ip}`:i).join(' | ');let datos=(r.materiales||[]).map(m=>({'Fecha':r.fecha,'Día':dias[d.getDay()],'Actividades':acts,'Integrantes':(r.integrantes||[]).join(', '),'Material':m.material,'Cantidad':m.cantidad,'Unidad':m.unidad,'Observaciones':r.observaciones||'','IPs':ipsTexto}));if(!datos.length)datos=[{'Fecha':r.fecha,'Día':dias[d.getDay()],'Actividades':acts,'Integrantes':(r.integrantes||[]).join(', '),'Material':'—','Cantidad':0,'Unidad':'—','Observaciones':r.observaciones||'','IPs':ipsTexto}];const ws=XLSX.utils.json_to_sheet(datos);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Reporte');XLSX.writeFile(wb,`reporte_${r.fecha}.xlsx`);toast('✓ Excel descargado');}
-function exportarTodoExcel(){if(!todosLosReportes.length){toast('⚠ No hay reportes');return;}const dias=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];const filas=[];todosLosReportes.forEach(r=>{const d=new Date(r.fecha+'T12:00:00');const acts=(r.actividades||[]).map(a=>ACTIVIDADES_INFO[a]?.label||a).join(', ');const ipsTexto=(r.ips||[]).map(i=>typeof i==='object'?`${i.label}: ${i.ip}`:i).join(' | ');(r.materiales||[]).forEach(m=>{filas.push({'Fecha':r.fecha,'Día':dias[d.getDay()],'Actividades':acts,'Integrantes':(r.integrantes||[]).join(', '),'Material':m.material,'Cantidad':m.cantidad,'Unidad':m.unidad,'Observaciones':r.observaciones||'','IPs':ipsTexto});});});const ws=XLSX.utils.json_to_sheet(filas);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Historial');XLSX.writeFile(wb,`historial_${new Date().toISOString().slice(0,10)}.xlsx`);toast('✓ Historial exportado');}
-async function subirFotos(event,reporteId){const files=event.target.files;if(!files.length)return;const formData=new FormData();for(const file of files)formData.append('fotos',file);toast('⏳ Subiendo fotos...');try{const res=await fetch(`/api/reportes/${reporteId}/fotos`,{method:'POST',body:formData});const data=await res.json();if(data.ok){toast('✓ Fotos subidas');await cargarHistorial();}else{toast('Error: '+data.error);}}catch(e){toast('Error al subir fotos');}}
-async function eliminarFoto(reporteId,publicId){if(!confirm('¿Eliminar esta foto?'))return;try{const res=await fetch(`/api/reportes/${reporteId}/fotos/${encodeURIComponent(publicId)}`,{method:'DELETE'});const data=await res.json();if(data.ok){toast('Foto eliminada');await cargarHistorial();}}catch(e){toast('Error al eliminar foto');}}
-function verFoto(url){const overlay=document.createElement('div');overlay.style.cssText='position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.9);z-index:600;display:flex;align-items:center;justify-content:center;cursor:pointer;';overlay.innerHTML=`<img src="${url}" style="max-width:92%;max-height:92%;border-radius:8px;" />`;overlay.onclick=()=>document.body.removeChild(overlay);document.body.appendChild(overlay);}
+async function guardarEdicion(id) { const fecha=document.getElementById('edit-fecha').value; const obs=document.getElementById('edit-obs').value.trim(); try{const res=await fetch('/api/reportes/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({fecha,observaciones:obs})}); const data=await res.json(); if(data.ok){toast('✓ Reporte editado');document.querySelector('div[style*="position:fixed"]')?.remove();await cargarHistorial();}}catch(e){toast('Error al editar');} }
+function exportarReporteExcel(id) { const r=todosLosReportes.find(x=>x.id===id);if(!r)return;const dias=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];const d=new Date(r.fecha+'T12:00:00');const acts=(r.actividades||[]).map(a=>ACTIVIDADES_INFO[a]?.label||a).join(', ');const ipsTexto=(r.ips||[]).map(i=>typeof i==='object'?`${i.label}: ${i.ip}`:i).join(' | ');let datos=(r.materiales||[]).map(m=>({'Fecha':r.fecha,'Día':dias[d.getDay()],'Actividades':acts,'Integrantes':(r.integrantes||[]).join(', '),'Material':m.material,'Cantidad':m.cantidad,'Unidad':m.unidad,'Observaciones':r.observaciones||'','IPs':ipsTexto}));if(!datos.length)datos=[{'Fecha':r.fecha,'Día':dias[d.getDay()],'Actividades':acts,'Integrantes':(r.integrantes||[]).join(', '),'Material':'—','Cantidad':0,'Unidad':'—','Observaciones':r.observaciones||'','IPs':ipsTexto}];const ws=XLSX.utils.json_to_sheet(datos);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Reporte');XLSX.writeFile(wb,`reporte_${r.fecha}.xlsx`);toast('✓ Excel descargado'); }
+function exportarTodoExcel() { if(!todosLosReportes.length){toast('⚠ No hay reportes');return;}const dias=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];const filas=[];todosLosReportes.forEach(r=>{const d=new Date(r.fecha+'T12:00:00');const acts=(r.actividades||[]).map(a=>ACTIVIDADES_INFO[a]?.label||a).join(', ');const ipsTexto=(r.ips||[]).map(i=>typeof i==='object'?`${i.label}: ${i.ip}`:i).join(' | ');(r.materiales||[]).forEach(m=>{filas.push({'Fecha':r.fecha,'Día':dias[d.getDay()],'Actividades':acts,'Integrantes':(r.integrantes||[]).join(', '),'Material':m.material,'Cantidad':m.cantidad,'Unidad':m.unidad,'Observaciones':r.observaciones||'','IPs':ipsTexto});});});const ws=XLSX.utils.json_to_sheet(filas);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Historial');XLSX.writeFile(wb,`historial_${new Date().toISOString().slice(0,10)}.xlsx`);toast('✓ Historial exportado'); }
+async function subirFotos(event,reporteId) { const files=event.target.files;if(!files.length)return;const formData=new FormData();for(const file of files)formData.append('fotos',file);toast('⏳ Subiendo fotos...');try{const res=await fetch(`/api/reportes/${reporteId}/fotos`,{method:'POST',body:formData});const data=await res.json();if(data.ok){toast('✓ Fotos subidas');await cargarHistorial();}else{toast('Error: '+data.error);}}catch(e){toast('Error al subir fotos');} }
+async function eliminarFoto(reporteId,publicId) { if(!confirm('¿Eliminar esta foto?'))return;try{const res=await fetch(`/api/reportes/${reporteId}/fotos/${encodeURIComponent(publicId)}`,{method:'DELETE'});const data=await res.json();if(data.ok){toast('Foto eliminada');await cargarHistorial();}}catch(e){toast('Error al eliminar foto');} }
+function verFoto(url) { const overlay=document.createElement('div');overlay.style.cssText='position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.9);z-index:600;display:flex;align-items:center;justify-content:center;cursor:pointer;';overlay.innerHTML=`<img src="${url}" style="max-width:92%;max-height:92%;border-radius:8px;" />`;overlay.onclick=()=>document.body.removeChild(overlay);document.body.appendChild(overlay); }
 
 // ── Mapa ──────────────────────────────────────────────────
 async function iniciarMapa() {
   await cargarCajas();
   await cargarMangas();
   if (!mapaLeaflet) {
-    const lat=todasLasCajas.length>0?todasLasCajas[0].lat:todasLasMangas.length>0?todasLasMangas[0].lat:-1.0224;
-    const lng=todasLasCajas.length>0?todasLasCajas[0].lng:todasLasMangas.length>0?todasLasMangas[0].lng:-79.4604;
-    mapaLeaflet=L.map('mapa').setView([lat,lng],15);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap',maxZoom:19}).addTo(mapaLeaflet);
+    const lat = todasLasCajas.length>0 ? todasLasCajas[0].lat : todasLasMangas.length>0 ? todasLasMangas[0].lat : -1.0224;
+    const lng = todasLasCajas.length>0 ? todasLasCajas[0].lng : todasLasMangas.length>0 ? todasLasMangas[0].lng : -79.4604;
+    mapaLeaflet = L.map('mapa').setView([lat, lng], 15);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'© OpenStreetMap', maxZoom:19 }).addTo(mapaLeaflet);
 
-    // Ubicación en vivo
-    if(navigator.geolocation){
-      const iconoYo=L.divIcon({html:`<div style="width:16px;height:16px;background:#0099ff;border:3px solid #fff;border-radius:50%;box-shadow:0 0 0 4px rgba(0,153,255,0.25);"></div>`,className:'',iconSize:[16,16],iconAnchor:[8,8]});
-      const actualizarPosicion=(pos)=>{
-        const lat=pos.coords.latitude,lng=pos.coords.longitude,precision=pos.coords.accuracy;
-        if(marcadorYo){marcadorYo.setLatLng([lat,lng]);circuloYo.setLatLng([lat,lng]);circuloYo.setRadius(precision);}
-        else{marcadorYo=L.marker([lat,lng],{icon:iconoYo,zIndexOffset:1000}).addTo(mapaLeaflet).bindPopup(`<div style="font-family:'IBM Plex Sans',sans-serif;font-size:12px;"><strong>📍 Tu ubicación</strong><br><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;">${lat.toFixed(5)}, ${lng.toFixed(5)}</span><br><span style="color:#6b7280;">Precisión: ±${Math.round(precision)}m</span></div>`);circuloYo=L.circle([lat,lng],{radius:precision,color:'#0099ff',fillColor:'#0099ff',fillOpacity:0.08,weight:1}).addTo(mapaLeaflet);}
+    if (navigator.geolocation) {
+      const iconoYo = L.divIcon({ html:`<div style="width:16px;height:16px;background:#0099ff;border:3px solid #fff;border-radius:50%;box-shadow:0 0 0 4px rgba(0,153,255,0.25);"></div>`, className:'', iconSize:[16,16], iconAnchor:[8,8] });
+      const actualizarPosicion = pos => {
+        const lat=pos.coords.latitude, lng=pos.coords.longitude, precision=pos.coords.accuracy;
+        if (marcadorYo) { marcadorYo.setLatLng([lat,lng]); circuloYo.setLatLng([lat,lng]); circuloYo.setRadius(precision); }
+        else {
+          marcadorYo = L.marker([lat,lng],{icon:iconoYo,zIndexOffset:1000}).addTo(mapaLeaflet).bindPopup(`<div style="font-family:'IBM Plex Sans',sans-serif;font-size:12px;"><strong>📍 Tu ubicación</strong><br><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;">${lat.toFixed(5)}, ${lng.toFixed(5)}</span><br><span style="color:#6b7280;">Precisión: ±${Math.round(precision)}m</span></div>`);
+          circuloYo = L.circle([lat,lng],{radius:precision,color:'#0099ff',fillColor:'#0099ff',fillOpacity:0.08,weight:1}).addTo(mapaLeaflet);
+        }
       };
-      navigator.geolocation.watchPosition(actualizarPosicion,null,{enableHighAccuracy:true,maximumAge:10000});
+      navigator.geolocation.watchPosition(actualizarPosicion, null, {enableHighAccuracy:true, maximumAge:10000});
     }
 
-    mapaLeaflet.on('click',e=>{
-      if(modoSeleccionMapaManga){
-        mangaGpsLat=e.latlng.lat;mangaGpsLng=e.latlng.lng;
+    mapaLeaflet.on('click', e => {
+      if (modoSeleccionMapaManga) {
+        mangaGpsLat=e.latlng.lat; mangaGpsLng=e.latlng.lng;
         modoSeleccionMapaManga=false;
-        const lbl=document.getElementById('modo-seleccion-label');if(lbl)lbl.textContent='';
+        const lbl=document.getElementById('modo-seleccion-label'); if(lbl)lbl.textContent='';
         mapaLeaflet.getContainer().style.cursor='';
         const st=document.getElementById('manga-gps-status');
         if(st){st.innerHTML=`✅ Ubicación en mapa: <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;">${mangaGpsLat.toFixed(5)}, ${mangaGpsLng.toFixed(5)}</span>`;st.style.color='var(--accent)';}
         toast('✓ Ubicación de manga lista');
         return;
       }
-      if(modoSeleccionMapaCaja){
-        cajaGpsLat=e.latlng.lat;cajaGpsLng=e.latlng.lng;
+      if (modoSeleccionMapaCaja) {
+        cajaGpsLat=e.latlng.lat; cajaGpsLng=e.latlng.lng;
         modoSeleccionMapaCaja=false;
-        const lbl=document.getElementById('modo-seleccion-label');if(lbl)lbl.textContent='';
+        const lbl=document.getElementById('modo-seleccion-label'); if(lbl)lbl.textContent='';
         mapaLeaflet.getContainer().style.cursor='';
         toast('✓ Ubicación guardada — vuelve a Nuevo registro');
         mostrarTab('registro');
-        setTimeout(()=>{const status=document.getElementById('caja-gps-status');if(status){status.innerHTML=`✅ Ubicación en mapa: <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;">${cajaGpsLat.toFixed(5)}, ${cajaGpsLng.toFixed(5)}</span>`;status.style.color='var(--accent)';}},400);
+        setTimeout(()=>{const st=document.getElementById('caja-gps-status');if(st){st.innerHTML=`✅ Ubicación en mapa: <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;">${cajaGpsLat.toFixed(5)}, ${cajaGpsLng.toFixed(5)}</span>`;st.style.color='var(--accent)';}},400);
         return;
       }
-      if(!modoSeleccionMapa)return;
-      gpsLat=e.latlng.lat;gpsLng=e.latlng.lng;actualizarStatusGPS();
-      modoSeleccionMapa=false;const lbl=document.getElementById('modo-seleccion-label');if(lbl)lbl.textContent='';
-      mapaLeaflet.getContainer().style.cursor='';toast('✓ Ubicación seleccionada');
+      if (!modoSeleccionMapa) return;
+      gpsLat=e.latlng.lat; gpsLng=e.latlng.lng; actualizarStatusGPS();
+      modoSeleccionMapa=false;
+      const lbl=document.getElementById('modo-seleccion-label'); if(lbl)lbl.textContent='';
+      mapaLeaflet.getContainer().style.cursor=''; toast('✓ Ubicación seleccionada');
     });
   }
-  renderMarcadores();renderListaCajas();
-  if(rolActual==='trabajador'){const form=document.getElementById('mapa-trabajador-form');if(form)form.style.display='block';obtenerGPS();}
+  renderMarcadores(); renderListaCajas();
+  if (rolActual==='trabajador') { const form=document.getElementById('mapa-trabajador-form'); if(form)form.style.display='block'; obtenerGPS(); }
 }
 
-function activarSeleccionMapa(){modoSeleccionMapa=true;const lbl=document.getElementById('modo-seleccion-label');if(lbl)lbl.textContent='👆 Haz clic en el mapa para fijar la ubicación';mapaLeaflet.getContainer().style.cursor='crosshair';}
-function actualizarStatusGPS(){const status=document.getElementById('gps-status');if(!status)return;if(gpsLat!==null&&gpsLng!==null){status.innerHTML=`✅ Ubicación lista: <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;">${gpsLat.toFixed(5)}, ${gpsLng.toFixed(5)}</span><button onclick="activarSeleccionMapa()" style="margin-left:8px;font-size:11px;padding:2px 8px;border-radius:4px;border:1px solid var(--accent);color:var(--accent);background:none;cursor:pointer;">🗺️ Cambiar</button>`;status.style.color='var(--accent)';}}
-function obtenerGPS(){const status=document.getElementById('gps-status');if(!navigator.geolocation){if(status)status.innerHTML=`❌ GPS no disponible. <button onclick="activarSeleccionMapa()" style="font-size:11px;padding:2px 8px;border-radius:4px;border:1px solid var(--accent);color:var(--accent);background:none;cursor:pointer;">🗺️ Seleccionar</button>`;return;}if(status)status.textContent='⏳ Obteniendo GPS...';navigator.geolocation.getCurrentPosition(pos=>{gpsLat=pos.coords.latitude;gpsLng=pos.coords.longitude;actualizarStatusGPS();if(mapaLeaflet)mapaLeaflet.setView([gpsLat,gpsLng],17);},()=>{if(status)status.innerHTML=`⚠️ No se pudo obtener GPS. <button onclick="activarSeleccionMapa()" style="font-size:11px;padding:2px 8px;border-radius:4px;border:1px solid var(--accent);color:var(--accent);background:none;cursor:pointer;">🗺️ Seleccionar</button>`;},{enableHighAccuracy:true,timeout:10000});}
-function actualizarFormCaja(){const tipo=document.getElementById('caja-tipo').value;const panel=document.getElementById('distribucion-panel');if(panel)panel.style.display=tipo==='principal'?'block':'none';}
+function activarSeleccionMapa() { modoSeleccionMapa=true; const lbl=document.getElementById('modo-seleccion-label'); if(lbl)lbl.textContent='👆 Haz clic en el mapa para fijar la ubicación'; mapaLeaflet.getContainer().style.cursor='crosshair'; }
+function actualizarStatusGPS() { const status=document.getElementById('gps-status'); if(!status)return; if(gpsLat!==null&&gpsLng!==null){status.innerHTML=`✅ Ubicación lista: <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;">${gpsLat.toFixed(5)}, ${gpsLng.toFixed(5)}</span><button onclick="activarSeleccionMapa()" style="margin-left:8px;font-size:11px;padding:2px 8px;border-radius:4px;border:1px solid var(--accent);color:var(--accent);background:none;cursor:pointer;">🗺️ Cambiar</button>`;status.style.color='var(--accent)';} }
+function obtenerGPS() { const status=document.getElementById('gps-status'); if(!navigator.geolocation){if(status)status.innerHTML=`❌ GPS no disponible. <button onclick="activarSeleccionMapa()" style="font-size:11px;padding:2px 8px;border-radius:4px;border:1px solid var(--accent);color:var(--accent);background:none;cursor:pointer;">🗺️ Seleccionar</button>`;return;}if(status)status.textContent='⏳ Obteniendo GPS...';navigator.geolocation.getCurrentPosition(pos=>{gpsLat=pos.coords.latitude;gpsLng=pos.coords.longitude;actualizarStatusGPS();if(mapaLeaflet)mapaLeaflet.setView([gpsLat,gpsLng],17);},()=>{if(status)status.innerHTML=`⚠️ No se pudo obtener GPS. <button onclick="activarSeleccionMapa()" style="font-size:11px;padding:2px 8px;border-radius:4px;border:1px solid var(--accent);color:var(--accent);background:none;cursor:pointer;">🗺️ Seleccionar</button>`;},{enableHighAccuracy:true,timeout:10000}); }
+function actualizarFormCaja() { const tipo=document.getElementById('caja-tipo').value; const panel=document.getElementById('distribucion-panel'); if(panel)panel.style.display=tipo==='principal'?'block':'none'; }
 
 function selHilos(id,val=''){return `<select id="${id}" class="sel-field" style="flex:1;min-width:80px;"><option value="">Hilo...</option>${HILOS.map(h=>`<option value="${h}" ${val===h?'selected':''}>${h}</option>`).join('')}</select>`;}
 function selBuffers(id,val=''){return `<select id="${id}" class="sel-field" style="flex:1;min-width:80px;"><option value="">Buffer...</option>${BUFFERS.map(b=>`<option value="${b}" ${val===b?'selected':''}>${b}</option>`).join('')}</select>`;}
 
-function crearIconoManga() {
-  return L.divIcon({
-    html:`<div style="width:16px;height:16px;background:#E24B4A;border:2px solid #fff;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,0.5);"></div>`,
-    className:'',iconSize:[16,16],iconAnchor:[8,8]
-  });
-}
-
-function crearIcono(tipo){
-  const colores={principal:'#1D9E75',cliente:'#3B82F6',pasante:'#F59E0B'};
-  const color=colores[tipo]||'#6b7280';
-  return L.divIcon({html:`<div style="width:14px;height:14px;background:${color};border:2px solid #fff;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,0.4);"></div>`,className:'',iconSize:[14,14],iconAnchor:[7,7]});
-}
+function crearIconoManga() { return L.divIcon({html:`<div style="width:16px;height:16px;background:#E24B4A;border:2px solid #fff;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,0.5);"></div>`,className:'',iconSize:[16,16],iconAnchor:[8,8]}); }
+function crearIcono(tipo) { const colores={principal:'#1D9E75',cliente:'#3B82F6',pasante:'#F59E0B'}; const color=colores[tipo]||'#6b7280'; return L.divIcon({html:`<div style="width:14px;height:14px;background:${color};border:2px solid #fff;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,0.4);"></div>`,className:'',iconSize:[14,14],iconAnchor:[7,7]}); }
 
 function renderMarcadores() {
-  marcadoresMapa.forEach(m=>mapaLeaflet.removeLayer(m));
-  marcadoresMapa=[];
+  marcadoresMapa.forEach(m => mapaLeaflet.removeLayer(m));
+  marcadoresMapa = [];
 
-  // Cajas
-  const cajasFiltradas = filtroActivo==='todos'||filtroActivo==='manga' ? [] :
-    filtroActivo==='todos' ? todasLasCajas : todasLasCajas.filter(c=>c.tipo===filtroActivo);
-  const cajasAMostrar = (filtroActivo==='todos'||!['principal','cliente','pasante','manga'].includes(filtroActivo))
-    ? todasLasCajas
-    : filtroActivo==='manga' ? [] : todasLasCajas.filter(c=>c.tipo===filtroActivo);
+  const cajasAMostrar = (filtroActivo==='todos' || ['principal','cliente','pasante'].includes(filtroActivo))
+    ? (filtroActivo==='todos' ? todasLasCajas : todasLasCajas.filter(c=>c.tipo===filtroActivo))
+    : [];
 
-  cajasAMostrar.forEach(caja=>{
+  cajasAMostrar.forEach(caja => {
     const libres=caja.totalPuertos-caja.puertosOcupados;
     const pct=Math.round((caja.puertosOcupados/caja.totalPuertos)*100);
     const colorBarra=pct>=90?'#E24B4A':pct>=60?'#F59E0B':'#1D9E75';
@@ -711,47 +714,43 @@ function renderMarcadores() {
       <div style="font-size:11px;color:#6b7280;margin-top:6px;">Por: ${caja.registrado_por||'—'}</div>
       ${rolActual==='trabajador'?`<div style="margin-top:8px;display:flex;gap:6px;"><button onclick="editarCaja(${caja.id})" style="flex:1;font-size:11px;padding:4px;background:#1D9E75;color:#fff;border:none;border-radius:4px;cursor:pointer;">Editar</button><button onclick="eliminarCaja(${caja.id})" style="flex:1;font-size:11px;padding:4px;background:#E24B4A;color:#fff;border:none;border-radius:4px;cursor:pointer;">Eliminar</button></div>`:''}
     </div>`;
-    const marcador=L.marker([caja.lat,caja.lng],{icon:crearIcono(caja.tipo)}).addTo(mapaLeaflet).bindPopup(popup);
+    const marcador = L.marker([caja.lat,caja.lng],{icon:crearIcono(caja.tipo)}).addTo(mapaLeaflet).bindPopup(popup);
     marcadoresMapa.push(marcador);
   });
 
-  // Mangas
-  const mangasAMostrar = filtroActivo==='todos'||filtroActivo==='manga' ? todasLasMangas : [];
-  mangasAMostrar.forEach(manga=>{
-    let distPopupManga='';
+  const mangasAMostrar = (filtroActivo==='todos'||filtroActivo==='manga') ? todasLasMangas : [];
+  mangasAMostrar.forEach(manga => {
+    let distPopupManga = '';
     if(manga.distribucion?.length>0){
       const porBuffer={};manga.distribucion.forEach(d=>{const key=d.bufferId?`${d.buffer} ${d.bufferId}`:d.buffer;if(!porBuffer[key])porBuffer[key]={color:d.buffer,hilos:[]};porBuffer[key].hilos.push(d);});
       distPopupManga=`<div style="margin-top:8px;border-top:1px solid #e5e7eb;padding-top:6px;"><div style="font-size:11px;font-weight:600;margin-bottom:4px;">📡 Hilos fusionados</div>${Object.entries(porBuffer).map(([label,grupo])=>{const bc=COLOR_BUFFER[grupo.color]||'#6b7280';return `<div style="margin-bottom:4px;"><span style="font-size:11px;display:inline-flex;align-items:center;gap:3px;"><span style="width:7px;height:7px;background:${bc};border-radius:50%;display:inline-block;"></span><strong>Buffer ${label}:</strong></span>${grupo.hilos.map(d=>{const hc=COLOR_BUFFER[d.hilo]||'#6b7280';return `<span style="font-size:11px;display:inline-flex;align-items:center;gap:2px;margin-left:8px;"><span style="width:6px;height:6px;background:${hc};border-radius:50%;display:inline-block;"></span>${d.hilo}${d.destino?` → ${d.destino}`:''}</span>`;}).join('')}</div>`;}).join('')}</div>`;
     }
     const popup=`<div style="font-family:'IBM Plex Sans',sans-serif;min-width:200px;">
       <div style="font-weight:600;font-size:14px;margin-bottom:2px;">🔴 ${manga.nombre}</div>
-      <div style="font-size:12px;color:#E24B4A;margin-bottom:4px;font-weight:600;">Manga de fibra óptica</div>
+      <div style="font-size:12px;color:#E24B4A;font-weight:600;margin-bottom:4px;">Manga de fibra óptica</div>
       ${manga.sector?`<div style="font-size:12px;color:#6b7280;margin-bottom:4px;">📍 ${manga.sector}</div>`:''}
       <div style="font-size:12px;color:#6b7280;margin-bottom:8px;">Fibra: <strong style="color:#111;">${manga.tipoFibra} hilos</strong></div>
       ${distPopupManga}
       ${rolActual==='trabajador'?`<div style="margin-top:8px;"><button onclick="eliminarManga(${manga.id})" style="width:100%;font-size:11px;padding:4px;background:#E24B4A;color:#fff;border:none;border-radius:4px;cursor:pointer;">Eliminar manga</button></div>`:''}
     </div>`;
-    const marcador=L.marker([manga.lat,manga.lng],{icon:crearIconoManga()}).addTo(mapaLeaflet).bindPopup(popup);
+    const marcador = L.marker([manga.lat,manga.lng],{icon:crearIconoManga()}).addTo(mapaLeaflet).bindPopup(popup);
     marcadoresMapa.push(marcador);
   });
 }
 
 function renderListaCajas() {
-  const cont=document.getElementById('lista-cajas'); if(!cont) return;
-  const grupos={principal:[],cliente:[],pasante:[],manga:[]};
-
-  if(filtroActivo==='todos'||filtroActivo!=='manga') {
-    const cajasAMostrar=filtroActivo==='todos'?todasLasCajas:todasLasCajas.filter(c=>c.tipo===filtroActivo);
-    cajasAMostrar.forEach(c=>{if(grupos[c.tipo])grupos[c.tipo].push(c);else grupos.cliente.push(c);});
+  const cont = document.getElementById('lista-cajas'); if (!cont) return;
+  const grupos = { principal:[], cliente:[], pasante:[], manga:[] };
+  if (filtroActivo==='todos'||['principal','cliente','pasante'].includes(filtroActivo)) {
+    const cajasAMostrar = filtroActivo==='todos' ? todasLasCajas : todasLasCajas.filter(c=>c.tipo===filtroActivo);
+    cajasAMostrar.forEach(c => { if(grupos[c.tipo]) grupos[c.tipo].push(c); else grupos.cliente.push(c); });
   }
-  if(filtroActivo==='todos'||filtroActivo==='manga') {
-    grupos.manga=todasLasMangas;
-  }
+  if (filtroActivo==='todos'||filtroActivo==='manga') grupos.manga = todasLasMangas;
 
-  const renderGrupoLista=(tipo,lista)=>{
-    if(!lista.length) return '';
-    const esManga=tipo==='manga';
-    const info=esManga?{label:'Mangas',icon:'🔴',color:'#E24B4A'}:TIPO_CAJA[tipo];
+  const renderGrupoLista = (tipo, lista) => {
+    if (!lista.length) return '';
+    const esManga = tipo==='manga';
+    const info = esManga ? {label:'Mangas',icon:'🔴',color:'#E24B4A'} : TIPO_CAJA[tipo];
     return `<div style="margin-bottom:8px;">
       <div onclick="toggleGrupoCajas('${tipo}')" style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--surface);border:1px solid var(--border);border-radius:8px;cursor:pointer;user-select:none;">
         <div style="display:flex;align-items:center;gap:8px;">
@@ -762,9 +761,9 @@ function renderListaCajas() {
         <span id="arrow-cajas-${tipo}" style="color:var(--muted);font-size:14px;">▼</span>
       </div>
       <div id="grupo-cajas-${tipo}" style="display:none;padding-top:4px;">
-        ${lista.map(item=>{
-          if(esManga){
-            return `<div style="background:var(--surface2);border:1px solid #E24B4A30;border-radius:8px;padding:10px 12px;margin-bottom:4px;cursor:pointer;" onclick="irACaja(${item.lat},${item.lng})">
+        ${lista.map(item => {
+          if (esManga) {
+            return `<div style="background:var(--surface2);border:1px solid rgba(226,75,74,0.3);border-radius:8px;padding:10px 12px;margin-bottom:4px;cursor:pointer;" onclick="irACaja(${item.lat},${item.lng})">
               <div style="display:flex;align-items:flex-start;gap:10px;">
                 <div style="flex:1;min-width:0;">
                   <div style="font-size:13px;font-weight:500;color:var(--text);">🔴 ${item.nombre}</div>
@@ -776,7 +775,7 @@ function renderListaCajas() {
               </div>
             </div>`;
           }
-          const c=item;const libres=c.totalPuertos-c.puertosOcupados;const pct=Math.round((c.puertosOcupados/c.totalPuertos)*100);const colorBarra=pct>=90?'#E24B4A':pct>=60?'#F59E0B':'#1D9E75';const bufColor=COLOR_BUFFER[c.buffer]||'#6b7280';
+          const c=item; const libres=c.totalPuertos-c.puertosOcupados; const pct=Math.round((c.puertosOcupados/c.totalPuertos)*100); const colorBarra=pct>=90?'#E24B4A':pct>=60?'#F59E0B':'#1D9E75'; const bufColor=COLOR_BUFFER[c.buffer]||'#6b7280';
           return `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:4px;cursor:pointer;" onclick="irACaja(${c.lat},${c.lng})">
             <div style="display:flex;align-items:flex-start;gap:10px;">
               <div style="flex:1;min-width:0;">
@@ -793,28 +792,46 @@ function renderListaCajas() {
     </div>`;
   };
 
-  const total=grupos.principal.length+grupos.cliente.length+grupos.pasante.length+grupos.manga.length;
-  cont.innerHTML=`<div style="font-size:11px;color:var(--muted);margin-bottom:8px;">Total: ${total} punto${total!==1?'s':''} registrado${total!==1?'s':''}</div>
+  const total = grupos.principal.length+grupos.cliente.length+grupos.pasante.length+grupos.manga.length;
+  cont.innerHTML = `<div style="font-size:11px;color:var(--muted);margin-bottom:8px;">Total: ${total} punto${total!==1?'s':''} registrado${total!==1?'s':''}</div>
     ${renderGrupoLista('principal',grupos.principal)}
     ${renderGrupoLista('cliente',grupos.cliente)}
     ${renderGrupoLista('pasante',grupos.pasante)}
     ${renderGrupoLista('manga',grupos.manga)}`;
 }
 
-function toggleGrupoCajas(tipo){const grupo=document.getElementById(`grupo-cajas-${tipo}`);const arrow=document.getElementById(`arrow-cajas-${tipo}`);if(!grupo)return;const visible=grupo.style.display!=='none';grupo.style.display=visible?'none':'block';arrow.textContent=visible?'▼':'▲';}
-function irACaja(lat,lng){if(mapaLeaflet)mapaLeaflet.setView([lat,lng],18);}
+function toggleGrupoCajas(tipo) { const grupo=document.getElementById(`grupo-cajas-${tipo}`); const arrow=document.getElementById(`arrow-cajas-${tipo}`); if(!grupo)return; const visible=grupo.style.display!=='none'; grupo.style.display=visible?'none':'block'; arrow.textContent=visible?'▼':'▲'; }
+function irACaja(lat,lng) { if(mapaLeaflet) mapaLeaflet.setView([lat,lng],18); }
+function filtrarMapa(tipo) { filtroActivo=tipo; document.querySelectorAll('[id^="filtro-"]').forEach(btn=>{btn.style.background='none';btn.style.color='var(--muted)';btn.style.borderColor='var(--border)';}); const activo=document.getElementById('filtro-'+tipo); if(activo){activo.style.background=tipo==='manga'?'#E24B4A':'var(--accent)';activo.style.color='#000';activo.style.borderColor=tipo==='manga'?'#E24B4A':'var(--accent)';} renderMarcadores(); renderListaCajas(); }
+async function cargarCajas() { try{const res=await fetch('/api/cajas');todasLasCajas=await res.json();}catch(e){todasLasCajas=[];} }
+async function cargarMangas() { try{const res=await fetch('/api/mangas');todasLasMangas=await res.json();}catch(e){todasLasMangas=[];} }
 
-function filtrarMapa(tipo){
-  filtroActivo=tipo;
-  document.querySelectorAll('[id^="filtro-"]').forEach(btn=>{btn.style.background='none';btn.style.color='var(--muted)';btn.style.borderColor='var(--border)';});
-  const activo=document.getElementById('filtro-'+tipo);
-  if(activo){activo.style.background=tipo==='manga'?'#E24B4A':'var(--accent)';activo.style.color='#000';activo.style.borderColor=tipo==='manga'?'#E24B4A':'var(--accent)';}
-  renderMarcadores();renderListaCajas();
+async function registrarManga() {
+  const nombre = document.getElementById('manga-mapa-nombre')?.value.trim();
+  const sector = document.getElementById('manga-mapa-sector')?.value.trim();
+  const tipoFibra = document.getElementById('manga-mapa-tipo')?.value;
+  if (!nombre) { toast('⚠ Ingresa un nombre para la manga'); return; }
+  if (mangaGpsLat===null||mangaGpsLng===null) { toast('⚠ GPS obligatorio — obtén la ubicación primero'); return; }
+  const distribucion = getDistribucionManga();
+  try {
+    const res = await fetch('/api/mangas',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nombre,sector,tipoFibra,distribucion,lat:mangaGpsLat,lng:mangaGpsLng})});
+    const data = await res.json();
+    if (data.ok) {
+      toast('✓ Manga registrada');
+      document.getElementById('manga-mapa-nombre').value='';
+      document.getElementById('manga-mapa-sector').value='';
+      document.getElementById('manga-buffers-lista').innerHTML='';
+      mangaBufContador=0; mangaGpsLat=null; mangaGpsLng=null;
+      const st=document.getElementById('manga-gps-status');
+      if(st){st.textContent='📍 GPS obligatorio — usa el botón o haz clic en el mapa';st.style.color='var(--muted)';}
+      await cargarMangas(); renderMarcadores(); renderListaCajas();
+      if(mapaLeaflet) mapaLeaflet.setView([data.manga.lat,data.manga.lng],17);
+    } else { toast('Error: '+data.error); }
+  } catch(e) { toast('Error de conexión'); }
 }
+async function eliminarManga(id) { if(!confirm('¿Eliminar esta manga?'))return; try{await fetch('/api/mangas/'+id,{method:'DELETE'});toast('Manga eliminada');await cargarMangas();renderMarcadores();renderListaCajas();}catch(e){toast('Error al eliminar');} }
 
-async function cargarCajas(){try{const res=await fetch('/api/cajas');todasLasCajas=await res.json();}catch(e){todasLasCajas=[];}}
-
-async function registrarCaja(){
+async function registrarCaja() {
   if(gpsLat===null||gpsLng===null){toast('⚠ Obtén tu ubicación primero');return;}
   const tipo=document.getElementById('caja-tipo').value;
   const referencia=document.getElementById('caja-referencia').value.trim();
@@ -827,15 +844,12 @@ async function registrarCaja(){
   try{
     const res=await fetch('/api/cajas',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tipo,referencia,lat:gpsLat,lng:gpsLng,totalPuertos,puertosOcupados,buffer,hilo,distribucion})});
     const data=await res.json();
-    if(data.ok){
-      toast('✓ Punto registrado');
-      document.getElementById('caja-referencia').value='';document.getElementById('caja-total-puertos').value='16';document.getElementById('caja-puertos-ocupados').value='0';document.getElementById('caja-buffer').value='';document.getElementById('caja-hilo').value='';document.getElementById('distribucion-lista').innerHTML='';distMapaContador=0;
-      await cargarCajas();renderMarcadores();renderListaCajas();if(mapaLeaflet)mapaLeaflet.setView([gpsLat,gpsLng],17);
-    }else{toast('Error: '+data.error);}
+    if(data.ok){toast('✓ Punto registrado');document.getElementById('caja-referencia').value='';document.getElementById('caja-total-puertos').value='16';document.getElementById('caja-puertos-ocupados').value='0';document.getElementById('caja-buffer').value='';document.getElementById('caja-hilo').value='';document.getElementById('distribucion-lista').innerHTML='';distMapaContador=0;await cargarCajas();renderMarcadores();renderListaCajas();if(mapaLeaflet)mapaLeaflet.setView([gpsLat,gpsLng],17);}
+    else{toast('Error: '+data.error);}
   }catch(e){toast('Error de conexión');}
 }
 
-function editarCaja(id){
+function editarCaja(id) {
   const c=todasLasCajas.find(x=>x.id===id);if(!c)return;
   const esPrincipal=c.tipo==='principal';
   const distFilas=(c.distribucion||[]).map((d,i)=>{const iid=`edit-dist-${id}-${i}`;const bufferId=d.bufferId||'';return `<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;flex-wrap:wrap;" id="${iid}">${selBuffers(`edit-db-${id}-${i}`,d.buffer)}<input type="text" id="edit-dbid-${id}-${i}" placeholder="ID buffer..." value="${bufferId}" style="width:80px;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;padding:5px 8px;outline:none;" />${selHilos(`edit-dh-${id}-${i}`,d.hilo)}<input type="text" id="edit-dd-${id}-${i}" placeholder="Destino..." value="${d.destino||''}" style="flex:2;min-width:100px;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;padding:6px 8px;outline:none;" /><button onclick="document.getElementById('${iid}').remove()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;">✕</button></div>`;}).join('');
@@ -859,16 +873,8 @@ function editarCaja(id){
   </div>`;
   document.body.appendChild(overlay);
 }
-
 function agregarDistEdit(cajaId){if(!editDistMap[cajaId])editDistMap[cajaId]=100;editDistMap[cajaId]++;const idx=editDistMap[cajaId];const lista=document.getElementById(`edit-dist-lista-${cajaId}`);const div=document.createElement('div');div.style.cssText='display:flex;gap:6px;align-items:center;margin-bottom:6px;flex-wrap:wrap;';div.id=`edit-dist-${cajaId}-${idx}`;div.innerHTML=`${selBuffers(`edit-db-${cajaId}-${idx}`,'')}<input type="text" id="edit-dbid-${cajaId}-${idx}" placeholder="ID buffer..." style="width:80px;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;padding:5px 8px;outline:none;" />${selHilos(`edit-dh-${cajaId}-${idx}`,'')}<input type="text" id="edit-dd-${cajaId}-${idx}" placeholder="Destino..." style="flex:2;min-width:100px;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;padding:6px 8px;outline:none;" /><button onclick="document.getElementById('edit-dist-${cajaId}-${idx}').remove()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;">✕</button>`;lista.appendChild(div);}
-
-async function guardarEdicionCaja(id){
-  const tipo=document.getElementById('edit-caja-tipo').value;const referencia=document.getElementById('edit-caja-ref').value.trim();const totalPuertos=parseInt(document.getElementById('edit-caja-total').value);const puertosOcupados=parseInt(document.getElementById('edit-caja-ocupados').value);const buffer=document.getElementById('edit-caja-buffer').value;const hilo=document.getElementById('edit-caja-hilo').value;
-  const distLista=document.getElementById(`edit-dist-lista-${id}`);let distribucion=[];
-  if(distLista){distribucion=[...distLista.querySelectorAll('[id^="edit-dist-"]')].map(row=>{const rid=row.id.replace(`edit-dist-${id}-`,'');return{buffer:document.getElementById(`edit-db-${id}-${rid}`)?.value||'',bufferId:document.getElementById(`edit-dbid-${id}-${rid}`)?.value.trim()||'',hilo:document.getElementById(`edit-dh-${id}-${rid}`)?.value||'',destino:document.getElementById(`edit-dd-${id}-${rid}`)?.value.trim()||''};}).filter(d=>d.buffer||d.hilo||d.destino);}
-  if(!referencia){toast('⚠ Ingresa una referencia');return;}
-  try{const res=await fetch('/api/cajas/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({tipo,referencia,totalPuertos,puertosOcupados,buffer,hilo,distribucion})});const data=await res.json();if(data.ok){toast('✓ Punto actualizado');document.querySelector('div[style*="position:fixed"]')?.remove();await cargarCajas();renderMarcadores();renderListaCajas();}}catch(e){toast('Error al guardar');}
-}
+async function guardarEdicionCaja(id){const tipo=document.getElementById('edit-caja-tipo').value;const referencia=document.getElementById('edit-caja-ref').value.trim();const totalPuertos=parseInt(document.getElementById('edit-caja-total').value);const puertosOcupados=parseInt(document.getElementById('edit-caja-ocupados').value);const buffer=document.getElementById('edit-caja-buffer').value;const hilo=document.getElementById('edit-caja-hilo').value;const distLista=document.getElementById(`edit-dist-lista-${id}`);let distribucion=[];if(distLista){distribucion=[...distLista.querySelectorAll('[id^="edit-dist-"]')].map(row=>{const rid=row.id.replace(`edit-dist-${id}-`,'');return{buffer:document.getElementById(`edit-db-${id}-${rid}`)?.value||'',bufferId:document.getElementById(`edit-dbid-${id}-${rid}`)?.value.trim()||'',hilo:document.getElementById(`edit-dh-${id}-${rid}`)?.value||'',destino:document.getElementById(`edit-dd-${id}-${rid}`)?.value.trim()||''};}).filter(d=>d.buffer||d.hilo||d.destino);}if(!referencia){toast('⚠ Ingresa una referencia');return;}try{const res=await fetch('/api/cajas/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({tipo,referencia,totalPuertos,puertosOcupados,buffer,hilo,distribucion})});const data=await res.json();if(data.ok){toast('✓ Punto actualizado');document.querySelector('div[style*="position:fixed"]')?.remove();await cargarCajas();renderMarcadores();renderListaCajas();}}catch(e){toast('Error al guardar');}}
 async function eliminarCaja(id){if(!confirm('¿Eliminar este punto?'))return;try{await fetch('/api/cajas/'+id,{method:'DELETE'});toast('Punto eliminado');await cargarCajas();renderMarcadores();renderListaCajas();}catch(e){toast('Error al eliminar');}}
 
 // ── Cuadrillas ────────────────────────────────────────────
@@ -906,15 +912,159 @@ function exportarBodegaExcel(){if(!stockActual.length){toast('⚠ No hay stock')
 function getLunes(fecha){const d=new Date(fecha+'T12:00:00');const dia=d.getDay();const diff=dia===0?-6:1-dia;d.setDate(d.getDate()+diff);return d.toISOString().slice(0,10);}
 function getMat(reportes,label){return reportes.reduce((s,r)=>{const m=(r.materiales||[]).find(m=>m.material===label);return s+(m?m.cantidad:0);},0);}
 function barMeta(valor,meta){const pct=Math.min(Math.round(valor/meta*100),100);const c=valor>=meta?'#1D9E75':valor>=meta/2?'#BA7517':'#E24B4A';return `<div style="display:flex;align-items:center;gap:8px;"><div style="flex:1;height:7px;background:var(--surface2);border-radius:4px;overflow:hidden;"><div style="width:${pct}%;height:100%;background:${c};border-radius:4px;"></div></div><span style="font-size:11px;color:var(--muted);width:70px;text-align:right;">${valor} / ${meta}</span></div>`;}
-function calcularBadge(reportes,actividades,numPersonas=5,cuadrillaAsignada=false){if(reportes.length===0){if(cuadrillaAsignada)return{badge:'Sin reporte',color:'#fff',bg:'#A32D2D'};return{badge:'Sin registro',color:'var(--muted)',bg:'var(--surface2)';};}const fibra=getMat(reportes,'Fibra Principal');const cajas=getMat(reportes,'Cajas NAT');const numInc=reportes.reduce((s,r)=>s+(r.numIncidencias||0),0);const acts=new Set(actividades);if(numPersonas>=5&&fibra>=2000&&acts.has('fibra'))return{badge:'Productivo',color:'#3B6D11',bg:'#EAF3DE'};if(numPersonas===3&&fibra>=1500&&acts.has('fibra'))return{badge:'Productivo',color:'#3B6D11',bg:'#EAF3DE'};if(numPersonas>=5&&fibra>=500&&acts.has('fibra')&&acts.has('cajas')&&(acts.has('instalacion')||acts.has('mudanza')))return{badge:'Productivo',color:'#3B6D11',bg:'#EAF3DE'};if(numPersonas<=2&&cajas>=5&&acts.has('cajas'))return{badge:'Productivo',color:'#3B6D11',bg:'#EAF3DE'};if(numPersonas<=2&&acts.has('odf'))return{badge:'Productivo',color:'#3B6D11',bg:'#EAF3DE'};if(numPersonas<=2&&acts.has('mangas'))return{badge:'Productivo',color:'#3B6D11',bg:'#EAF3DE'};if(numPersonas<=2&&numInc>6&&acts.has('incidencias'))return{badge:'Productivo',color:'#3B6D11',bg:'#EAF3DE'};if(acts.has('instalacion'))return{badge:'Productivo',color:'#3B6D11',bg:'#EAF3DE'};if(acts.has('mudanza'))return{badge:'Productivo',color:'#3B6D11',bg:'#EAF3DE'};if(acts.has('reparacion'))return{badge:'Productivo',color:'#3B6D11',bg:'#EAF3DE'};if(fibra>0||cajas>0||numInc>0)return{badge:'Parcial',color:'#854F0B',bg:'#FAEEDA'};return{badge:'Bajo',color:'#A32D2D',bg:'#FCEBEB'};}
-async function iniciarIndicadores(){try{const res=await fetch('/api/reportes');todosLosReportes=await res.json();const semanas={};todosLosReportes.forEach(r=>{semanas[getLunes(r.fecha)]=true;});todasLasCuadrillas.forEach(c=>{semanas[getLunes(c.fecha)]=true;});const semanasOrdenadas=Object.keys(semanas).sort().reverse();const sel=document.getElementById('semana-select');sel.innerHTML=semanasOrdenadas.map(s=>{const lunes=new Date(s+'T12:00:00');const sabado=new Date(lunes);sabado.setDate(sabado.getDate()+5);return `<option value="${s}">${lunes.toLocaleDateString('es-EC',{day:'2-digit',month:'short'})} – ${sabado.toLocaleDateString('es-EC',{day:'2-digit',month:'short',year:'numeric'})}</option>`;}).join('');cargarIndicadores();}catch(e){document.getElementById('dias-semana').innerHTML='<p class="empty">Error al cargar.</p>';}}
-function cargarIndicadores(){semanaActual=document.getElementById('semana-select').value;if(!semanaActual)return;const inicio=new Date(semanaActual+'T12:00:00');const diasSemana=[];for(let i=0;i<6;i++){const d=new Date(inicio);d.setDate(d.getDate()+i);diasSemana.push(d.toISOString().slice(0,10));}const rpf={};todosLosReportes.forEach(r=>{if(!rpf[r.fecha])rpf[r.fecha]=[];rpf[r.fecha].push(r);});const nombres=['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];let diasProd=0,totalFibra=0,totalCajas=0,totalInst=0;diasSemana.slice(0,5).forEach(fecha=>{const reportes=rpf[fecha]||[];const actividades=[...new Set(reportes.flatMap(r=>r.actividades||[]))];const integrantes=[...new Set(reportes.flatMap(r=>r.integrantes||[]))];const numP=integrantes.length||5;const cuadrillaDia=todasLasCuadrillas.find(c=>c.fecha===fecha);const{badge}=calcularBadge(reportes,actividades,numP,!!cuadrillaDia);if(badge==='Productivo')diasProd++;totalFibra+=getMat(reportes,'Fibra Principal');totalCajas+=getMat(reportes,'Cajas NAT');if(actividades.includes('instalacion')&&reportes.length>0)totalInst++;});const tieneSab=(rpf[diasSemana[5]]||[]).length>0;
-document.getElementById('metricas-resumen').innerHTML=`<div style="background:var(--surface2);border-radius:8px;padding:1rem;"><div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Días productivos</div><div style="font-size:20px;font-weight:600;color:${diasProd>=4?'var(--accent)':diasProd>=2?'#f59e0b':'var(--danger)'};">${diasProd}/5</div><div style="font-size:11px;color:var(--muted);">Lun–Vie</div></div><div style="background:var(--surface2);border-radius:8px;padding:1rem;"><div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Fibra tendida</div><div style="font-size:20px;font-weight:600;">${totalFibra}m</div><div style="font-size:11px;color:var(--muted);">semana</div></div><div style="background:var(--surface2);border-radius:8px;padding:1rem;"><div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Cajas armadas</div><div style="font-size:20px;font-weight:600;">${totalCajas}</div><div style="font-size:11px;color:var(--muted);">semana</div></div><div style="background:var(--surface2);border-radius:8px;padding:1rem;"><div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Instalaciones</div><div style="font-size:20px;font-weight:600;color:var(--accent);">${totalInst}</div><div style="font-size:11px;color:var(--muted);">${tieneSab?'+ Sáb extra':'días'}</div></div>`;
-const cont=document.getElementById('dias-semana');cont.innerHTML=diasSemana.map((fecha,i)=>{const reportes=rpf[fecha]||[];const esSab=i===5;const actividades=[...new Set(reportes.flatMap(r=>r.actividades||[]))];const integrantes=[...new Set(reportes.flatMap(r=>r.integrantes||[]))];const numP=integrantes.length||5;const metaFibra=numP>=5?2000:numP===3?1500:Math.round(2000*numP/5);const fibra=getMat(reportes,'Fibra Principal');const cajas=getMat(reportes,'Cajas NAT');const numInc=reportes.reduce((s,r)=>s+(r.numIncidencias||0),0);const cuadrilla=todasLasCuadrillas.find(c=>reportes.some(r=>r.cuadrillaId===c.id));const cuadrillaDia=todasLasCuadrillas.find(c=>c.fecha===fecha);const allIps=reportes.flatMap(r=>r.ips||[]);let badgeInfo=esSab?{badge:'Extra',color:'#854F0B',bg:'#FAEEDA'}:calcularBadge(reportes,actividades,numP,!!cuadrillaDia);const obs=reportes.map(r=>r.observaciones).filter(Boolean);const actsHTML=actividades.length>0?`<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px;">${actividades.map(a=>ACTIVIDADES_INFO[a]?`<span style="font-size:11px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:3px 8px;">${ACTIVIDADES_INFO[a].icon} ${ACTIVIDADES_INFO[a].label}</span>`:'').join('')}</div>`:'';const todosMat=MATERIALES_STOCK.map(m=>({label:m.label,val:getMat(reportes,m.label),unidad:m.unidad})).filter(m=>m.val>0);
-return `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:1rem;margin-bottom:10px;"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;"><div><span style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600;color:var(--accent);">${nombres[i]}</span><span style="font-size:12px;color:var(--muted);margin-left:8px;">${fecha}</span>${numP<5&&!esSab&&reportes.length>0?`<span style="font-size:10px;background:#FAEEDA;color:#854F0B;padding:2px 6px;border-radius:10px;margin-left:6px;">👥 ${numP}/5</span>`:''}${esSab?'<span style="font-size:10px;background:var(--surface);border:1px solid var(--border);color:var(--muted);padding:2px 6px;border-radius:10px;margin-left:6px;">extra</span>':''}</div><span style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;background:${badgeInfo.bg};color:${badgeInfo.color};">${badgeInfo.badge}</span></div>
-${reportes.length===0?`${cuadrillaDia?`<div style="background:rgba(163,45,45,0.1);border:1px solid rgba(163,45,45,0.3);border-radius:8px;padding:1rem;text-align:center;"><div style="font-size:13px;font-weight:600;color:#ff6b6b;margin-bottom:6px;">⚠️ Sin reporte</div><div style="font-size:12px;color:var(--muted);margin-bottom:8px;">La cuadrilla <strong style="color:var(--text);">${cuadrillaDia.nombre}</strong> no registró actividad este día</div><div style="display:flex;flex-wrap:wrap;gap:5px;justify-content:center;">${cuadrillaDia.integrantes.map(i=>`<span style="font-size:11px;background:rgba(163,45,45,0.15);border:1px solid rgba(163,45,45,0.3);border-radius:20px;padding:2px 8px;color:#ff6b6b;">👷 ${i}</span>`).join('')}</div></div>`:'<p style="font-size:12px;color:var(--muted);text-align:center;padding:0.5rem 0;">Sin actividad registrada</p>'}`:`${cuadrilla?`<div style="font-size:12px;color:var(--accent);margin-bottom:8px;">🏷️ ${cuadrilla.nombre}</div>`:''}${actsHTML}${integrantes.length>0?`<div style="margin-bottom:8px;"><div style="font-size:11px;color:var(--muted);text-transform:uppercase;margin-bottom:3px;">👷 Integrantes</div><div style="font-size:13px;">${integrantes.join(', ')}</div></div>`:''}${obs.length>0?`<div style="margin-bottom:8px;background:var(--surface);border-left:3px solid var(--accent2);border-radius:0 6px 6px 0;padding:8px 12px;"><div style="font-size:11px;color:var(--muted);text-transform:uppercase;margin-bottom:2px;">📋 Observaciones</div><div style="font-size:13px;line-height:1.5;">${obs.join(' | ')}</div></div>`:''}${allIps.length>0?renderIPsHistorial(allIps):''}
-<div style="margin-bottom:10px;"><div style="font-size:11px;color:var(--muted);text-transform:uppercase;margin-bottom:8px;">📊 Rendimiento</div>${actividades.includes('fibra')?`<div style="margin-bottom:8px;"><div style="display:flex;justify-content:space-between;margin-bottom:3px;"><span style="font-size:12px;color:var(--text);">📡 Fibra</span><span style="font-size:11px;color:var(--muted);">meta: ${metaFibra}m</span></div>${barMeta(fibra,metaFibra)}</div>`:''}${actividades.includes('cajas')?`<div style="margin-bottom:8px;"><div style="display:flex;justify-content:space-between;margin-bottom:3px;"><span style="font-size:12px;color:var(--text);">📦 Cajas NAT</span><span style="font-size:11px;color:var(--muted);">meta: 5</span></div>${barMeta(cajas,5)}</div>`:''}${actividades.includes('incidencias')?`<div style="margin-bottom:8px;"><div style="display:flex;justify-content:space-between;margin-bottom:3px;"><span style="font-size:12px;color:var(--text);">⚠️ Incidencias</span><span style="font-size:11px;color:var(--muted);">meta: 6</span></div>${barMeta(numInc,6)}</div>`:''}${['instalacion','mudanza','odf','mangas','reparacion'].filter(a=>actividades.includes(a)).map(a=>`<div style="margin-bottom:8px;"><div style="display:flex;justify-content:space-between;margin-bottom:3px;"><span style="font-size:12px;color:var(--text);">${ACTIVIDADES_INFO[a].icon} ${ACTIVIDADES_INFO[a].label}</span><span style="font-size:11px;color:var(--accent);">✓ Productivo</span></div><div style="height:6px;background:#EAF3DE;border-radius:4px;"><div style="width:100%;height:100%;background:#1D9E75;border-radius:4px;"></div></div></div>`).join('')}</div>
-${todosMat.length>0?`<div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;margin-bottom:6px;">📦 Materiales</div><table style="width:100%;border-collapse:collapse;"><tbody>${todosMat.map(m=>`<tr><td style="font-size:12px;color:var(--text);padding:4px 8px 4px 0;width:140px;white-space:nowrap;">${m.label}</td><td style="padding:4px 6px;"><div style="height:5px;background:var(--surface);border-radius:3px;overflow:hidden;"><div style="width:100%;height:100%;background:#1D9E75;border-radius:3px;"></div></div></td><td style="font-size:12px;color:var(--muted);padding:4px 0;text-align:right;white-space:nowrap;width:70px;">${m.val} ${m.unidad}</td></tr>`).join('')}</tbody></table></div>`:''}
-`}</div>`;}).join('');
-const contMat=document.getElementById('top-materiales');const totalesMat={};diasSemana.forEach(fecha=>{(rpf[fecha]||[]).forEach(r=>{(r.materiales||[]).forEach(m=>{totalesMat[m.material]=(totalesMat[m.material]||0)+m.cantidad;});});});const sorted=Object.entries(totalesMat).sort((a,b)=>b[1]-a[1]);if(!sorted.length){contMat.innerHTML='<p class="empty">No hay materiales esta semana.</p>';return;}const max=sorted[0][1];contMat.innerHTML=sorted.map(([mat,cant])=>`<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><span style="font-size:12px;color:var(--muted);width:150px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${mat}</span><div style="flex:1;height:6px;background:var(--surface2);border-radius:3px;overflow:hidden;"><div style="width:${Math.round(cant/max*100)}%;height:100%;background:var(--accent);border-radius:3px;"></div></div><span style="font-size:12px;color:var(--muted);width:36px;text-align:right;">${cant}</span></div>`).join('');}
-function exportarInformeSemanal(){if(!semanaActual){toast('⚠ Selecciona una semana');return;}const inicio=new Date(semanaActual+'T12:00:00');const diasSemana=[];for(let i=0;i<6;i++){const d=new Date(inicio);d.setDate(d.getDate()+i);diasSemana.push(d.toISOString().slice(0,10));}const rpf={};todosLosReportes.forEach(r=>{if(!rpf[r.fecha])rpf[r.fecha]=[];rpf[r.fecha].push(r);});const nombres=['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];const wb=XLSX.utils.book_new();const filas=[];diasSemana.forEach((fecha,i)=>{const reportes=rpf[fecha]||[];const actividades=[...new Set(reportes.flatMap(r=>r.actividades||[]))];const integrantes=[...new Set(reportes.flatMap(r=>r.integrantes||[]))];const numP=integrantes.length||5;const cuadrillaDia=todasLasCuadrillas.find(c=>c.fecha===fecha);const{badge}=i===5?{badge:'Extra'}:calcularBadge(reportes,actividades,numP,!!cuadrillaDia);const allIps=reportes.flatMap(r=>r.ips||[]);filas.push({'Día':nombres[i],'Fecha':fecha,'Estado':badge,'Cuadrilla':cuadrillaDia?cuadrillaDia.nombre:'—','Personas':numP,'Actividades':actividades.map(a=>ACTIVIDADES_INFO[a]?.label||a).join(', ')||'—','Integrantes':integrantes.join(', ')||'—','Fibra (m)':getMat(reportes,'Fibra Principal'),'Cajas NAT':getMat(reportes,'Cajas NAT'),'Incidencias':reportes.reduce((s,r)=>s+(r.numIncidencias||0),0),'IPs':allIps.map(i=>typeof i==='object'?`${i.label}: ${i.ip}`:i).join(' | ')||'—','Observaciones':reportes.map(r=>r.observaciones).filter(Boolean).join(' | ')||'—'});});const ws=XLSX.utils.json_to_sheet(filas);XLSX.utils.book_append_sheet(wb,ws,'Resumen semanal');XLSX.writeFile(wb,`informe_semana_${semanaActual}.xlsx`);toast('✓ Informe exportado');}
+
+function calcularBadge(reportes, actividades, numPersonas=5, cuadrillaAsignada=false) {
+  if (reportes.length===0) {
+    if (cuadrillaAsignada) return { badge:'Sin reporte', color:'#fff', bg:'#A32D2D' };
+    return { badge:'Sin registro', color:'var(--muted)', bg:'var(--surface2)' };
+  }
+  const fibra = getMat(reportes,'Fibra Principal');
+  const cajas = getMat(reportes,'Cajas NAT');
+  const numInc = reportes.reduce((s,r)=>s+(r.numIncidencias||0),0);
+  const acts = new Set(actividades);
+  if (numPersonas>=5&&fibra>=2000&&acts.has('fibra')) return { badge:'Productivo', color:'#3B6D11', bg:'#EAF3DE' };
+  if (numPersonas===3&&fibra>=1500&&acts.has('fibra')) return { badge:'Productivo', color:'#3B6D11', bg:'#EAF3DE' };
+  if (numPersonas>=5&&fibra>=500&&acts.has('fibra')&&acts.has('cajas')&&(acts.has('instalacion')||acts.has('mudanza'))) return { badge:'Productivo', color:'#3B6D11', bg:'#EAF3DE' };
+  if (numPersonas<=2&&cajas>=5&&acts.has('cajas')) return { badge:'Productivo', color:'#3B6D11', bg:'#EAF3DE' };
+  if (numPersonas<=2&&acts.has('odf')) return { badge:'Productivo', color:'#3B6D11', bg:'#EAF3DE' };
+  if (numPersonas<=2&&acts.has('mangas')) return { badge:'Productivo', color:'#3B6D11', bg:'#EAF3DE' };
+  if (numPersonas<=2&&numInc>6&&acts.has('incidencias')) return { badge:'Productivo', color:'#3B6D11', bg:'#EAF3DE' };
+  if (acts.has('instalacion')) return { badge:'Productivo', color:'#3B6D11', bg:'#EAF3DE' };
+  if (acts.has('mudanza')) return { badge:'Productivo', color:'#3B6D11', bg:'#EAF3DE' };
+  if (acts.has('reparacion')) return { badge:'Productivo', color:'#3B6D11', bg:'#EAF3DE' };
+  if (fibra>0||cajas>0||numInc>0) return { badge:'Parcial', color:'#854F0B', bg:'#FAEEDA' };
+  return { badge:'Bajo', color:'#A32D2D', bg:'#FCEBEB' };
+}
+
+async function iniciarIndicadores() {
+  try {
+    const res = await fetch('/api/reportes');
+    todosLosReportes = await res.json();
+    const semanas = {};
+    todosLosReportes.forEach(r => { semanas[getLunes(r.fecha)] = true; });
+    todasLasCuadrillas.forEach(c => { semanas[getLunes(c.fecha)] = true; });
+    const semanasOrdenadas = Object.keys(semanas).sort().reverse();
+    const sel = document.getElementById('semana-select');
+    sel.innerHTML = semanasOrdenadas.map(s => {
+      const lunes = new Date(s+'T12:00:00'); const sabado = new Date(lunes); sabado.setDate(sabado.getDate()+5);
+      return `<option value="${s}">${lunes.toLocaleDateString('es-EC',{day:'2-digit',month:'short'})} – ${sabado.toLocaleDateString('es-EC',{day:'2-digit',month:'short',year:'numeric'})}</option>`;
+    }).join('');
+    cargarIndicadores();
+  } catch(e) { document.getElementById('dias-semana').innerHTML = '<p class="empty">Error al cargar.</p>'; }
+}
+
+function cargarIndicadores() {
+  semanaActual = document.getElementById('semana-select').value;
+  if (!semanaActual) return;
+  const inicio = new Date(semanaActual+'T12:00:00');
+  const diasSemana = [];
+  for (let i=0; i<6; i++) { const d=new Date(inicio); d.setDate(d.getDate()+i); diasSemana.push(d.toISOString().slice(0,10)); }
+  const rpf = {};
+  todosLosReportes.forEach(r => { if(!rpf[r.fecha])rpf[r.fecha]=[]; rpf[r.fecha].push(r); });
+  const nombres = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+  let diasProd=0, totalFibra=0, totalCajas=0, totalInst=0;
+  diasSemana.slice(0,5).forEach(fecha => {
+    const reportes=rpf[fecha]||[];
+    const actividades=[...new Set(reportes.flatMap(r=>r.actividades||[]))];
+    const integrantes=[...new Set(reportes.flatMap(r=>r.integrantes||[]))];
+    const numP=integrantes.length||5;
+    const cuadrillaDia=todasLasCuadrillas.find(c=>c.fecha===fecha);
+    const{badge}=calcularBadge(reportes,actividades,numP,!!cuadrillaDia);
+    if(badge==='Productivo')diasProd++;
+    totalFibra+=getMat(reportes,'Fibra Principal');
+    totalCajas+=getMat(reportes,'Cajas NAT');
+    if(actividades.includes('instalacion')&&reportes.length>0)totalInst++;
+  });
+  const tieneSab=(rpf[diasSemana[5]]||[]).length>0;
+  document.getElementById('metricas-resumen').innerHTML=`
+    <div style="background:var(--surface2);border-radius:8px;padding:1rem;"><div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Días productivos</div><div style="font-size:20px;font-weight:600;color:${diasProd>=4?'var(--accent)':diasProd>=2?'#f59e0b':'var(--danger)'};">${diasProd}/5</div><div style="font-size:11px;color:var(--muted);">Lun–Vie</div></div>
+    <div style="background:var(--surface2);border-radius:8px;padding:1rem;"><div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Fibra tendida</div><div style="font-size:20px;font-weight:600;">${totalFibra}m</div><div style="font-size:11px;color:var(--muted);">semana</div></div>
+    <div style="background:var(--surface2);border-radius:8px;padding:1rem;"><div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Cajas armadas</div><div style="font-size:20px;font-weight:600;">${totalCajas}</div><div style="font-size:11px;color:var(--muted);">semana</div></div>
+    <div style="background:var(--surface2);border-radius:8px;padding:1rem;"><div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Instalaciones</div><div style="font-size:20px;font-weight:600;color:var(--accent);">${totalInst}</div><div style="font-size:11px;color:var(--muted);">${tieneSab?'+ Sáb extra':'días'}</div></div>`;
+
+  const cont = document.getElementById('dias-semana');
+  cont.innerHTML = diasSemana.map((fecha,i) => {
+    const reportes=rpf[fecha]||[];
+    const esSab=i===5;
+    const actividades=[...new Set(reportes.flatMap(r=>r.actividades||[]))];
+    const integrantes=[...new Set(reportes.flatMap(r=>r.integrantes||[]))];
+    const numP=integrantes.length||5;
+    const metaFibra=numP>=5?2000:numP===3?1500:Math.round(2000*numP/5);
+    const fibra=getMat(reportes,'Fibra Principal');
+    const cajas=getMat(reportes,'Cajas NAT');
+    const numInc=reportes.reduce((s,r)=>s+(r.numIncidencias||0),0);
+    const cuadrilla=todasLasCuadrillas.find(c=>reportes.some(r=>r.cuadrillaId===c.id));
+    const cuadrillaDia=todasLasCuadrillas.find(c=>c.fecha===fecha);
+    const allIps=reportes.flatMap(r=>r.ips||[]);
+    const badgeInfo=esSab?{badge:'Extra',color:'#854F0B',bg:'#FAEEDA'}:calcularBadge(reportes,actividades,numP,!!cuadrillaDia);
+    const obs=reportes.map(r=>r.observaciones).filter(Boolean);
+    const actsHTML=actividades.length>0?`<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px;">${actividades.map(a=>ACTIVIDADES_INFO[a]?`<span style="font-size:11px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:3px 8px;">${ACTIVIDADES_INFO[a].icon} ${ACTIVIDADES_INFO[a].label}</span>`:'').join('')}</div>`:'';
+    const todosMat=MATERIALES_STOCK.map(m=>({label:m.label,val:getMat(reportes,m.label),unidad:m.unidad})).filter(m=>m.val>0);
+    return `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:1rem;margin-bottom:10px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <div>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600;color:var(--accent);">${nombres[i]}</span>
+          <span style="font-size:12px;color:var(--muted);margin-left:8px;">${fecha}</span>
+          ${numP<5&&!esSab&&reportes.length>0?`<span style="font-size:10px;background:#FAEEDA;color:#854F0B;padding:2px 6px;border-radius:10px;margin-left:6px;">👥 ${numP}/5</span>`:''}
+          ${esSab?'<span style="font-size:10px;background:var(--surface);border:1px solid var(--border);color:var(--muted);padding:2px 6px;border-radius:10px;margin-left:6px;">extra</span>':''}
+        </div>
+        <span style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;background:${badgeInfo.bg};color:${badgeInfo.color};">${badgeInfo.badge}</span>
+      </div>
+      ${reportes.length===0 ? `
+        ${cuadrillaDia?`<div style="background:rgba(163,45,45,0.1);border:1px solid rgba(163,45,45,0.3);border-radius:8px;padding:1rem;text-align:center;">
+          <div style="font-size:13px;font-weight:600;color:#ff6b6b;margin-bottom:6px;">⚠️ Sin reporte</div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">La cuadrilla <strong style="color:var(--text);">${cuadrillaDia.nombre}</strong> no registró actividad este día</div>
+          <div style="display:flex;flex-wrap:wrap;gap:5px;justify-content:center;">${cuadrillaDia.integrantes.map(i=>`<span style="font-size:11px;background:rgba(163,45,45,0.15);border:1px solid rgba(163,45,45,0.3);border-radius:20px;padding:2px 8px;color:#ff6b6b;">👷 ${i}</span>`).join('')}</div>
+        </div>`:'<p style="font-size:12px;color:var(--muted);text-align:center;padding:0.5rem 0;">Sin actividad registrada</p>'}
+      ` : `
+        ${cuadrilla?`<div style="font-size:12px;color:var(--accent);margin-bottom:8px;">🏷️ ${cuadrilla.nombre}</div>`:''}
+        ${actsHTML}
+        ${integrantes.length>0?`<div style="margin-bottom:8px;"><div style="font-size:11px;color:var(--muted);text-transform:uppercase;margin-bottom:3px;">👷 Integrantes</div><div style="font-size:13px;">${integrantes.join(', ')}</div></div>`:''}
+        ${obs.length>0?`<div style="margin-bottom:8px;background:var(--surface);border-left:3px solid var(--accent2);border-radius:0 6px 6px 0;padding:8px 12px;"><div style="font-size:11px;color:var(--muted);text-transform:uppercase;margin-bottom:2px;">📋 Observaciones</div><div style="font-size:13px;line-height:1.5;">${obs.join(' | ')}</div></div>`:''}
+        ${allIps.length>0?renderIPsHistorial(allIps):''}
+        <div style="margin-bottom:10px;">
+          <div style="font-size:11px;color:var(--muted);text-transform:uppercase;margin-bottom:8px;">📊 Rendimiento</div>
+          ${actividades.includes('fibra')?`<div style="margin-bottom:8px;"><div style="display:flex;justify-content:space-between;margin-bottom:3px;"><span style="font-size:12px;color:var(--text);">📡 Fibra</span><span style="font-size:11px;color:var(--muted);">meta: ${metaFibra}m</span></div>${barMeta(fibra,metaFibra)}</div>`:''}
+          ${actividades.includes('cajas')?`<div style="margin-bottom:8px;"><div style="display:flex;justify-content:space-between;margin-bottom:3px;"><span style="font-size:12px;color:var(--text);">📦 Cajas NAT</span><span style="font-size:11px;color:var(--muted);">meta: 5</span></div>${barMeta(cajas,5)}</div>`:''}
+          ${actividades.includes('incidencias')?`<div style="margin-bottom:8px;"><div style="display:flex;justify-content:space-between;margin-bottom:3px;"><span style="font-size:12px;color:var(--text);">⚠️ Incidencias</span><span style="font-size:11px;color:var(--muted);">meta: 6</span></div>${barMeta(numInc,6)}</div>`:''}
+          ${['instalacion','mudanza','odf','mangas','reparacion'].filter(a=>actividades.includes(a)).map(a=>`<div style="margin-bottom:8px;"><div style="display:flex;justify-content:space-between;margin-bottom:3px;"><span style="font-size:12px;color:var(--text);">${ACTIVIDADES_INFO[a].icon} ${ACTIVIDADES_INFO[a].label}</span><span style="font-size:11px;color:var(--accent);">✓ Productivo</span></div><div style="height:6px;background:#EAF3DE;border-radius:4px;"><div style="width:100%;height:100%;background:#1D9E75;border-radius:4px;"></div></div></div>`).join('')}
+        </div>
+        ${todosMat.length>0?`<div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;margin-bottom:6px;">📦 Materiales</div><table style="width:100%;border-collapse:collapse;"><tbody>${todosMat.map(m=>`<tr><td style="font-size:12px;color:var(--text);padding:4px 8px 4px 0;width:140px;white-space:nowrap;">${m.label}</td><td style="padding:4px 6px;"><div style="height:5px;background:var(--surface);border-radius:3px;overflow:hidden;"><div style="width:100%;height:100%;background:#1D9E75;border-radius:3px;"></div></div></td><td style="font-size:12px;color:var(--muted);padding:4px 0;text-align:right;white-space:nowrap;width:70px;">${m.val} ${m.unidad}</td></tr>`).join('')}</tbody></table></div>`:''}
+      `}
+    </div>`;
+  }).join('');
+
+  const contMat = document.getElementById('top-materiales');
+  const totalesMat = {};
+  diasSemana.forEach(fecha => { (rpf[fecha]||[]).forEach(r => { (r.materiales||[]).forEach(m => { totalesMat[m.material]=(totalesMat[m.material]||0)+m.cantidad; }); }); });
+  const sorted = Object.entries(totalesMat).sort((a,b)=>b[1]-a[1]);
+  if (!sorted.length) { contMat.innerHTML='<p class="empty">No hay materiales esta semana.</p>'; return; }
+  const max = sorted[0][1];
+  contMat.innerHTML = sorted.map(([mat,cant])=>`<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><span style="font-size:12px;color:var(--muted);width:150px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${mat}</span><div style="flex:1;height:6px;background:var(--surface2);border-radius:3px;overflow:hidden;"><div style="width:${Math.round(cant/max*100)}%;height:100%;background:var(--accent);border-radius:3px;"></div></div><span style="font-size:12px;color:var(--muted);width:36px;text-align:right;">${cant}</span></div>`).join('');
+}
+
+function exportarInformeSemanal() {
+  if(!semanaActual){toast('⚠ Selecciona una semana');return;}
+  const inicio=new Date(semanaActual+'T12:00:00');
+  const diasSemana=[];
+  for(let i=0;i<6;i++){const d=new Date(inicio);d.setDate(d.getDate()+i);diasSemana.push(d.toISOString().slice(0,10));}
+  const rpf={};
+  todosLosReportes.forEach(r=>{if(!rpf[r.fecha])rpf[r.fecha]=[];rpf[r.fecha].push(r);});
+  const nombres=['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+  const wb=XLSX.utils.book_new();
+  const filas=[];
+  diasSemana.forEach((fecha,i)=>{
+    const reportes=rpf[fecha]||[];
+    const actividades=[...new Set(reportes.flatMap(r=>r.actividades||[]))];
+    const integrantes=[...new Set(reportes.flatMap(r=>r.integrantes||[]))];
+    const numP=integrantes.length||5;
+    const cuadrillaDia=todasLasCuadrillas.find(c=>c.fecha===fecha);
+    const{badge}=i===5?{badge:'Extra'}:calcularBadge(reportes,actividades,numP,!!cuadrillaDia);
+    const allIps=reportes.flatMap(r=>r.ips||[]);
+    filas.push({'Día':nombres[i],'Fecha':fecha,'Estado':badge,'Cuadrilla':cuadrillaDia?cuadrillaDia.nombre:'—','Personas':numP,'Actividades':actividades.map(a=>ACTIVIDADES_INFO[a]?.label||a).join(', ')||'—','Integrantes':integrantes.join(', ')||'—','Fibra (m)':getMat(reportes,'Fibra Principal'),'Cajas NAT':getMat(reportes,'Cajas NAT'),'Incidencias':reportes.reduce((s,r)=>s+(r.numIncidencias||0),0),'IPs':allIps.map(i=>typeof i==='object'?`${i.label}: ${i.ip}`:i).join(' | ')||'—','Observaciones':reportes.map(r=>r.observaciones).filter(Boolean).join(' | ')||'—'});
+  });
+  const ws=XLSX.utils.json_to_sheet(filas);
+  XLSX.utils.book_append_sheet(wb,ws,'Resumen semanal');
+  XLSX.writeFile(wb,`informe_semana_${semanaActual}.xlsx`);
+  toast('✓ Informe exportado');
+}
