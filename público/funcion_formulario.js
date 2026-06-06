@@ -61,14 +61,11 @@ let gpsLat = null, gpsLng = null;
 let cajaGpsLat = null, cajaGpsLng = null;
 let mapaLeaflet = null;
 let marcadoresMapa = [];
-let marcadorYo = null;
-let circuloYo = null;
 let filtroActivo = 'todos';
 let modoSeleccionMapa = false;
 let modoSeleccionMapaCaja = false;
 let distContador = 0;
 let distRegContador = 0;
-let distMapaContador = 0;
 let editDistMap = {};
 
 // ── Fecha local ──────────────────────────────────────────
@@ -133,116 +130,82 @@ function toggleIncPanel(tipo) {
   if (panel) panel.style.display = cb.checked ? 'block' : 'none';
 }
 
-// ── Helper: render checkboxes de hilos ───────────────────
-function renderCheckboxesHilos(prefijo, grupoId) {
-  return HILOS.map(h => {
-    const hColor = COLOR_BUFFER[h] || '#6b7280';
-    return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap;">
-      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;min-width:110px;">
-        <input type="checkbox" id="${prefijo}-check-${grupoId}-${h}" style="accent-color:var(--accent);width:14px;height:14px;" />
-        <span style="display:flex;align-items:center;gap:4px;font-size:12px;color:var(--text);">
-          <span style="width:8px;height:8px;background:${hColor};border-radius:50%;display:inline-block;border:1px solid rgba(255,255,255,0.2);"></span>
-          ${h}
-        </span>
-      </label>
-      <input type="text" id="${prefijo}-dest-${grupoId}-${h}" placeholder="Destino (Caja 01, Pasante...)"
-        style="flex:1;min-width:130px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;padding:5px 8px;outline:none;" />
-    </div>`;
-  }).join('');
-}
-
-function renderGrupoBuffer(prefijo, id, bufferPreset = '', idPreset = '') {
-  const bufColor = COLOR_BUFFER[bufferPreset] || '#6b7280';
-  return `
-    <div id="${prefijo}-grupo-${id}" style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
-        <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;flex-shrink:0;">Buffer</label>
-        <select id="${prefijo}-buf-${id}" class="sel-field" style="flex:1;min-width:100px;"
-          onchange="actualizarHeaderBuffer('${prefijo}',${id})">
-          <option value="">Seleccionar...</option>
-          ${BUFFERS.map(b => `<option value="${b}" ${b===bufferPreset?'selected':''}>${b}</option>`).join('')}
-        </select>
-        <input type="text" id="${prefijo}-id-${id}" placeholder="ID (Ej: #1, Cable A...)" value="${idPreset}"
-          style="flex:1;min-width:90px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;padding:6px 8px;outline:none;"
-          oninput="actualizarHeaderBuffer('${prefijo}',${id})" />
-        <button onclick="document.getElementById('${prefijo}-grupo-${id}').remove()"
-          style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;flex-shrink:0;line-height:1;">✕</button>
-      </div>
-      <div id="${prefijo}-info-${id}" style="font-size:11px;color:var(--muted);margin-bottom:8px;display:flex;align-items:center;gap:5px;">
-        <span style="width:8px;height:8px;background:${bufColor};border-radius:50%;display:inline-block;"></span>
-        ${bufferPreset ? `Buffer ${bufferPreset}${idPreset?' '+idPreset:''} — marca los hilos que salen` : 'Selecciona un buffer para ver los hilos'}
-      </div>
-      <div id="${prefijo}-hilos-${id}" style="padding-left:4px;">
-        ${bufferPreset ? renderCheckboxesHilos(prefijo, id) : '<div style="font-size:12px;color:var(--muted);">Selecciona un buffer para continuar</div>'}
-      </div>
-    </div>`;
-}
-
-function actualizarHeaderBuffer(prefijo, grupoId) {
-  const buffer = document.getElementById(`${prefijo}-buf-${grupoId}`)?.value;
-  const bufferId = document.getElementById(`${prefijo}-id-${grupoId}`)?.value.trim() || '';
-  const infoEl = document.getElementById(`${prefijo}-info-${grupoId}`);
-  const hilosEl = document.getElementById(`${prefijo}-hilos-${grupoId}`);
-  if (!infoEl || !hilosEl) return;
-
-  if (!buffer) {
-    infoEl.innerHTML = `<span style="font-size:12px;color:var(--muted);">Selecciona un buffer para ver los hilos</span>`;
-    hilosEl.innerHTML = '<div style="font-size:12px;color:var(--muted);">Selecciona un buffer para continuar</div>';
-    return;
-  }
-
-  const bufColor = COLOR_BUFFER[buffer] || '#6b7280';
-  const label = bufferId ? `${buffer} ${bufferId}` : buffer;
-  infoEl.innerHTML = `
-    <span style="width:8px;height:8px;background:${bufColor};border-radius:50%;display:inline-block;"></span>
-    <strong style="color:var(--text);">Buffer ${label}</strong> — marca los hilos que salen de esta caja`;
-  hilosEl.innerHTML = renderCheckboxesHilos(prefijo, grupoId);
-}
-
-function getDistribucionDePrefijo(prefijo) {
-  const resultado = [];
-  document.querySelectorAll(`[id^="${prefijo}-grupo-"]`).forEach(grupo => {
-    const id = grupo.id.replace(`${prefijo}-grupo-`, '');
-    const buffer = document.getElementById(`${prefijo}-buf-${id}`)?.value;
-    const bufferId = document.getElementById(`${prefijo}-id-${id}`)?.value.trim() || '';
-    if (!buffer) return;
-    HILOS.forEach(h => {
-      const check = document.getElementById(`${prefijo}-check-${id}-${h}`);
-      if (check?.checked) {
-        const destino = document.getElementById(`${prefijo}-dest-${id}-${h}`)?.value.trim() || '';
-        resultado.push({ buffer, bufferId, hilo: h, destino });
-      }
-    });
-  });
-  return resultado;
-}
-
-// ── Distribución en REGISTRO ─────────────────────────────
+// ── Distribución de hilos en REGISTRO (por buffer) ───────
 function toggleDistribucionReg() {
   const tipo = document.getElementById('caja-tipo-reg')?.value;
   const panel = document.getElementById('dist-reg-panel');
   if (panel) panel.style.display = tipo === 'principal' ? 'block' : 'none';
 }
 
-function agregarDistReg() {
+function agregarDistReg(bufferPreset = '') {
   distRegContador++;
+  const id = distRegContador;
   const lista = document.getElementById('dist-reg-lista');
-  lista.insertAdjacentHTML('beforeend', renderGrupoBuffer('dreg', distRegContador));
+  const div = document.createElement('div');
+  div.id = `dreg-grupo-${id}`;
+  div.style.cssText = 'background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;';
+  div.innerHTML = `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+      <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;flex-shrink:0;">Buffer</label>
+      <select id="dreg-buf-${id}" class="sel-field" style="flex:1;" onchange="renderHilosBuffer(${id})">
+        <option value="">Seleccionar buffer...</option>
+        ${BUFFERS.map(b => `<option value="${b}" ${b===bufferPreset?'selected':''}>${b}</option>`).join('')}
+      </select>
+      <button onclick="document.getElementById('dreg-grupo-${id}').remove()"
+        style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;flex-shrink:0;line-height:1;">✕</button>
+    </div>
+    <div id="dreg-hilos-${id}" style="padding-left:4px;">
+      <div style="font-size:12px;color:var(--muted);">Selecciona un buffer para ver los hilos disponibles</div>
+    </div>`;
+  lista.appendChild(div);
+  if (bufferPreset) renderHilosBuffer(id);
+}
+
+function renderHilosBuffer(grupoId) {
+  const buffer = document.getElementById(`dreg-buf-${grupoId}`)?.value;
+  const cont = document.getElementById(`dreg-hilos-${grupoId}`);
+  if (!cont) return;
+  if (!buffer) {
+    cont.innerHTML = '<div style="font-size:12px;color:var(--muted);">Selecciona un buffer para ver los hilos</div>';
+    return;
+  }
+  const bufColor = COLOR_BUFFER[buffer] || '#6b7280';
+  cont.innerHTML = `
+    <div style="font-size:11px;color:var(--muted);margin-bottom:6px;display:flex;align-items:center;gap:5px;">
+      <span style="width:8px;height:8px;background:${bufColor};border-radius:50%;display:inline-block;"></span>
+      Hilos del buffer ${buffer} — marca los que salen de esta caja
+    </div>
+    ${HILOS.map(h => {
+      const hColor = COLOR_BUFFER[h] || '#6b7280';
+      return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap;">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;min-width:110px;">
+          <input type="checkbox" id="dreg-check-${grupoId}-${h}" style="accent-color:var(--accent);width:14px;height:14px;" />
+          <span style="display:flex;align-items:center;gap:4px;font-size:12px;color:var(--text);">
+            <span style="width:8px;height:8px;background:${hColor};border-radius:50%;display:inline-block;border:1px solid rgba(255,255,255,0.2);"></span>
+            ${h}
+          </span>
+        </label>
+        <input type="text" id="dreg-dest-${grupoId}-${h}" placeholder="Destino (Caja 01, Pasante...)"
+          style="flex:1;min-width:130px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;padding:5px 8px;outline:none;" />
+      </div>`;
+    }).join('')}`;
 }
 
 function getDistribucionReg() {
-  return getDistribucionDePrefijo('dreg');
-}
-
-// ── Distribución en MAPA ─────────────────────────────────
-function agregarDistMapa() {
-  distMapaContador++;
-  const lista = document.getElementById('distribucion-lista');
-  lista.insertAdjacentHTML('beforeend', renderGrupoBuffer('dmapa', distMapaContador));
-}
-
-function getDistribucionMapa() {
-  return getDistribucionDePrefijo('dmapa');
+  const resultado = [];
+  document.querySelectorAll('[id^="dreg-grupo-"]').forEach(grupo => {
+    const id = grupo.id.replace('dreg-grupo-', '');
+    const buffer = document.getElementById(`dreg-buf-${id}`)?.value;
+    if (!buffer) return;
+    HILOS.forEach(h => {
+      const check = document.getElementById(`dreg-check-${id}-${h}`);
+      if (check?.checked) {
+        const destino = document.getElementById(`dreg-dest-${id}-${h}`)?.value.trim() || '';
+        resultado.push({ buffer, hilo: h, destino });
+      }
+    });
+  });
+  return resultado;
 }
 
 // ── GPS de caja en registro ──────────────────────────────
@@ -448,6 +411,7 @@ function recopilarDatos() {
     };
   }
 
+  // Deduplicar materiales
   const matMap = {};
   datos.materiales.forEach(m => {
     if (matMap[m.material]) matMap[m.material].cantidad += m.cantidad;
@@ -462,24 +426,28 @@ async function guardarReporte() {
   const fecha = document.getElementById('fecha')?.value;
   if (!fecha) { toast('⚠ Selecciona la fecha'); return; }
   if (actividadesSeleccionadas.size === 0) { toast('⚠ Selecciona al menos una actividad'); return; }
+
   const observaciones = document.getElementById('observaciones')?.value.trim() || '';
   const cuadrilla = todasLasCuadrillas.find(c => c.id === cuadrillaHoyId);
   const integrantes = cuadrilla ? cuadrilla.integrantes : [];
   const datos = recopilarDatos();
 
+  // Guardar caja en mapa si tiene GPS
   if (actividadesSeleccionadas.has('cajas') && cajaGpsLat !== null && cajaGpsLng !== null) {
     const det = datos.detalles.cajas;
     const tipoLabel = det.tipo==='principal'?'Caja Principal':det.tipo==='cliente'?'Caja Cliente':'Pasante';
-    const refIngresada = document.getElementById('caja-referencia-reg')?.value.trim();
     try {
       await fetch('/api/cajas', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          tipo: det.tipo||'cliente',
-          referencia: refIngresada || `${tipoLabel} — ${fecha}`,
+          tipo: det.tipo || 'cliente',
+          referencia: `${tipoLabel} — ${fecha}`,
           lat: cajaGpsLat, lng: cajaGpsLng,
-          totalPuertos: det.totalPuertos, puertosOcupados: det.puertosOcupados,
-          buffer: det.buffer, hilo: det.hilo, distribucion: det.distribucion||[]
+          totalPuertos: det.totalPuertos,
+          puertosOcupados: det.puertosOcupados,
+          buffer: det.buffer, hilo: det.hilo,
+          distribucion: det.distribucion || []
         })
       });
     } catch(e) { console.error('Error guardando caja en mapa:', e); }
@@ -487,12 +455,17 @@ async function guardarReporte() {
 
   try {
     const res = await fetch('/api/reportes', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         fecha, integrantes, observaciones,
-        materiales: datos.materiales, actividades: datos.actividades,
-        incidencias: datos.incidencias||[], numIncidencias: datos.numIncidencias||0,
-        ips: datos.ips, detalles: datos.detalles, cuadrillaId: cuadrillaHoyId
+        materiales:     datos.materiales,
+        actividades:    datos.actividades,
+        incidencias:    datos.incidencias || [],
+        numIncidencias: datos.numIncidencias || 0,
+        ips:            datos.ips,
+        detalles:       datos.detalles,
+        cuadrillaId:    cuadrillaHoyId
       })
     });
     const data = await res.json();
@@ -522,8 +495,6 @@ function limpiarFormulario() {
   if (drl) drl.innerHTML = '';
   const dp = document.getElementById('dist-reg-panel');
   if (dp) dp.style.display = 'none';
-  const refReg = document.getElementById('caja-referencia-reg');
-  if (refReg) refReg.value = '';
 }
 
 // ── Historial ────────────────────────────────────────────
@@ -540,36 +511,6 @@ function filtrarHistorial() {
   renderHistorial(todosLosReportes.filter(r => r.fecha.includes(q)));
 }
 
-// ── Helper: render distribución agrupada por buffer ──────
-function renderDistribucionAgrupada(distribucion) {
-  if (!distribucion?.length) return '';
-  const porBuffer = {};
-  distribucion.forEach(d => {
-    const key = d.bufferId ? `${d.buffer} ${d.bufferId}` : d.buffer;
-    if (!porBuffer[key]) porBuffer[key] = { color: d.buffer, hilos: [] };
-    porBuffer[key].hilos.push(d);
-  });
-  return `<div style="margin-top:4px;padding:6px 10px;background:var(--surface2);border-radius:6px;">
-    <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);margin-bottom:4px;">📡 Distribución</div>
-    ${Object.entries(porBuffer).map(([label, grupo]) => {
-      const bc = COLOR_BUFFER[grupo.color] || '#6b7280';
-      return `<div style="margin-bottom:4px;font-size:11px;">
-        <span style="display:inline-flex;align-items:center;gap:3px;">
-          <span style="width:7px;height:7px;background:${bc};border-radius:50%;display:inline-block;"></span>
-          <strong style="color:var(--text);">Buffer ${label}:</strong>
-        </span>
-        ${grupo.hilos.map(d => {
-          const hc = COLOR_BUFFER[d.hilo]||'#6b7280';
-          return `<span style="display:inline-flex;align-items:center;gap:2px;margin-left:6px;">
-            <span style="width:6px;height:6px;background:${hc};border-radius:50%;display:inline-block;"></span>
-            <span style="color:var(--text);">${d.hilo}</span>${d.destino?`<span style="color:var(--muted);"> → ${d.destino}</span>`:''}
-          </span>`;
-        }).join('')}
-      </div>`;
-    }).join('')}
-  </div>`;
-}
-
 function renderDetallesHistorial(detalles) {
   if (!detalles) return '';
   let html = '';
@@ -579,7 +520,7 @@ function renderDetallesHistorial(detalles) {
   if (detalles.cajas) {
     const c = detalles.cajas;
     const bufColor = COLOR_BUFFER[c.buffer] || '#6b7280';
-    html += `<div style="font-size:12px;color:var(--muted);margin-bottom:4px;">
+    html += `<div style="font-size:12px;color:var(--muted);margin-bottom:6px;">
       📦 Caja: <strong style="color:var(--text);">${c.tipo||'—'}</strong>
       ${c.buffer?`· <span style="display:inline-flex;align-items:center;gap:3px;"><span style="width:8px;height:8px;background:${bufColor};border-radius:50%;display:inline-block;"></span>Buffer ${c.buffer}</span>`:''}
       ${c.hilo?`· Hilo: <strong style="color:var(--text);">${c.hilo}</strong>`:''}
@@ -587,7 +528,31 @@ function renderDetallesHistorial(detalles) {
       ${c.lat?'· 📍 En mapa':''}
     </div>`;
     if (c.distribucion?.length > 0) {
-      html += renderDistribucionAgrupada(c.distribucion);
+      // Agrupar por buffer para mostrar más limpio
+      const porBuffer = {};
+      c.distribucion.forEach(d => {
+        if (!porBuffer[d.buffer]) porBuffer[d.buffer] = [];
+        porBuffer[d.buffer].push(d);
+      });
+      html += `<div style="font-size:11px;color:var(--muted);margin-bottom:6px;margin-left:12px;padding:6px 10px;background:var(--surface2);border-radius:6px;">
+        <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px;">📡 Distribución de hilos</div>
+        ${Object.entries(porBuffer).map(([buf, hilos]) => {
+          const bc = COLOR_BUFFER[buf] || '#6b7280';
+          return `<div style="margin-bottom:4px;">
+            <span style="display:inline-flex;align-items:center;gap:3px;font-size:11px;">
+              <span style="width:7px;height:7px;background:${bc};border-radius:50%;display:inline-block;"></span>
+              <strong>Buffer ${buf}:</strong>
+            </span>
+            ${hilos.map(d => {
+              const hc = COLOR_BUFFER[d.hilo] || '#6b7280';
+              return `<span style="display:inline-flex;align-items:center;gap:2px;font-size:11px;margin-left:6px;">
+                <span style="width:6px;height:6px;background:${hc};border-radius:50%;display:inline-block;"></span>
+                ${d.hilo}${d.destino?` → ${d.destino}`:''}
+              </span>`;
+            }).join('')}
+          </div>`;
+        }).join('')}
+      </div>`;
     }
   }
   if (detalles.mudanza) {
@@ -599,18 +564,22 @@ function renderDetallesHistorial(detalles) {
     const o = detalles.odf;
     html += `<div style="font-size:12px;color:var(--muted);margin-bottom:6px;">
       🗄️ ODF — Nodo: <strong style="color:var(--text);">${o.nodo||'—'}</strong>
-      · ${o.hilos} hilos fusionados ${o.linea?`· Línea: ${o.linea}`:''} ${o.obs?`· ${o.obs}`:''}
+      · ${o.hilos} hilos fusionados
+      ${o.linea?`· Línea: ${o.linea}`:''}
+      ${o.obs?`· ${o.obs}`:''}
     </div>`;
   }
   if (detalles.mangas) {
     const m = detalles.mangas;
     html += `<div style="font-size:12px;color:var(--muted);margin-bottom:6px;">
-      🔧 Manga: <strong style="color:var(--text);">${m.hilos} hilos</strong> ${m.sector?`· Sector: ${m.sector}`:''} ${m.buffer?`· Buffer: ${m.buffer}`:''}
+      🔧 Manga: <strong style="color:var(--text);">${m.hilos} hilos</strong>
+      ${m.sector?`· Sector: ${m.sector}`:''}
+      ${m.buffer?`· Buffer: ${m.buffer}`:''}
     </div>`;
   }
   if (detalles.incidencias?.tipos?.length > 0) {
     detalles.incidencias.tipos.forEach(t => {
-      const info = INCIDENCIAS_TIPOS[t.tipo]||{ label:t.tipo, icon:'⚠️' };
+      const info = INCIDENCIAS_TIPOS[t.tipo] || { label:t.tipo, icon:'⚠️' };
       html += `<div style="font-size:12px;color:var(--muted);margin-bottom:4px;">
         ${info.icon} ${info.label}
         ${t.desc?`· <em style="color:var(--text);">${t.desc}</em>`:''}
@@ -625,7 +594,9 @@ function renderDetallesHistorial(detalles) {
     html += `<div style="font-size:12px;color:var(--muted);margin-bottom:6px;">
       🛠️ Reparación: ${daños||'—'}
       ${r.sector?`· Sector: <strong style="color:var(--text);">${r.sector}</strong>`:''}
-      · ${r.hilos} hilos ${r.buffer?`· Buffer: ${r.buffer}`:''} ${r.up?`· Quedó up: <strong style="color:var(--accent);">${r.up}</strong>`:''}
+      · ${r.hilos} hilos fusionados
+      ${r.buffer?`· Buffer: ${r.buffer}`:''}
+      ${r.up?`· Quedó up: <strong style="color:var(--accent);">${r.up}</strong>`:''}
     </div>`;
   }
   return html ? `<div style="background:var(--surface);border-radius:8px;padding:10px 12px;margin-bottom:10px;border:1px solid var(--border);">${html}</div>` : '';
@@ -635,9 +606,9 @@ function renderIPsHistorial(ips) {
   if (!ips?.length) return '';
   const grupos = {};
   ips.forEach(item => {
-    const key = item.tipo||'otro';
+    const key = item.tipo || 'otro';
     if (!grupos[key]) grupos[key] = { label:item.label||key, icon:item.icon||'🌐', ips:[] };
-    grupos[key].ips.push(item.ip||item);
+    grupos[key].ips.push(item.ip || item);
   });
   return `<div style="margin-bottom:10px;">
     <div style="font-size:11px;color:var(--muted);text-transform:uppercase;margin-bottom:6px;">🌐 IPs de clientes</div>
@@ -645,7 +616,7 @@ function renderIPsHistorial(ips) {
       <div style="margin-bottom:6px;">
         <div style="font-size:11px;color:var(--muted);margin-bottom:3px;">${g.icon} ${g.label}</div>
         <div style="display:flex;flex-wrap:wrap;gap:5px;">
-          ${g.ips.map(ip=>`<a href="http://${ip}" target="_blank" rel="noopener"
+          ${g.ips.map(ip => `<a href="http://${ip}" target="_blank" rel="noopener"
             style="font-size:12px;font-family:'IBM Plex Mono',monospace;background:var(--surface);border:1px solid var(--accent);border-radius:6px;padding:3px 10px;color:var(--accent);text-decoration:none;">${ip} ↗</a>`).join('')}
         </div>
       </div>`).join('')}
@@ -654,15 +625,15 @@ function renderIPsHistorial(ips) {
 
 function renderHistorial(reportes) {
   const cont = document.getElementById('lista-reportes');
-  if (!reportes.length) { cont.innerHTML='<p class="empty">No hay reportes registrados.</p>'; return; }
+  if (!reportes.length) { cont.innerHTML = '<p class="empty">No hay reportes registrados.</p>'; return; }
   const dias = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
   cont.innerHTML = reportes.map(r => {
     const d = new Date(r.fecha+'T12:00:00');
     const dia = dias[d.getDay()];
-    const acts = (r.actividades||[]).map(a=>ACTIVIDADES_INFO[a]?`${ACTIVIDADES_INFO[a].icon} ${ACTIVIDADES_INFO[a].label}`:a).join(' · ');
-    const fotos = r.fotos||[];
-    const cuadrilla = todasLasCuadrillas.find(c=>c.id===r.cuadrillaId);
-    const ips = r.ips||[];
+    const acts = (r.actividades||[]).map(a => ACTIVIDADES_INFO[a]?`${ACTIVIDADES_INFO[a].icon} ${ACTIVIDADES_INFO[a].label}`:a).join(' · ');
+    const fotos = r.fotos || [];
+    const cuadrilla = todasLasCuadrillas.find(c => c.id === r.cuadrillaId);
+    const ips = r.ips || [];
     return `
       <div class="reporte-card">
         <div class="reporte-header" onclick="toggleReporte(${r.id})">
@@ -718,23 +689,23 @@ function renderHistorial(reportes) {
 }
 
 function toggleReporte(id) {
-  const body=document.getElementById('body-'+id), arrow=document.getElementById('arrow-'+id);
-  const visible=body.style.display!=='none';
-  body.style.display=visible?'none':'block';
-  arrow.textContent=visible?'▼':'▲';
+  const body = document.getElementById('body-'+id), arrow = document.getElementById('arrow-'+id);
+  const visible = body.style.display !== 'none';
+  body.style.display = visible ? 'none' : 'block';
+  arrow.textContent = visible ? '▼' : '▲';
 }
 
 async function eliminarReporte(id) {
   if (!confirm('¿Eliminar este reporte?')) return;
-  await fetch('/api/reportes/'+id,{method:'DELETE'});
+  await fetch('/api/reportes/'+id, { method:'DELETE' });
   toast('Reporte eliminado'); cargarHistorial();
 }
 
 function editarReporte(id) {
-  const r=todosLosReportes.find(x=>x.id===id); if(!r) return;
-  const overlay=document.createElement('div');
-  overlay.style.cssText='position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);z-index:500;display:flex;align-items:center;justify-content:center;padding:1rem;';
-  overlay.innerHTML=`
+  const r = todosLosReportes.find(x => x.id === id); if (!r) return;
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);z-index:500;display:flex;align-items:center;justify-content:center;padding:1rem;';
+  overlay.innerHTML = `
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.5rem;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;">
       <h3 style="color:var(--accent);font-size:13px;margin-bottom:1rem;font-family:'IBM Plex Mono',monospace;">✏️ Editar reporte</h3>
       <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:10px;">
@@ -754,70 +725,70 @@ function editarReporte(id) {
 }
 
 async function guardarEdicion(id) {
-  const fecha=document.getElementById('edit-fecha').value;
-  const observaciones=document.getElementById('edit-obs').value.trim();
+  const fecha = document.getElementById('edit-fecha').value;
+  const observaciones = document.getElementById('edit-obs').value.trim();
   try {
-    const res=await fetch('/api/reportes/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({fecha,observaciones})});
-    const data=await res.json();
-    if(data.ok){toast('✓ Reporte editado');document.querySelector('div[style*="position:fixed"]')?.remove();await cargarHistorial();}
-  }catch(e){toast('Error al editar');}
+    const res = await fetch('/api/reportes/'+id, { method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ fecha, observaciones }) });
+    const data = await res.json();
+    if (data.ok) { toast('✓ Reporte editado'); document.querySelector('div[style*="position:fixed"]')?.remove(); await cargarHistorial(); }
+  } catch(e) { toast('Error al editar'); }
 }
 
 function exportarReporteExcel(id) {
-  const r=todosLosReportes.find(x=>x.id===id); if(!r) return;
-  const dias=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
-  const d=new Date(r.fecha+'T12:00:00');
-  const acts=(r.actividades||[]).map(a=>ACTIVIDADES_INFO[a]?.label||a).join(', ');
-  const ipsTexto=(r.ips||[]).map(i=>typeof i==='object'?`${i.label}: ${i.ip}`:i).join(' | ');
-  let datos=(r.materiales||[]).map(m=>({'Fecha':r.fecha,'Día':dias[d.getDay()],'Actividades':acts,'Integrantes':(r.integrantes||[]).join(', '),'Material':m.material,'Cantidad':m.cantidad,'Unidad':m.unidad,'Observaciones':r.observaciones||'','IPs':ipsTexto}));
-  if(!datos.length) datos=[{'Fecha':r.fecha,'Día':dias[d.getDay()],'Actividades':acts,'Integrantes':(r.integrantes||[]).join(', '),'Material':'—','Cantidad':0,'Unidad':'—','Observaciones':r.observaciones||'','IPs':ipsTexto}];
-  const ws=XLSX.utils.json_to_sheet(datos);
-  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Reporte');
-  XLSX.writeFile(wb,`reporte_${r.fecha}.xlsx`); toast('✓ Excel descargado');
+  const r = todosLosReportes.find(x => x.id === id); if (!r) return;
+  const dias = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+  const d = new Date(r.fecha+'T12:00:00');
+  const acts = (r.actividades||[]).map(a => ACTIVIDADES_INFO[a]?.label||a).join(', ');
+  const ipsTexto = (r.ips||[]).map(i => typeof i==='object'?`${i.label}: ${i.ip}`:i).join(' | ');
+  let datos = (r.materiales||[]).map(m => ({ 'Fecha':r.fecha,'Día':dias[d.getDay()],'Actividades':acts,'Integrantes':(r.integrantes||[]).join(', '),'Material':m.material,'Cantidad':m.cantidad,'Unidad':m.unidad,'Observaciones':r.observaciones||'','IPs':ipsTexto }));
+  if (!datos.length) datos = [{ 'Fecha':r.fecha,'Día':dias[d.getDay()],'Actividades':acts,'Integrantes':(r.integrantes||[]).join(', '),'Material':'—','Cantidad':0,'Unidad':'—','Observaciones':r.observaciones||'','IPs':ipsTexto }];
+  const ws = XLSX.utils.json_to_sheet(datos);
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Reporte');
+  XLSX.writeFile(wb, `reporte_${r.fecha}.xlsx`); toast('✓ Excel descargado');
 }
 
 function exportarTodoExcel() {
-  if(!todosLosReportes.length){toast('⚠ No hay reportes');return;}
-  const dias=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
-  const filas=[];
-  todosLosReportes.forEach(r=>{
-    const d=new Date(r.fecha+'T12:00:00');
-    const acts=(r.actividades||[]).map(a=>ACTIVIDADES_INFO[a]?.label||a).join(', ');
-    const ipsTexto=(r.ips||[]).map(i=>typeof i==='object'?`${i.label}: ${i.ip}`:i).join(' | ');
-    (r.materiales||[]).forEach(m=>{filas.push({'Fecha':r.fecha,'Día':dias[d.getDay()],'Actividades':acts,'Integrantes':(r.integrantes||[]).join(', '),'Material':m.material,'Cantidad':m.cantidad,'Unidad':m.unidad,'Observaciones':r.observaciones||'','IPs':ipsTexto});});
+  if (!todosLosReportes.length) { toast('⚠ No hay reportes'); return; }
+  const dias = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+  const filas = [];
+  todosLosReportes.forEach(r => {
+    const d = new Date(r.fecha+'T12:00:00');
+    const acts = (r.actividades||[]).map(a => ACTIVIDADES_INFO[a]?.label||a).join(', ');
+    const ipsTexto = (r.ips||[]).map(i => typeof i==='object'?`${i.label}: ${i.ip}`:i).join(' | ');
+    (r.materiales||[]).forEach(m => { filas.push({ 'Fecha':r.fecha,'Día':dias[d.getDay()],'Actividades':acts,'Integrantes':(r.integrantes||[]).join(', '),'Material':m.material,'Cantidad':m.cantidad,'Unidad':m.unidad,'Observaciones':r.observaciones||'','IPs':ipsTexto }); });
   });
-  const ws=XLSX.utils.json_to_sheet(filas);
-  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Historial');
-  XLSX.writeFile(wb,`historial_${new Date().toISOString().slice(0,10)}.xlsx`); toast('✓ Historial exportado');
+  const ws = XLSX.utils.json_to_sheet(filas);
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Historial');
+  XLSX.writeFile(wb, `historial_${new Date().toISOString().slice(0,10)}.xlsx`); toast('✓ Historial exportado');
 }
 
-async function subirFotos(event,reporteId) {
-  const files=event.target.files; if(!files.length) return;
-  const formData=new FormData();
-  for(const file of files) formData.append('fotos',file);
+async function subirFotos(event, reporteId) {
+  const files = event.target.files; if (!files.length) return;
+  const formData = new FormData();
+  for (const file of files) formData.append('fotos', file);
   toast('⏳ Subiendo fotos...');
   try {
-    const res=await fetch(`/api/reportes/${reporteId}/fotos`,{method:'POST',body:formData});
-    const data=await res.json();
-    if(data.ok){toast('✓ Fotos subidas');await cargarHistorial();}
-    else{toast('Error: '+data.error);}
-  }catch(e){toast('Error al subir fotos');}
+    const res = await fetch(`/api/reportes/${reporteId}/fotos`, { method:'POST', body:formData });
+    const data = await res.json();
+    if (data.ok) { toast('✓ Fotos subidas'); await cargarHistorial(); }
+    else { toast('Error: '+data.error); }
+  } catch(e) { toast('Error al subir fotos'); }
 }
 
-async function eliminarFoto(reporteId,publicId) {
-  if(!confirm('¿Eliminar esta foto?')) return;
+async function eliminarFoto(reporteId, publicId) {
+  if (!confirm('¿Eliminar esta foto?')) return;
   try {
-    const res=await fetch(`/api/reportes/${reporteId}/fotos/${encodeURIComponent(publicId)}`,{method:'DELETE'});
-    const data=await res.json();
-    if(data.ok){toast('Foto eliminada');await cargarHistorial();}
-  }catch(e){toast('Error al eliminar foto');}
+    const res = await fetch(`/api/reportes/${reporteId}/fotos/${encodeURIComponent(publicId)}`, { method:'DELETE' });
+    const data = await res.json();
+    if (data.ok) { toast('Foto eliminada'); await cargarHistorial(); }
+  } catch(e) { toast('Error al eliminar foto'); }
 }
 
 function verFoto(url) {
-  const overlay=document.createElement('div');
-  overlay.style.cssText='position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.9);z-index:600;display:flex;align-items:center;justify-content:center;cursor:pointer;';
-  overlay.innerHTML=`<img src="${url}" style="max-width:92%;max-height:92%;border-radius:8px;" />`;
-  overlay.onclick=()=>document.body.removeChild(overlay);
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.9);z-index:600;display:flex;align-items:center;justify-content:center;cursor:pointer;';
+  overlay.innerHTML = `<img src="${url}" style="max-width:92%;max-height:92%;border-radius:8px;" />`;
+  overlay.onclick = () => document.body.removeChild(overlay);
   document.body.appendChild(overlay);
 }
 
@@ -825,109 +796,99 @@ function verFoto(url) {
 async function iniciarMapa() {
   await cargarCajas();
   if (!mapaLeaflet) {
-    const lat=todasLasCajas.length>0?todasLasCajas[0].lat:-1.0224;
-    const lng=todasLasCajas.length>0?todasLasCajas[0].lng:-79.4604;
-    mapaLeaflet=L.map('mapa').setView([lat,lng],15);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap',maxZoom:19}).addTo(mapaLeaflet);
+    const lat = todasLasCajas.length>0?todasLasCajas[0].lat:-1.0224;
+    const lng = todasLasCajas.length>0?todasLasCajas[0].lng:-79.4604;
+    mapaLeaflet = L.map('mapa').setView([lat,lng],15);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'© OpenStreetMap', maxZoom:19 }).addTo(mapaLeaflet);
 
-    // Ubicación en vivo
-    if (navigator.geolocation) {
-      const iconoYo=L.divIcon({html:`<div style="width:16px;height:16px;background:#0099ff;border:3px solid #fff;border-radius:50%;box-shadow:0 0 0 4px rgba(0,153,255,0.25);"></div>`,className:'',iconSize:[16,16],iconAnchor:[8,8]});
-      const actualizarPosicion=(pos)=>{
-        const lat=pos.coords.latitude, lng=pos.coords.longitude, precision=pos.coords.accuracy;
-        if(marcadorYo){marcadorYo.setLatLng([lat,lng]);circuloYo.setLatLng([lat,lng]);circuloYo.setRadius(precision);}
-        else{
-          marcadorYo=L.marker([lat,lng],{icon:iconoYo,zIndexOffset:1000}).addTo(mapaLeaflet)
-            .bindPopup(`<div style="font-family:'IBM Plex Sans',sans-serif;font-size:12px;"><strong>📍 Tu ubicación</strong><br><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;">${lat.toFixed(5)}, ${lng.toFixed(5)}</span><br><span style="color:#6b7280;">Precisión: ±${Math.round(precision)}m</span></div>`);
-          circuloYo=L.circle([lat,lng],{radius:precision,color:'#0099ff',fillColor:'#0099ff',fillOpacity:0.08,weight:1}).addTo(mapaLeaflet);
-        }
-      };
-      navigator.geolocation.watchPosition(actualizarPosicion,null,{enableHighAccuracy:true,maximumAge:10000});
-    }
-
-    mapaLeaflet.on('click',e=>{
-      if(modoSeleccionMapaCaja){
-        cajaGpsLat=e.latlng.lat; cajaGpsLng=e.latlng.lng;
-        modoSeleccionMapaCaja=false;
-        const lbl=document.getElementById('modo-seleccion-label');
-        if(lbl) lbl.textContent='';
-        mapaLeaflet.getContainer().style.cursor='';
+    mapaLeaflet.on('click', e => {
+      if (modoSeleccionMapaCaja) {
+        cajaGpsLat = e.latlng.lat; cajaGpsLng = e.latlng.lng;
+        modoSeleccionMapaCaja = false;
+        const lbl = document.getElementById('modo-seleccion-label');
+        if (lbl) lbl.textContent = '';
+        mapaLeaflet.getContainer().style.cursor = '';
         toast('✓ Ubicación guardada — vuelve a Nuevo registro');
         mostrarTab('registro');
-        setTimeout(()=>{
-          const status=document.getElementById('caja-gps-status');
-          if(status){status.innerHTML=`✅ Ubicación en mapa: <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;">${cajaGpsLat.toFixed(5)}, ${cajaGpsLng.toFixed(5)}</span>`;status.style.color='var(--accent)';}
-        },400);
+        setTimeout(() => {
+          const status = document.getElementById('caja-gps-status');
+          if (status) {
+            status.innerHTML = `✅ Ubicación en mapa: <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;">${cajaGpsLat.toFixed(5)}, ${cajaGpsLng.toFixed(5)}</span>`;
+            status.style.color = 'var(--accent)';
+          }
+        }, 400);
         return;
       }
-      if(!modoSeleccionMapa) return;
-      gpsLat=e.latlng.lat; gpsLng=e.latlng.lng;
+      if (!modoSeleccionMapa) return;
+      gpsLat = e.latlng.lat; gpsLng = e.latlng.lng;
       actualizarStatusGPS();
-      modoSeleccionMapa=false;
-      const lbl=document.getElementById('modo-seleccion-label');
-      if(lbl) lbl.textContent='';
-      mapaLeaflet.getContainer().style.cursor='';
+      modoSeleccionMapa = false;
+      const lbl = document.getElementById('modo-seleccion-label');
+      if (lbl) lbl.textContent = '';
+      mapaLeaflet.getContainer().style.cursor = '';
       toast('✓ Ubicación seleccionada');
     });
   }
   renderMarcadores(); renderListaCajas();
-  if(rolActual==='trabajador'){
-    const form=document.getElementById('mapa-trabajador-form');
-    if(form) form.style.display='block';
+  if (rolActual === 'trabajador') {
+    const form = document.getElementById('mapa-trabajador-form');
+    if (form) form.style.display = 'block';
     obtenerGPS();
   }
 }
 
 function activarSeleccionMapa() {
-  modoSeleccionMapa=true;
-  const lbl=document.getElementById('modo-seleccion-label');
-  if(lbl) lbl.textContent='👆 Haz clic en el mapa para fijar la ubicación';
-  mapaLeaflet.getContainer().style.cursor='crosshair';
+  modoSeleccionMapa = true;
+  const lbl = document.getElementById('modo-seleccion-label');
+  if (lbl) lbl.textContent = '👆 Haz clic en el mapa para fijar la ubicación';
+  mapaLeaflet.getContainer().style.cursor = 'crosshair';
 }
 
 function actualizarStatusGPS() {
-  const status=document.getElementById('gps-status'); if(!status) return;
-  if(gpsLat!==null&&gpsLng!==null){
-    status.innerHTML=`✅ Ubicación lista: <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;">${gpsLat.toFixed(5)}, ${gpsLng.toFixed(5)}</span>
+  const status = document.getElementById('gps-status'); if (!status) return;
+  if (gpsLat!==null&&gpsLng!==null) {
+    status.innerHTML = `✅ Ubicación lista: <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;">${gpsLat.toFixed(5)}, ${gpsLng.toFixed(5)}</span>
       <button onclick="activarSeleccionMapa()" style="margin-left:8px;font-size:11px;padding:2px 8px;border-radius:4px;border:1px solid var(--accent);color:var(--accent);background:none;cursor:pointer;">🗺️ Cambiar</button>`;
-    status.style.color='var(--accent)';
+    status.style.color = 'var(--accent)';
   }
 }
 
 function obtenerGPS() {
-  const status=document.getElementById('gps-status');
-  if(!navigator.geolocation){if(status) status.innerHTML=`❌ GPS no disponible. <button onclick="activarSeleccionMapa()" style="font-size:11px;padding:2px 8px;border-radius:4px;border:1px solid var(--accent);color:var(--accent);background:none;cursor:pointer;">🗺️ Seleccionar</button>`;return;}
-  if(status) status.textContent='⏳ Obteniendo GPS...';
+  const status = document.getElementById('gps-status');
+  if (!navigator.geolocation) {
+    if (status) status.innerHTML = `❌ GPS no disponible. <button onclick="activarSeleccionMapa()" style="font-size:11px;padding:2px 8px;border-radius:4px;border:1px solid var(--accent);color:var(--accent);background:none;cursor:pointer;">🗺️ Seleccionar</button>`;
+    return;
+  }
+  if (status) status.textContent = '⏳ Obteniendo GPS...';
   navigator.geolocation.getCurrentPosition(
-    pos=>{gpsLat=pos.coords.latitude;gpsLng=pos.coords.longitude;actualizarStatusGPS();if(mapaLeaflet)mapaLeaflet.setView([gpsLat,gpsLng],17);},
-    ()=>{if(status) status.innerHTML=`⚠️ No se pudo obtener GPS. <button onclick="activarSeleccionMapa()" style="font-size:11px;padding:2px 8px;border-radius:4px;border:1px solid var(--accent);color:var(--accent);background:none;cursor:pointer;">🗺️ Seleccionar</button>`;},
-    {enableHighAccuracy:true,timeout:10000}
+    pos => { gpsLat=pos.coords.latitude; gpsLng=pos.coords.longitude; actualizarStatusGPS(); if(mapaLeaflet) mapaLeaflet.setView([gpsLat,gpsLng],17); },
+    () => { if(status) status.innerHTML = `⚠️ No se pudo obtener GPS. <button onclick="activarSeleccionMapa()" style="font-size:11px;padding:2px 8px;border-radius:4px;border:1px solid var(--accent);color:var(--accent);background:none;cursor:pointer;">🗺️ Seleccionar</button>`; },
+    { enableHighAccuracy:true, timeout:10000 }
   );
 }
 
 function actualizarFormCaja() {
-  const tipo=document.getElementById('caja-tipo').value;
-  const panel=document.getElementById('distribucion-panel');
-  if(panel) panel.style.display=tipo==='principal'?'block':'none';
+  const tipo = document.getElementById('caja-tipo').value;
+  const panel = document.getElementById('distribucion-panel');
+  if (panel) panel.style.display = tipo==='principal'?'block':'none';
 }
 
-function selHilos(id,val='') {
+function selHilos(id, val='') {
   return `<select id="${id}" class="sel-field" style="flex:1;min-width:80px;"><option value="">Hilo...</option>${HILOS.map(h=>`<option value="${h}" ${val===h?'selected':''}>${h}</option>`).join('')}</select>`;
 }
 
-function selBuffers(id,val='') {
+function selBuffers(id, val='') {
   return `<select id="${id}" class="sel-field" style="flex:1;min-width:80px;"><option value="">Buffer...</option>${BUFFERS.map(b=>`<option value="${b}" ${val===b?'selected':''}>${b}</option>`).join('')}</select>`;
 }
 
-// agregarDistribucion se mantiene para edición de cajas existentes (formato simple)
-function agregarDistribucion(buf='',hil='',dest='') {
+function agregarDistribucion(buf='', hil='', dest='') {
   distContador++;
-  const id=distContador;
-  const lista=document.getElementById('distribucion-lista');
-  const div=document.createElement('div');
-  div.id=`dist-row-${id}`;
-  div.style.cssText='display:flex;gap:6px;align-items:center;margin-bottom:6px;flex-wrap:wrap;';
-  div.innerHTML=`${selBuffers(`dist-buf-${id}`,buf)}${selHilos(`dist-hil-${id}`,hil)}
+  const id = distContador;
+  const lista = document.getElementById('distribucion-lista');
+  const div = document.createElement('div');
+  div.id = `dist-row-${id}`;
+  div.style.cssText = 'display:flex;gap:6px;align-items:center;margin-bottom:6px;flex-wrap:wrap;';
+  div.innerHTML = `${selBuffers(`dist-buf-${id}`,buf)}${selHilos(`dist-hil-${id}`,hil)}
     <input type="text" id="dist-dest-${id}" placeholder="Destino..." value="${dest}"
       style="flex:2;min-width:100px;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;padding:6px 8px;outline:none;" />
     <button onclick="document.getElementById('dist-row-${id}').remove()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;flex-shrink:0;">✕</button>`;
@@ -935,51 +896,50 @@ function agregarDistribucion(buf='',hil='',dest='') {
 }
 
 function getDistribucion() {
-  return [...document.querySelectorAll('[id^="dist-row-"]')].map(row=>{
-    const id=row.id.replace('dist-row-','');
-    return{buffer:document.getElementById(`dist-buf-${id}`)?.value||'',hilo:document.getElementById(`dist-hil-${id}`)?.value||'',destino:document.getElementById(`dist-dest-${id}`)?.value.trim()||''};
-  }).filter(d=>d.buffer||d.hilo||d.destino);
+  return [...document.querySelectorAll('[id^="dist-row-"]')].map(row => {
+    const id = row.id.replace('dist-row-','');
+    return { buffer:document.getElementById(`dist-buf-${id}`)?.value||'', hilo:document.getElementById(`dist-hil-${id}`)?.value||'', destino:document.getElementById(`dist-dest-${id}`)?.value.trim()||'' };
+  }).filter(d => d.buffer||d.hilo||d.destino);
 }
 
 function crearIcono(tipo) {
-  const colores={principal:'#1D9E75',cliente:'#3B82F6',pasante:'#F59E0B'};
-  const color=colores[tipo]||'#6b7280';
-  return L.divIcon({html:`<div style="width:14px;height:14px;background:${color};border:2px solid #fff;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,0.4);"></div>`,className:'',iconSize:[14,14],iconAnchor:[7,7]});
+  const colores = { principal:'#1D9E75', cliente:'#3B82F6', pasante:'#F59E0B' };
+  const color = colores[tipo] || '#6b7280';
+  return L.divIcon({ html:`<div style="width:14px;height:14px;background:${color};border:2px solid #fff;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,0.4);"></div>`, className:'', iconSize:[14,14], iconAnchor:[7,7] });
 }
 
 function renderMarcadores() {
-  marcadoresMapa.forEach(m=>mapaLeaflet.removeLayer(m));
-  marcadoresMapa=[];
-  const cajasFiltradas=filtroActivo==='todos'?todasLasCajas:todasLasCajas.filter(c=>c.tipo===filtroActivo);
-  cajasFiltradas.forEach(caja=>{
-    const libres=caja.totalPuertos-caja.puertosOcupados;
-    const pct=Math.round((caja.puertosOcupados/caja.totalPuertos)*100);
-    const colorBarra=pct>=90?'#E24B4A':pct>=60?'#F59E0B':'#1D9E75';
-    const info=TIPO_CAJA[caja.tipo]||{label:caja.tipo,icon:'📦'};
-    const bufColor=COLOR_BUFFER[caja.buffer]||'#6b7280';
-    const distPopup = caja.tipo==='principal'&&caja.distribucion?.length>0 ? (() => {
-      const porBuffer={};
-      caja.distribucion.forEach(d=>{
-        const key=d.bufferId?`${d.buffer} ${d.bufferId}`:d.buffer;
-        if(!porBuffer[key]) porBuffer[key]={color:d.buffer,hilos:[]};
-        porBuffer[key].hilos.push(d);
-      });
-      return `<div style="margin-top:8px;border-top:1px solid #e5e7eb;padding-top:6px;">
+  marcadoresMapa.forEach(m => mapaLeaflet.removeLayer(m));
+  marcadoresMapa = [];
+  const cajasFiltradas = filtroActivo==='todos'?todasLasCajas:todasLasCajas.filter(c=>c.tipo===filtroActivo);
+  cajasFiltradas.forEach(caja => {
+    const libres = caja.totalPuertos - caja.puertosOcupados;
+    const pct = Math.round((caja.puertosOcupados/caja.totalPuertos)*100);
+    const colorBarra = pct>=90?'#E24B4A':pct>=60?'#F59E0B':'#1D9E75';
+    const info = TIPO_CAJA[caja.tipo] || { label:caja.tipo, icon:'📦' };
+    const bufColor = COLOR_BUFFER[caja.buffer] || '#6b7280';
+
+    // Agrupar distribución por buffer para el popup
+    let distHTML = '';
+    if (caja.tipo==='principal' && caja.distribucion?.length>0) {
+      const porBuffer = {};
+      caja.distribucion.forEach(d => { if (!porBuffer[d.buffer]) porBuffer[d.buffer]=[]; porBuffer[d.buffer].push(d); });
+      distHTML = `<div style="margin-top:8px;border-top:1px solid #e5e7eb;padding-top:6px;">
         <div style="font-size:11px;font-weight:600;margin-bottom:4px;">📡 Hilos distribuidos</div>
-        ${Object.entries(porBuffer).map(([label,grupo])=>{
-          const bc=COLOR_BUFFER[grupo.color]||'#6b7280';
+        ${Object.entries(porBuffer).map(([buf,hilos]) => {
+          const bc = COLOR_BUFFER[buf]||'#6b7280';
           return `<div style="margin-bottom:4px;">
-            <span style="font-size:11px;display:inline-flex;align-items:center;gap:3px;">
+            <span style="font-size:11px;display:flex;align-items:center;gap:3px;">
               <span style="width:7px;height:7px;background:${bc};border-radius:50%;display:inline-block;"></span>
-              <strong>Buffer ${label}:</strong>
+              <strong>Buffer ${buf}:</strong>
             </span>
-            ${grupo.hilos.map(d=>{const hc=COLOR_BUFFER[d.hilo]||'#6b7280';return `<span style="font-size:11px;display:inline-flex;align-items:center;gap:2px;margin-left:8px;"><span style="width:6px;height:6px;background:${hc};border-radius:50%;display:inline-block;"></span>${d.hilo}${d.destino?` → ${d.destino}`:''}</span>`;}).join('')}
+            ${hilos.map(d=>{const hc=COLOR_BUFFER[d.hilo]||'#6b7280';return `<span style="font-size:11px;display:inline-flex;align-items:center;gap:2px;margin-left:8px;"><span style="width:6px;height:6px;background:${hc};border-radius:50%;display:inline-block;"></span>${d.hilo}${d.destino?` → ${d.destino}`:''}</span>`;}).join('')}
           </div>`;
         }).join('')}
       </div>`;
-    })() : '';
+    }
 
-    const popup=`<div style="font-family:'IBM Plex Sans',sans-serif;min-width:200px;">
+    const popup = `<div style="font-family:'IBM Plex Sans',sans-serif;min-width:200px;">
       <div style="font-weight:600;font-size:14px;margin-bottom:2px;">${info.icon} ${caja.referencia}</div>
       <div style="font-size:12px;color:#6b7280;margin-bottom:8px;">${info.label}</div>
       ${caja.buffer||caja.hilo?`<div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;">
@@ -991,7 +951,7 @@ function renderMarcadores() {
         <div style="height:6px;background:#e5e7eb;border-radius:3px;overflow:hidden;"><div style="width:${pct}%;height:100%;background:${colorBarra};border-radius:3px;"></div></div>
         <div style="font-size:11px;color:#6b7280;margin-top:2px;">${libres} libre${libres!==1?'s':''}</div>
       </div>
-      ${distPopup}
+      ${distHTML}
       <div style="font-size:11px;color:#6b7280;margin-top:6px;">Por: ${caja.registrado_por||'—'}</div>
       ${rolActual==='trabajador'?`<div style="margin-top:8px;display:flex;gap:6px;">
         <button onclick="editarCaja(${caja.id})" style="flex:1;font-size:11px;padding:4px;background:#1D9E75;color:#fff;border:none;border-radius:4px;cursor:pointer;">Editar</button>
@@ -999,108 +959,76 @@ function renderMarcadores() {
       </div>`:''}
     </div>`;
 
-    const marcador=L.marker([caja.lat,caja.lng],{icon:crearIcono(caja.tipo)}).addTo(mapaLeaflet).bindPopup(popup);
+    const marcador = L.marker([caja.lat,caja.lng], { icon:crearIcono(caja.tipo) }).addTo(mapaLeaflet).bindPopup(popup);
     marcadoresMapa.push(marcador);
   });
 }
 
 function renderListaCajas() {
-  const cont=document.getElementById('lista-cajas'); if(!cont) return;
-  const cajasFiltradas=filtroActivo==='todos'?todasLasCajas:todasLasCajas.filter(c=>c.tipo===filtroActivo);
-  if(!cajasFiltradas.length){cont.innerHTML='<p class="empty">No hay puntos registrados.</p>';return;}
-  const grupos={principal:[],cliente:[],pasante:[]};
-  cajasFiltradas.forEach(c=>{if(grupos[c.tipo])grupos[c.tipo].push(c);else grupos.cliente.push(c);});
-
-  const renderGrupoLista=(tipo,lista)=>{
-    if(!lista.length) return '';
-    const info=TIPO_CAJA[tipo];
+  const cont = document.getElementById('lista-cajas'); if (!cont) return;
+  const cajasFiltradas = filtroActivo==='todos'?todasLasCajas:todasLasCajas.filter(c=>c.tipo===filtroActivo);
+  if (!cajasFiltradas.length) { cont.innerHTML='<p class="empty">No hay puntos registrados.</p>'; return; }
+  cont.innerHTML = cajasFiltradas.map(c => {
+    const libres = c.totalPuertos - c.puertosOcupados;
+    const pct = Math.round((c.puertosOcupados/c.totalPuertos)*100);
+    const colorBarra = pct>=90?'#E24B4A':pct>=60?'#F59E0B':'#1D9E75';
+    const info = TIPO_CAJA[c.tipo] || { label:c.tipo, icon:'📦' };
+    const bufColor = COLOR_BUFFER[c.buffer] || '#6b7280';
     return `
-      <div style="margin-bottom:8px;">
-        <div onclick="toggleGrupoCajas('${tipo}')" style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--surface);border:1px solid var(--border);border-radius:8px;cursor:pointer;user-select:none;">
-          <div style="display:flex;align-items:center;gap:8px;">
-            <span style="width:10px;height:10px;background:${info.color};border-radius:50%;display:inline-block;"></span>
-            <span style="font-size:13px;font-weight:500;color:var(--text);">${info.icon} ${info.label}</span>
-            <span style="font-size:11px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:1px 8px;color:var(--muted);">${lista.length}</span>
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:6px;cursor:pointer;" onclick="irACaja(${c.lat},${c.lng})">
+        <div style="display:flex;align-items:flex-start;gap:10px;">
+          <span style="width:10px;height:10px;background:${TIPO_CAJA[c.tipo]?.color||'#6b7280'};border-radius:50%;flex-shrink:0;margin-top:3px;"></span>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:13px;font-weight:500;color:var(--text);">${info.icon} ${c.referencia}</div>
+            <div style="font-size:11px;color:var(--muted);">${info.label}</div>
+            ${c.buffer||c.hilo?`<div style="display:flex;gap:5px;margin-top:3px;flex-wrap:wrap;">
+              ${c.buffer?`<span style="font-size:10px;background:var(--surface);border-radius:3px;padding:1px 5px;display:flex;align-items:center;gap:3px;"><span style="width:6px;height:6px;background:${bufColor};border-radius:50%;display:inline-block;"></span>${c.buffer}</span>`:''}
+              ${c.hilo?`<span style="font-size:10px;background:var(--surface);border-radius:3px;padding:1px 5px;">Hilo: ${c.hilo}</span>`:''}
+            </div>`:''}
+            ${c.distribucion?.length>0?`<div style="font-size:10px;color:var(--muted);margin-top:2px;">📡 ${c.distribucion.length} hilo${c.distribucion.length>1?'s':''} distribuido${c.distribucion.length>1?'s':''}</div>`:''}
+            <div style="margin-top:4px;">
+              <div style="height:4px;background:var(--surface);border-radius:2px;overflow:hidden;"><div style="width:${pct}%;height:100%;background:${colorBarra};border-radius:2px;"></div></div>
+              <div style="font-size:10px;color:var(--muted);margin-top:2px;">${libres} libre${libres!==1?'s':''} de ${c.totalPuertos}</div>
+            </div>
           </div>
-          <span id="arrow-cajas-${tipo}" style="color:var(--muted);font-size:14px;">▼</span>
-        </div>
-        <div id="grupo-cajas-${tipo}" style="display:none;padding-top:4px;">
-          ${lista.map(c=>{
-            const libres=c.totalPuertos-c.puertosOcupados;
-            const pct=Math.round((c.puertosOcupados/c.totalPuertos)*100);
-            const colorBarra=pct>=90?'#E24B4A':pct>=60?'#F59E0B':'#1D9E75';
-            const bufColor=COLOR_BUFFER[c.buffer]||'#6b7280';
-            return `
-              <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:4px;cursor:pointer;" onclick="irACaja(${c.lat},${c.lng})">
-                <div style="display:flex;align-items:flex-start;gap:10px;">
-                  <div style="flex:1;min-width:0;">
-                    <div style="font-size:13px;font-weight:500;color:var(--text);">${c.referencia}</div>
-                    ${c.buffer||c.hilo?`<div style="display:flex;gap:5px;margin-top:3px;flex-wrap:wrap;">
-                      ${c.buffer?`<span style="font-size:10px;background:var(--surface);border-radius:3px;padding:1px 5px;display:flex;align-items:center;gap:3px;"><span style="width:6px;height:6px;background:${bufColor};border-radius:50%;display:inline-block;"></span>${c.buffer}</span>`:''}
-                      ${c.hilo?`<span style="font-size:10px;background:var(--surface);border-radius:3px;padding:1px 5px;">Hilo: ${c.hilo}</span>`:''}
-                    </div>`:''}
-                    ${c.distribucion?.length>0?`<div style="font-size:10px;color:var(--muted);margin-top:2px;">📡 ${c.distribucion.length} hilo${c.distribucion.length>1?'s':''} distribuido${c.distribucion.length>1?'s':''}</div>`:''}
-                    <div style="margin-top:4px;">
-                      <div style="height:4px;background:var(--surface);border-radius:2px;overflow:hidden;"><div style="width:${pct}%;height:100%;background:${colorBarra};border-radius:2px;"></div></div>
-                      <div style="font-size:10px;color:var(--muted);margin-top:2px;">${libres} libre${libres!==1?'s':''} de ${c.totalPuertos}</div>
-                    </div>
-                  </div>
-                  ${rolActual==='trabajador'?`<div style="display:flex;flex-direction:column;gap:4px;">
-                    <button onclick="event.stopPropagation();editarCaja(${c.id})" style="font-size:11px;padding:3px 8px;background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:4px;cursor:pointer;">✏️</button>
-                    <button onclick="event.stopPropagation();eliminarCaja(${c.id})" style="font-size:11px;padding:3px 8px;background:none;border:1px solid var(--danger);color:var(--danger);border-radius:4px;cursor:pointer;">✕</button>
-                  </div>`:''}
-                </div>
-              </div>`;
-          }).join('')}
+          ${rolActual==='trabajador'?`<div style="display:flex;flex-direction:column;gap:4px;">
+            <button onclick="event.stopPropagation();editarCaja(${c.id})" style="font-size:11px;padding:3px 8px;background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:4px;cursor:pointer;">✏️</button>
+            <button onclick="event.stopPropagation();eliminarCaja(${c.id})" style="font-size:11px;padding:3px 8px;background:none;border:1px solid var(--danger);color:var(--danger);border-radius:4px;cursor:pointer;">✕</button>
+          </div>`:''}
         </div>
       </div>`;
-  };
-
-  cont.innerHTML=`
-    <div style="font-size:11px;color:var(--muted);margin-bottom:8px;">Total: ${cajasFiltradas.length} punto${cajasFiltradas.length!==1?'s':''} registrado${cajasFiltradas.length!==1?'s':''}</div>
-    ${renderGrupoLista('principal',grupos.principal)}
-    ${renderGrupoLista('cliente',grupos.cliente)}
-    ${renderGrupoLista('pasante',grupos.pasante)}`;
+  }).join('');
 }
 
-function toggleGrupoCajas(tipo) {
-  const grupo=document.getElementById(`grupo-cajas-${tipo}`);
-  const arrow=document.getElementById(`arrow-cajas-${tipo}`);
-  if(!grupo) return;
-  const visible=grupo.style.display!=='none';
-  grupo.style.display=visible?'none':'block';
-  arrow.textContent=visible?'▼':'▲';
-}
-
-function irACaja(lat,lng){if(mapaLeaflet)mapaLeaflet.setView([lat,lng],18);}
+function irACaja(lat,lng) { if (mapaLeaflet) mapaLeaflet.setView([lat,lng],18); }
 
 function filtrarMapa(tipo) {
-  filtroActivo=tipo;
-  document.querySelectorAll('[id^="filtro-"]').forEach(btn=>{btn.style.background='none';btn.style.color='var(--muted)';btn.style.borderColor='var(--border)';});
-  const activo=document.getElementById('filtro-'+tipo);
-  if(activo){activo.style.background='var(--accent)';activo.style.color='#000';activo.style.borderColor='var(--accent)';}
+  filtroActivo = tipo;
+  document.querySelectorAll('[id^="filtro-"]').forEach(btn => { btn.style.background='none'; btn.style.color='var(--muted)'; btn.style.borderColor='var(--border)'; });
+  const activo = document.getElementById('filtro-'+tipo);
+  if (activo) { activo.style.background='var(--accent)'; activo.style.color='#000'; activo.style.borderColor='var(--accent)'; }
   renderMarcadores(); renderListaCajas();
 }
 
-async function cargarCajas(){
-  try{const res=await fetch('/api/cajas');todasLasCajas=await res.json();}
-  catch(e){todasLasCajas=[];}
+async function cargarCajas() {
+  try { const res = await fetch('/api/cajas'); todasLasCajas = await res.json(); }
+  catch(e) { todasLasCajas = []; }
 }
 
 async function registrarCaja() {
-  if(gpsLat===null||gpsLng===null){toast('⚠ Obtén tu ubicación primero');return;}
-  const tipo=document.getElementById('caja-tipo').value;
-  const referencia=document.getElementById('caja-referencia').value.trim();
-  const totalPuertos=parseInt(document.getElementById('caja-total-puertos').value)||16;
-  const puertosOcupados=parseInt(document.getElementById('caja-puertos-ocupados').value)||0;
-  const buffer=document.getElementById('caja-buffer').value;
-  const hilo=document.getElementById('caja-hilo').value;
-  const distribucion=tipo==='principal'?getDistribucionMapa():[];
-  if(!referencia){toast('⚠ Ingresa una referencia');return;}
-  try{
-    const res=await fetch('/api/cajas',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tipo,referencia,lat:gpsLat,lng:gpsLng,totalPuertos,puertosOcupados,buffer,hilo,distribucion})});
-    const data=await res.json();
-    if(data.ok){
+  if (gpsLat===null||gpsLng===null) { toast('⚠ Obtén tu ubicación primero'); return; }
+  const tipo = document.getElementById('caja-tipo').value;
+  const referencia = document.getElementById('caja-referencia').value.trim();
+  const totalPuertos = parseInt(document.getElementById('caja-total-puertos').value)||16;
+  const puertosOcupados = parseInt(document.getElementById('caja-puertos-ocupados').value)||0;
+  const buffer = document.getElementById('caja-buffer').value;
+  const hilo = document.getElementById('caja-hilo').value;
+  const distribucion = tipo==='principal'?getDistribucion():[];
+  if (!referencia) { toast('⚠ Ingresa una referencia'); return; }
+  try {
+    const res = await fetch('/api/cajas', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ tipo, referencia, lat:gpsLat, lng:gpsLng, totalPuertos, puertosOcupados, buffer, hilo, distribucion }) });
+    const data = await res.json();
+    if (data.ok) {
       toast('✓ Punto registrado');
       document.getElementById('caja-referencia').value='';
       document.getElementById('caja-total-puertos').value='16';
@@ -1108,60 +1036,62 @@ async function registrarCaja() {
       document.getElementById('caja-buffer').value='';
       document.getElementById('caja-hilo').value='';
       document.getElementById('distribucion-lista').innerHTML='';
-      distMapaContador=0;
-      await cargarCajas();renderMarcadores();renderListaCajas();
-      if(mapaLeaflet)mapaLeaflet.setView([gpsLat,gpsLng],17);
-    }else{toast('Error: '+data.error);}
-  }catch(e){toast('Error de conexión');}
+      distContador=0;
+      await cargarCajas(); renderMarcadores(); renderListaCajas();
+      if (mapaLeaflet) mapaLeaflet.setView([gpsLat,gpsLng],17);
+    } else { toast('Error: '+data.error); }
+  } catch(e) { toast('Error de conexión'); }
 }
 
 function editarCaja(id) {
-  const c=todasLasCajas.find(x=>x.id===id); if(!c) return;
-  const esPrincipal=c.tipo==='principal';
-  const distFilas=(c.distribucion||[]).map((d,i)=>{
-    const iid=`edit-dist-${id}-${i}`;
-    const bufferId=d.bufferId||'';
+  const c = todasLasCajas.find(x=>x.id===id); if (!c) return;
+  const esPrincipal = c.tipo==='principal';
+  const distFilas = (c.distribucion||[]).map((d,i) => {
+    const iid = `edit-dist-${id}-${i}`;
     return `<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;flex-wrap:wrap;" id="${iid}">
-      ${selBuffers(`edit-db-${id}-${i}`,d.buffer)}
-      <input type="text" id="edit-dbid-${id}-${i}" placeholder="ID buffer..." value="${bufferId}"
-        style="width:80px;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;padding:5px 8px;outline:none;" />
-      ${selHilos(`edit-dh-${id}-${i}`,d.hilo)}
+      ${selBuffers(`edit-db-${id}-${i}`,d.buffer)}${selHilos(`edit-dh-${id}-${i}`,d.hilo)}
       <input type="text" id="edit-dd-${id}-${i}" placeholder="Destino..." value="${d.destino||''}"
         style="flex:2;min-width:100px;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;padding:6px 8px;outline:none;" />
       <button onclick="document.getElementById('${iid}').remove()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;">✕</button>
     </div>`;
   }).join('');
 
-  const overlay=document.createElement('div');
-  overlay.style.cssText='position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);z-index:500;display:flex;align-items:center;justify-content:center;padding:1rem;';
-  overlay.innerHTML=`
-    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.5rem;width:100%;max-width:500px;max-height:90vh;overflow-y:auto;">
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);z-index:500;display:flex;align-items:center;justify-content:center;padding:1rem;';
+  overlay.innerHTML = `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.5rem;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;">
       <h3 style="color:var(--accent);font-size:13px;margin-bottom:1rem;font-family:'IBM Plex Mono',monospace;">✏️ Editar punto</h3>
       <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
-        <div style="flex:1;min-width:120px;"><label style="font-size:11px;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:4px;">Tipo</label>
+        <div style="flex:1;min-width:120px;">
+          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:4px;">Tipo</label>
           <select id="edit-caja-tipo" style="background:var(--surface2);border:1px solid var(--border);border-radius:7px;color:var(--text);font-size:13px;padding:7px;outline:none;width:100%;">
             <option value="principal" ${c.tipo==='principal'?'selected':''}>📦 Principal</option>
             <option value="cliente" ${c.tipo==='cliente'?'selected':''}>🔌 Cliente</option>
             <option value="pasante" ${c.tipo==='pasante'?'selected':''}>➡️ Pasante</option>
           </select>
         </div>
-        <div style="flex:2;min-width:140px;"><label style="font-size:11px;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:4px;">Referencia</label>
+        <div style="flex:2;min-width:140px;">
+          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:4px;">Referencia</label>
           <input type="text" id="edit-caja-ref" value="${c.referencia}" style="background:var(--surface2);border:1px solid var(--border);border-radius:7px;color:var(--text);font-size:13px;padding:7px;outline:none;width:100%;" />
         </div>
       </div>
       <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
-        <div style="flex:1;min-width:100px;"><label style="font-size:11px;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:4px;">Total puertos</label>
+        <div style="flex:1;min-width:100px;">
+          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:4px;">Total puertos</label>
           <input type="number" id="edit-caja-total" value="${c.totalPuertos}" style="background:var(--surface2);border:1px solid var(--border);border-radius:7px;color:var(--text);font-size:13px;padding:7px;outline:none;width:100%;" />
         </div>
-        <div style="flex:1;min-width:100px;"><label style="font-size:11px;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:4px;">Ocupados</label>
+        <div style="flex:1;min-width:100px;">
+          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:4px;">Ocupados</label>
           <input type="number" id="edit-caja-ocupados" value="${c.puertosOcupados}" style="background:var(--surface2);border:1px solid var(--border);border-radius:7px;color:var(--text);font-size:13px;padding:7px;outline:none;width:100%;" />
         </div>
       </div>
       <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
-        <div style="flex:1;min-width:100px;"><label style="font-size:11px;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:4px;">Buffer</label>
+        <div style="flex:1;min-width:100px;">
+          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:4px;">Buffer</label>
           <select id="edit-caja-buffer" class="sel-field"><option value="">Sin buffer</option>${BUFFERS.map(b=>`<option value="${b}" ${c.buffer===b?'selected':''}>${b}</option>`).join('')}</select>
         </div>
-        <div style="flex:1;min-width:100px;"><label style="font-size:11px;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:4px;">Hilo</label>
+        <div style="flex:1;min-width:100px;">
+          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:4px;">Hilo</label>
           <select id="edit-caja-hilo" class="sel-field"><option value="">Sin hilo</option>${HILOS.map(h=>`<option value="${h}" ${c.hilo===h?'selected':''}>${h}</option>`).join('')}</select>
         </div>
       </div>
@@ -1179,17 +1109,14 @@ function editarCaja(id) {
 }
 
 function agregarDistEdit(cajaId) {
-  if(!editDistMap[cajaId]) editDistMap[cajaId]=100;
+  if (!editDistMap[cajaId]) editDistMap[cajaId]=100;
   editDistMap[cajaId]++;
-  const idx=editDistMap[cajaId];
-  const lista=document.getElementById(`edit-dist-lista-${cajaId}`);
-  const div=document.createElement('div');
-  div.style.cssText='display:flex;gap:6px;align-items:center;margin-bottom:6px;flex-wrap:wrap;';
-  div.id=`edit-dist-${cajaId}-${idx}`;
-  div.innerHTML=`${selBuffers(`edit-db-${cajaId}-${idx}`,'')}
-    <input type="text" id="edit-dbid-${cajaId}-${idx}" placeholder="ID buffer..."
-      style="width:80px;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;padding:5px 8px;outline:none;" />
-    ${selHilos(`edit-dh-${cajaId}-${idx}`,'')}
+  const idx = editDistMap[cajaId];
+  const lista = document.getElementById(`edit-dist-lista-${cajaId}`);
+  const div = document.createElement('div');
+  div.style.cssText = 'display:flex;gap:6px;align-items:center;margin-bottom:6px;flex-wrap:wrap;';
+  div.id = `edit-dist-${cajaId}-${idx}`;
+  div.innerHTML = `${selBuffers(`edit-db-${cajaId}-${idx}`,'')}${selHilos(`edit-dh-${cajaId}-${idx}`,'')}
     <input type="text" id="edit-dd-${cajaId}-${idx}" placeholder="Destino..."
       style="flex:2;min-width:100px;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;padding:6px 8px;outline:none;" />
     <button onclick="document.getElementById('edit-dist-${cajaId}-${idx}').remove()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;">✕</button>`;
@@ -1197,72 +1124,67 @@ function agregarDistEdit(cajaId) {
 }
 
 async function guardarEdicionCaja(id) {
-  const tipo=document.getElementById('edit-caja-tipo').value;
-  const referencia=document.getElementById('edit-caja-ref').value.trim();
-  const totalPuertos=parseInt(document.getElementById('edit-caja-total').value);
-  const puertosOcupados=parseInt(document.getElementById('edit-caja-ocupados').value);
-  const buffer=document.getElementById('edit-caja-buffer').value;
-  const hilo=document.getElementById('edit-caja-hilo').value;
-  const distLista=document.getElementById(`edit-dist-lista-${id}`);
-  let distribucion=[];
-  if(distLista){
-    distribucion=[...distLista.querySelectorAll('[id^="edit-dist-"]')].map(row=>{
-      const rid=row.id.replace(`edit-dist-${id}-`,'');
-      return{
-        buffer:document.getElementById(`edit-db-${id}-${rid}`)?.value||'',
-        bufferId:document.getElementById(`edit-dbid-${id}-${rid}`)?.value.trim()||'',
-        hilo:document.getElementById(`edit-dh-${id}-${rid}`)?.value||'',
-        destino:document.getElementById(`edit-dd-${id}-${rid}`)?.value.trim()||''
-      };
-    }).filter(d=>d.buffer||d.hilo||d.destino);
+  const tipo = document.getElementById('edit-caja-tipo').value;
+  const referencia = document.getElementById('edit-caja-ref').value.trim();
+  const totalPuertos = parseInt(document.getElementById('edit-caja-total').value);
+  const puertosOcupados = parseInt(document.getElementById('edit-caja-ocupados').value);
+  const buffer = document.getElementById('edit-caja-buffer').value;
+  const hilo = document.getElementById('edit-caja-hilo').value;
+  const distLista = document.getElementById(`edit-dist-lista-${id}`);
+  let distribucion = [];
+  if (distLista) {
+    distribucion = [...distLista.querySelectorAll('[id^="edit-dist-"]')].map(row => {
+      const rid = row.id.replace(`edit-dist-${id}-`,'');
+      return { buffer:document.getElementById(`edit-db-${id}-${rid}`)?.value||'', hilo:document.getElementById(`edit-dh-${id}-${rid}`)?.value||'', destino:document.getElementById(`edit-dd-${id}-${rid}`)?.value.trim()||'' };
+    }).filter(d => d.buffer||d.hilo||d.destino);
   }
-  if(!referencia){toast('⚠ Ingresa una referencia');return;}
-  try{
-    const res=await fetch('/api/cajas/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({tipo,referencia,totalPuertos,puertosOcupados,buffer,hilo,distribucion})});
-    const data=await res.json();
-    if(data.ok){toast('✓ Punto actualizado');document.querySelector('div[style*="position:fixed"]')?.remove();await cargarCajas();renderMarcadores();renderListaCajas();}
-  }catch(e){toast('Error al guardar');}
+  if (!referencia) { toast('⚠ Ingresa una referencia'); return; }
+  try {
+    const res = await fetch('/api/cajas/'+id, { method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ tipo, referencia, totalPuertos, puertosOcupados, buffer, hilo, distribucion }) });
+    const data = await res.json();
+    if (data.ok) { toast('✓ Punto actualizado'); document.querySelector('div[style*="position:fixed"]')?.remove(); await cargarCajas(); renderMarcadores(); renderListaCajas(); }
+  } catch(e) { toast('Error al guardar'); }
 }
 
-async function eliminarCaja(id){
-  if(!confirm('¿Eliminar este punto?')) return;
-  try{await fetch('/api/cajas/'+id,{method:'DELETE'});toast('Punto eliminado');await cargarCajas();renderMarcadores();renderListaCajas();}
-  catch(e){toast('Error al eliminar');}
+async function eliminarCaja(id) {
+  if (!confirm('¿Eliminar este punto?')) return;
+  try { await fetch('/api/cajas/'+id, { method:'DELETE' }); toast('Punto eliminado'); await cargarCajas(); renderMarcadores(); renderListaCajas(); }
+  catch(e) { toast('Error al eliminar'); }
 }
 
 // ── Cuadrillas ───────────────────────────────────────────
-async function cargarTodasLasCuadrillas(){
-  try{const res=await fetch('/api/cuadrillas');todasLasCuadrillas=await res.json();}
-  catch(e){todasLasCuadrillas=[];}
+async function cargarTodasLasCuadrillas() {
+  try { const res = await fetch('/api/cuadrillas'); todasLasCuadrillas = await res.json(); }
+  catch(e) { todasLasCuadrillas = []; }
 }
 
-async function cargarCuadrillaHoy(){
-  const hoy=fechaLocal();
-  const cuadrilla=todasLasCuadrillas.find(c=>c.fecha===hoy);
-  const box=document.getElementById('cuadrilla-hoy-box'); if(!box) return;
-  if(cuadrilla){
-    cuadrillaHoyId=cuadrilla.id;
-    box.innerHTML=`<div style="background:linear-gradient(135deg,rgba(0,212,170,0.1),rgba(0,153,255,0.05));border:1px solid var(--accent);border-radius:12px;padding:1.25rem;margin-bottom:1rem;">
+async function cargarCuadrillaHoy() {
+  const hoy = fechaLocal();
+  const cuadrilla = todasLasCuadrillas.find(c => c.fecha === hoy);
+  const box = document.getElementById('cuadrilla-hoy-box'); if (!box) return;
+  if (cuadrilla) {
+    cuadrillaHoyId = cuadrilla.id;
+    box.innerHTML = `<div style="background:linear-gradient(135deg,rgba(0,212,170,0.1),rgba(0,153,255,0.05));border:1px solid var(--accent);border-radius:12px;padding:1.25rem;margin-bottom:1rem;">
       <div style="font-size:10px;color:var(--accent);text-transform:uppercase;letter-spacing:0.08em;font-family:'IBM Plex Mono',monospace;margin-bottom:6px;">Tu cuadrilla de hoy</div>
       <div style="font-size:17px;font-weight:600;color:var(--text);margin-bottom:10px;">${cuadrilla.nombre}</div>
       <div style="display:flex;flex-wrap:wrap;gap:6px;">${cuadrilla.integrantes.map(i=>`<span style="font-size:12px;background:rgba(0,212,170,0.15);border:1px solid rgba(0,212,170,0.3);border-radius:20px;padding:4px 12px;color:var(--accent);">👷 ${i}</span>`).join('')}</div>
     </div>`;
-  }else{
-    cuadrillaHoyId=null;
-    box.innerHTML=`<div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:1rem;margin-bottom:1rem;text-align:center;">
+  } else {
+    cuadrillaHoyId = null;
+    box.innerHTML = `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:1rem;margin-bottom:1rem;text-align:center;">
       <div style="font-size:13px;color:var(--muted);">No hay cuadrilla asignada para hoy</div>
       <div style="font-size:11px;color:var(--muted);margin-top:3px;">El administrador aún no ha creado la cuadrilla del día</div>
     </div>`;
   }
 }
 
-async function cargarCuadrillas(){
+async function cargarCuadrillas() {
   await cargarTodasLasCuadrillas();
-  const cont=document.getElementById('lista-cuadrillas'); if(!cont) return;
-  const originales=todasLasCuadrillas.filter(c=>!c.reutilizada);
-  if(!originales.length){cont.innerHTML='<p class="empty">No hay cuadrillas creadas.</p>';return;}
-  cont.innerHTML=originales.map(c=>{
-    const reusos=todasLasCuadrillas.filter(x=>x.reutilizada&&x.nombre===c.nombre);
+  const cont = document.getElementById('lista-cuadrillas'); if (!cont) return;
+  const originales = todasLasCuadrillas.filter(c => !c.reutilizada);
+  if (!originales.length) { cont.innerHTML='<p class="empty">No hay cuadrillas creadas.</p>'; return; }
+  cont.innerHTML = originales.map(c => {
+    const reusos = todasLasCuadrillas.filter(x => x.reutilizada && x.nombre===c.nombre);
     return `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:1rem;margin-bottom:8px;">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;flex-wrap:wrap;gap:6px;">
         <div>
@@ -1279,36 +1201,36 @@ async function cargarCuadrillas(){
   }).join('');
 }
 
-async function crearCuadrilla(){
-  const nombre=document.getElementById('cuadrilla-nombre').value.trim();
-  const fecha=document.getElementById('cuadrilla-fecha').value;
-  const integrantes=[...document.querySelectorAll('.cuadrilla-int:checked')].map(i=>i.value);
-  if(!nombre){toast('⚠ Ingresa un nombre');return;}
-  if(!fecha){toast('⚠ Selecciona la fecha');return;}
-  if(!integrantes.length){toast('⚠ Selecciona al menos un integrante');return;}
-  try{
-    const res=await fetch('/api/cuadrillas',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nombre,fecha,integrantes,reutilizada:false})});
-    const text=await res.text(); let data; try{data=JSON.parse(text);}catch(e){toast('Error del servidor');return;}
-    if(res.ok&&data.ok){toast('✓ Cuadrilla creada');document.getElementById('cuadrilla-nombre').value='';document.querySelectorAll('.cuadrilla-int').forEach(c=>c.checked=false);await cargarCuadrillas();}
-    else{toast('Error: '+(data.error||'Error desconocido'));}
-  }catch(e){toast('Error de conexión');}
+async function crearCuadrilla() {
+  const nombre = document.getElementById('cuadrilla-nombre').value.trim();
+  const fecha = document.getElementById('cuadrilla-fecha').value;
+  const integrantes = [...document.querySelectorAll('.cuadrilla-int:checked')].map(i=>i.value);
+  if (!nombre) { toast('⚠ Ingresa un nombre'); return; }
+  if (!fecha) { toast('⚠ Selecciona la fecha'); return; }
+  if (!integrantes.length) { toast('⚠ Selecciona al menos un integrante'); return; }
+  try {
+    const res = await fetch('/api/cuadrillas', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ nombre, fecha, integrantes, reutilizada:false }) });
+    const text = await res.text(); let data; try{data=JSON.parse(text);}catch(e){toast('Error del servidor');return;}
+    if (res.ok&&data.ok) { toast('✓ Cuadrilla creada'); document.getElementById('cuadrilla-nombre').value=''; document.querySelectorAll('.cuadrilla-int').forEach(c=>c.checked=false); await cargarCuadrillas(); }
+    else { toast('Error: '+(data.error||'Error desconocido')); }
+  } catch(e) { toast('Error de conexión'); }
 }
 
-async function eliminarCuadrilla(id){
-  if(!confirm('¿Eliminar esta cuadrilla y sus reusos?')) return;
-  try{
-    const c=todasLasCuadrillas.find(x=>x.id===id);
-    await fetch('/api/cuadrillas/'+id,{method:'DELETE'});
-    if(c){const reusos=todasLasCuadrillas.filter(x=>x.reutilizada&&x.nombre===c.nombre);for(const r of reusos)await fetch('/api/cuadrillas/'+r.id,{method:'DELETE'});}
-    toast('Cuadrilla eliminada');await cargarCuadrillas();
-  }catch(e){toast('Error al eliminar');}
+async function eliminarCuadrilla(id) {
+  if (!confirm('¿Eliminar esta cuadrilla y sus reusos?')) return;
+  try {
+    const c = todasLasCuadrillas.find(x=>x.id===id);
+    await fetch('/api/cuadrillas/'+id, { method:'DELETE' });
+    if (c) { const reusos=todasLasCuadrillas.filter(x=>x.reutilizada&&x.nombre===c.nombre); for(const r of reusos) await fetch('/api/cuadrillas/'+r.id,{method:'DELETE'}); }
+    toast('Cuadrilla eliminada'); await cargarCuadrillas();
+  } catch(e) { toast('Error al eliminar'); }
 }
 
-function reutilizarCuadrilla(id){
-  const c=todasLasCuadrillas.find(x=>x.id===id); if(!c) return;
-  const overlay=document.createElement('div');
-  overlay.style.cssText='position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);z-index:500;display:flex;align-items:center;justify-content:center;padding:1rem;';
-  overlay.innerHTML=`<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.5rem;width:100%;max-width:400px;">
+function reutilizarCuadrilla(id) {
+  const c = todasLasCuadrillas.find(x=>x.id===id); if (!c) return;
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);z-index:500;display:flex;align-items:center;justify-content:center;padding:1rem;';
+  overlay.innerHTML = `<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.5rem;width:100%;max-width:400px;">
     <h3 style="color:var(--accent);font-size:13px;margin-bottom:4px;font-family:'IBM Plex Mono',monospace;">♻️ Reutilizar cuadrilla</h3>
     <p style="font-size:13px;color:var(--muted);margin-bottom:1rem;">Mismos integrantes de <strong style="color:var(--text);">${c.nombre}</strong> para nueva fecha.</p>
     <div style="background:var(--surface2);border-radius:8px;padding:10px;margin-bottom:1rem;display:flex;flex-wrap:wrap;gap:5px;">${c.integrantes.map(i=>`<span style="font-size:11px;background:rgba(0,212,170,0.15);border:1px solid rgba(0,212,170,0.3);border-radius:20px;padding:2px 8px;color:var(--accent);">👷 ${i}</span>`).join('')}</div>
@@ -1321,197 +1243,197 @@ function reutilizarCuadrilla(id){
       <button onclick="this.closest('div[style*=fixed]').remove()" style="flex:1;background:none;border:1px solid var(--border);border-radius:8px;font-size:13px;color:var(--text);padding:10px;cursor:pointer;">Cancelar</button>
     </div>
   </div>`;
-  const m=new Date(); m.setDate(m.getDate()+1);
-  overlay.querySelector('#reutilizar-fecha').value=`${m.getFullYear()}-${String(m.getMonth()+1).padStart(2,'0')}-${String(m.getDate()).padStart(2,'0')}`;
+  const m = new Date(); m.setDate(m.getDate()+1);
+  overlay.querySelector('#reutilizar-fecha').value = `${m.getFullYear()}-${String(m.getMonth()+1).padStart(2,'0')}-${String(m.getDate()).padStart(2,'0')}`;
   document.body.appendChild(overlay);
 }
 
-async function confirmarReutilizar(id){
-  const c=todasLasCuadrillas.find(x=>x.id===id); if(!c) return;
-  const fecha=document.getElementById('reutilizar-fecha').value;
-  if(!fecha){toast('⚠ Selecciona una fecha');return;}
-  try{
-    const res=await fetch('/api/cuadrillas',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nombre:c.nombre,fecha,integrantes:c.integrantes,reutilizada:true})});
-    const text=await res.text(); let data; try{data=JSON.parse(text);}catch(e){toast('Error del servidor');return;}
-    if(res.ok&&data.ok){toast('✓ Cuadrilla reutilizada para '+fecha);document.querySelector('div[style*="position:fixed"]')?.remove();await cargarCuadrillas();}
-    else{toast('Error: '+(data.error||'Error desconocido'));}
-  }catch(e){toast('Error de conexión');}
+async function confirmarReutilizar(id) {
+  const c = todasLasCuadrillas.find(x=>x.id===id); if (!c) return;
+  const fecha = document.getElementById('reutilizar-fecha').value;
+  if (!fecha) { toast('⚠ Selecciona una fecha'); return; }
+  try {
+    const res = await fetch('/api/cuadrillas', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ nombre:c.nombre, fecha, integrantes:c.integrantes, reutilizada:true }) });
+    const text = await res.text(); let data; try{data=JSON.parse(text);}catch(e){toast('Error del servidor');return;}
+    if (res.ok&&data.ok) { toast('✓ Cuadrilla reutilizada para '+fecha); document.querySelector('div[style*="position:fixed"]')?.remove(); await cargarCuadrillas(); }
+    else { toast('Error: '+(data.error||'Error desconocido')); }
+  } catch(e) { toast('Error de conexión'); }
 }
 
 // ── Tabs ─────────────────────────────────────────────────
-function mostrarTab(tab){
-  ['registro','mapa','historial','bodega','indicadores','cuadrillas'].forEach(t=>{
-    const el=document.getElementById('tab-'+t); if(el) el.style.display=t===tab?'block':'none';
+function mostrarTab(tab) {
+  ['registro','mapa','historial','bodega','indicadores','cuadrillas'].forEach(t => {
+    const el = document.getElementById('tab-'+t); if (el) el.style.display = t===tab?'block':'none';
   });
-  document.querySelectorAll('.tab').forEach(btn=>{btn.classList.toggle('active',btn.getAttribute('onclick')?.includes(`'${tab}'`));});
-  if(tab==='mapa') iniciarMapa();
-  if(tab==='historial') cargarHistorial();
-  if(tab==='bodega') cargarBodega();
-  if(tab==='indicadores') iniciarIndicadores();
-  if(tab==='cuadrillas') cargarCuadrillas();
+  document.querySelectorAll('.tab').forEach(btn => { btn.classList.toggle('active', btn.getAttribute('onclick')?.includes(`'${tab}'`)); });
+  if (tab==='mapa') iniciarMapa();
+  if (tab==='historial') cargarHistorial();
+  if (tab==='bodega') cargarBodega();
+  if (tab==='indicadores') iniciarIndicadores();
+  if (tab==='cuadrillas') cargarCuadrillas();
 }
 
 // ── Conectados ───────────────────────────────────────────
-async function cargarConectados(){
-  try{
-    const res=await fetch('/api/conectados');
-    const conectados=await res.json();
-    document.getElementById('conectados-texto').textContent=`🟢 ${conectados.length}`;
-    document.getElementById('conectados-lista').innerHTML=conectados.length===0
-      ?'<div style="font-size:12px;color:#6b7280;padding:4px 0;">Nadie conectado</div>'
-      :conectados.map(c=>`<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #2a2f3a;"><span style="width:7px;height:7px;background:#00d4aa;border-radius:50%;flex-shrink:0;"></span><div><div style="font-size:13px;color:#e8eaf0;font-weight:500;">${c.nombre}</div><div style="font-size:11px;color:#00d4aa;">En línea</div></div></div>`).join('');
-  }catch(e){}
+async function cargarConectados() {
+  try {
+    const res = await fetch('/api/conectados');
+    const conectados = await res.json();
+    document.getElementById('conectados-texto').textContent = `🟢 ${conectados.length}`;
+    document.getElementById('conectados-lista').innerHTML = conectados.length===0
+      ? '<div style="font-size:12px;color:#6b7280;padding:4px 0;">Nadie conectado</div>'
+      : conectados.map(c=>`<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #2a2f3a;"><span style="width:7px;height:7px;background:#00d4aa;border-radius:50%;flex-shrink:0;"></span><div><div style="font-size:13px;color:#e8eaf0;font-weight:500;">${c.nombre}</div><div style="font-size:11px;color:#00d4aa;">En línea</div></div></div>`).join('');
+  } catch(e) {}
 }
 
-function toggleConectados(){
-  const popup=document.getElementById('conectados-popup');
-  popup.style.display=popup.style.display==='none'?'block':'none';
-  if(popup.style.display==='block') cargarConectados();
+function toggleConectados() {
+  const popup = document.getElementById('conectados-popup');
+  popup.style.display = popup.style.display==='none'?'block':'none';
+  if (popup.style.display==='block') cargarConectados();
 }
 
-document.addEventListener('click',e=>{
-  const badge=document.getElementById('conectados-badge');
-  const popup=document.getElementById('conectados-popup');
-  if(popup&&badge&&!badge.contains(e.target)&&!popup.contains(e.target)) popup.style.display='none';
+document.addEventListener('click', e => {
+  const badge = document.getElementById('conectados-badge');
+  const popup = document.getElementById('conectados-popup');
+  if (popup && badge && !badge.contains(e.target) && !popup.contains(e.target)) popup.style.display='none';
 });
 
-function toast(msg){
-  const t=document.getElementById('toast');
+function toast(msg) {
+  const t = document.getElementById('toast');
   t.textContent=msg; t.classList.add('show');
   setTimeout(()=>t.classList.remove('show'),2500);
 }
 
-async function cerrarSesion(){
+async function cerrarSesion() {
   await fetch('/api/logout',{method:'POST'});
   window.location.href='/';
 }
 
 // ── Bodega ───────────────────────────────────────────────
-async function cargarBodega(){
-  try{
-    const res=await fetch('/api/bodega'); stockActual=await res.json();
+async function cargarBodega() {
+  try {
+    const res = await fetch('/api/bodega'); stockActual = await res.json();
     renderStock(); setTimeout(()=>llenarSelectMaterial(),100); cargarMovimientos();
-  }catch(e){document.getElementById('tabla-stock').innerHTML='<p class="empty">Error.</p>';}
+  } catch(e) { document.getElementById('tabla-stock').innerHTML='<p class="empty">Error.</p>'; }
 }
 
-function renderStock(){
-  const cont=document.getElementById('tabla-stock');
-  if(!stockActual.length){cont.innerHTML='<p class="empty">No hay stock registrado.</p>';return;}
-  cont.innerHTML=`<table class="mat-table"><thead><tr><th>Material</th><th>Stock</th><th>Estado</th></tr></thead><tbody>${stockActual.map(s=>`<tr><td>${s.material}</td><td class="cant">${s.cantidad}</td><td><span style="color:${s.cantidad>5?'var(--accent)':s.cantidad>0?'#f59e0b':'var(--danger)'};font-size:12px;">${s.cantidad>5?'✓ Disponible':s.cantidad>0?'⚠ Poco':'✕ Sin stock'}</span></td></tr>`).join('')}</tbody></table>`;
+function renderStock() {
+  const cont = document.getElementById('tabla-stock');
+  if (!stockActual.length) { cont.innerHTML='<p class="empty">No hay stock registrado.</p>'; return; }
+  cont.innerHTML = `<table class="mat-table"><thead><tr><th>Material</th><th>Stock</th><th>Estado</th></tr></thead><tbody>${stockActual.map(s=>`<tr><td>${s.material}</td><td class="cant">${s.cantidad}</td><td><span style="color:${s.cantidad>5?'var(--accent)':s.cantidad>0?'#f59e0b':'var(--danger)'};font-size:12px;">${s.cantidad>5?'✓ Disponible':s.cantidad>0?'⚠ Poco':'✕ Sin stock'}</span></td></tr>`).join('')}</tbody></table>`;
 }
 
-function llenarSelectMaterial(){
-  const sel=document.getElementById('mov-material'); if(!sel) return;
-  sel.innerHTML=MATERIALES_STOCK.map(m=>`<option value="${m.label}">${m.label}</option>`).join('');
+function llenarSelectMaterial() {
+  const sel = document.getElementById('mov-material'); if (!sel) return;
+  sel.innerHTML = MATERIALES_STOCK.map(m=>`<option value="${m.label}">${m.label}</option>`).join('');
 }
 
-function mostrarModalStock(){
-  const cont=document.getElementById('modal-stock-items');
-  cont.innerHTML=MATERIALES_STOCK.map(m=>{const item=stockActual.find(s=>s.material===m.label);return `<div class="mat-row" style="margin-bottom:8px;"><label style="color:var(--text);font-size:12px;text-transform:none;letter-spacing:0;">${m.label}</label><input type="number" min="0" id="stock-${m.id}" value="${item?item.cantidad:0}" style="width:70px;text-align:right;" /><span class="unidad">${m.unidad}</span></div>`;}).join('');
+function mostrarModalStock() {
+  const cont = document.getElementById('modal-stock-items');
+  cont.innerHTML = MATERIALES_STOCK.map(m=>{const item=stockActual.find(s=>s.material===m.label);return `<div class="mat-row" style="margin-bottom:8px;"><label style="color:var(--text);font-size:12px;text-transform:none;letter-spacing:0;">${m.label}</label><input type="number" min="0" id="stock-${m.id}" value="${item?item.cantidad:0}" style="width:70px;text-align:right;" /><span class="unidad">${m.unidad}</span></div>`;}).join('');
   document.getElementById('modal-stock').style.display='flex';
 }
 
-function cerrarModalStock(){document.getElementById('modal-stock').style.display='none';}
+function cerrarModalStock() { document.getElementById('modal-stock').style.display='none'; }
 
-async function guardarStock(){
-  try{
-    for(const m of MATERIALES_STOCK){
-      const el=document.getElementById('stock-'+m.id);
-      const cantidad=el?parseFloat(el.value)||0:0;
-      const res=await fetch('/api/bodega/stock',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({material:m.label,cantidad})});
-      const data=await res.json();
-      if(!data.ok){toast('Error: '+data.error);return;}
+async function guardarStock() {
+  try {
+    for (const m of MATERIALES_STOCK) {
+      const el = document.getElementById('stock-'+m.id);
+      const cantidad = el?parseFloat(el.value)||0:0;
+      const res = await fetch('/api/bodega/stock',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({material:m.label,cantidad})});
+      const data = await res.json();
+      if (!data.ok) { toast('Error: '+data.error); return; }
     }
-    cerrarModalStock();await cargarBodega();toast('✓ Stock actualizado');
-  }catch(e){toast('Error: '+e.message);}
+    cerrarModalStock(); await cargarBodega(); toast('✓ Stock actualizado');
+  } catch(e) { toast('Error: '+e.message); }
 }
 
-async function registrarMovimiento(){
-  const tipo=document.getElementById('mov-tipo').value;
-  const material=document.getElementById('mov-material').value;
-  const cantidad=parseFloat(document.getElementById('mov-cantidad').value);
-  const responsable=document.getElementById('mov-responsable').value.trim();
-  const nota=document.getElementById('mov-nota').value.trim();
-  if(!cantidad||cantidad<=0){toast('⚠ Ingresa una cantidad válida');return;}
-  if(!responsable){toast('⚠ Ingresa el responsable');return;}
-  try{
-    const res=await fetch('/api/bodega/movimiento',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tipo,material,cantidad,responsable,nota})});
-    const data=await res.json();
-    if(data.ok){toast('✓ Movimiento registrado');document.getElementById('mov-cantidad').value='';document.getElementById('mov-responsable').value='';document.getElementById('mov-nota').value='';await cargarBodega();}
-    else{toast('Error: '+data.error);}
-  }catch(e){toast('Error de conexión');}
+async function registrarMovimiento() {
+  const tipo = document.getElementById('mov-tipo').value;
+  const material = document.getElementById('mov-material').value;
+  const cantidad = parseFloat(document.getElementById('mov-cantidad').value);
+  const responsable = document.getElementById('mov-responsable').value.trim();
+  const nota = document.getElementById('mov-nota').value.trim();
+  if (!cantidad||cantidad<=0) { toast('⚠ Ingresa una cantidad válida'); return; }
+  if (!responsable) { toast('⚠ Ingresa el responsable'); return; }
+  try {
+    const res = await fetch('/api/bodega/movimiento',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tipo,material,cantidad,responsable,nota})});
+    const data = await res.json();
+    if (data.ok) { toast('✓ Movimiento registrado'); document.getElementById('mov-cantidad').value=''; document.getElementById('mov-responsable').value=''; document.getElementById('mov-nota').value=''; await cargarBodega(); }
+    else { toast('Error: '+data.error); }
+  } catch(e) { toast('Error de conexión'); }
 }
 
-async function cargarMovimientos(){
-  try{
-    const res=await fetch('/api/bodega/movimientos');
-    const movimientos=await res.json();
-    const cont=document.getElementById('tabla-movimientos');
-    if(!movimientos.length){cont.innerHTML='<p class="empty">No hay movimientos.</p>';return;}
+async function cargarMovimientos() {
+  try {
+    const res = await fetch('/api/bodega/movimientos');
+    const movimientos = await res.json();
+    const cont = document.getElementById('tabla-movimientos');
+    if (!movimientos.length) { cont.innerHTML='<p class="empty">No hay movimientos.</p>'; return; }
     const colores={salida:'var(--danger)',entrada:'var(--accent)',devolucion:'#f59e0b'};
     cont.innerHTML=`<table class="mat-table"><thead><tr><th>Fecha</th><th>Tipo</th><th>Material</th><th>Cant.</th><th>Responsable</th><th>Nota</th><th></th></tr></thead><tbody>${movimientos.map(m=>`<tr><td style="font-size:11px;color:var(--muted);">${m.fecha}</td><td><span style="color:${colores[m.tipo]};font-weight:600;font-size:12px;text-transform:capitalize;">${m.tipo}</span></td><td style="font-size:12px;">${m.material}</td><td class="cant">${m.cantidad}</td><td style="font-size:12px;">${m.responsable}</td><td style="color:var(--muted);font-size:12px;">${m.nota||'—'}</td><td><button class="del-btn" onclick="eliminarMovimiento(${m.id})">✕</button></td></tr>`).join('')}</tbody></table>`;
-  }catch(e){}
+  } catch(e) {}
 }
 
-async function eliminarMovimiento(id){
-  if(!confirm('¿Eliminar este movimiento?')) return;
-  try{
-    const res=await fetch('/api/bodega/movimientos/'+id,{method:'DELETE'});
-    const data=await res.json();
-    if(data.ok){toast('Movimiento eliminado');cargarMovimientos();}
-  }catch(e){toast('Error al eliminar');}
+async function eliminarMovimiento(id) {
+  if (!confirm('¿Eliminar este movimiento?')) return;
+  try {
+    const res = await fetch('/api/bodega/movimientos/'+id,{method:'DELETE'});
+    const data = await res.json();
+    if (data.ok) { toast('Movimiento eliminado'); cargarMovimientos(); }
+  } catch(e) { toast('Error al eliminar'); }
 }
 
-function exportarBodegaExcel(){
-  if(!stockActual.length){toast('⚠ No hay stock');return;}
-  const datos=stockActual.map(s=>({'Material':s.material,'Stock disponible':s.cantidad}));
-  const ws=XLSX.utils.json_to_sheet(datos);
-  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Stock');
+function exportarBodegaExcel() {
+  if (!stockActual.length) { toast('⚠ No hay stock'); return; }
+  const datos = stockActual.map(s=>({'Material':s.material,'Stock disponible':s.cantidad}));
+  const ws = XLSX.utils.json_to_sheet(datos);
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Stock');
   XLSX.writeFile(wb,`bodega_${new Date().toISOString().slice(0,10)}.xlsx`); toast('✓ Stock exportado');
 }
 
 // ── Indicadores ──────────────────────────────────────────
-function getLunes(fecha){
+function getLunes(fecha) {
   const d=new Date(fecha+'T12:00:00'); const dia=d.getDay();
   const diff=dia===0?-6:1-dia; d.setDate(d.getDate()+diff);
   return d.toISOString().slice(0,10);
 }
 
-function getMat(reportes,label){
+function getMat(reportes,label) {
   return reportes.reduce((s,r)=>{const m=(r.materiales||[]).find(m=>m.material===label);return s+(m?m.cantidad:0);},0);
 }
 
-function barMeta(valor,meta){
+function barMeta(valor,meta) {
   const pct=Math.min(Math.round(valor/meta*100),100);
   const c=valor>=meta?'#1D9E75':valor>=meta/2?'#BA7517':'#E24B4A';
   return `<div style="display:flex;align-items:center;gap:8px;"><div style="flex:1;height:7px;background:var(--surface2);border-radius:4px;overflow:hidden;"><div style="width:${pct}%;height:100%;background:${c};border-radius:4px;"></div></div><span style="font-size:11px;color:var(--muted);width:70px;text-align:right;">${valor} / ${meta}</span></div>`;
 }
 
-function calcularBadge(reportes,actividades,numPersonas=5,cuadrillaAsignada=false){
-  if(reportes.length===0){
-    if(cuadrillaAsignada) return{badge:'Sin reporte',color:'#fff',bg:'#A32D2D'};
-    return{badge:'Sin registro',color:'var(--muted)',bg:'var(--surface2)'};
+function calcularBadge(reportes,actividades,numPersonas=5,cuadrillaAsignada=false) {
+  if (reportes.length===0) {
+    if (cuadrillaAsignada) return {badge:'Sin reporte',color:'#fff',bg:'#A32D2D'};
+    return {badge:'Sin registro',color:'var(--muted)',bg:'var(--surface2)'};
   }
   const fibra=getMat(reportes,'Fibra Principal');
   const cajas=getMat(reportes,'Cajas NAT');
   const numInc=reportes.reduce((s,r)=>s+(r.numIncidencias||0),0);
   const acts=new Set(actividades);
-  if(numPersonas>=5&&fibra>=2000&&acts.has('fibra'))    return{badge:'Productivo',color:'#3B6D11',bg:'#EAF3DE'};
-  if(numPersonas===3&&fibra>=1500&&acts.has('fibra'))   return{badge:'Productivo',color:'#3B6D11',bg:'#EAF3DE'};
-  if(numPersonas>=5&&fibra>=500&&acts.has('fibra')&&acts.has('cajas')&&(acts.has('instalacion')||acts.has('mudanza'))) return{badge:'Productivo',color:'#3B6D11',bg:'#EAF3DE'};
-  if(numPersonas<=2&&cajas>=5&&acts.has('cajas'))       return{badge:'Productivo',color:'#3B6D11',bg:'#EAF3DE'};
-  if(numPersonas<=2&&acts.has('odf'))                   return{badge:'Productivo',color:'#3B6D11',bg:'#EAF3DE'};
-  if(numPersonas<=2&&acts.has('mangas'))                return{badge:'Productivo',color:'#3B6D11',bg:'#EAF3DE'};
-  if(numPersonas<=2&&numInc>6&&acts.has('incidencias')) return{badge:'Productivo',color:'#3B6D11',bg:'#EAF3DE'};
-  if(acts.has('instalacion'))  return{badge:'Productivo',color:'#3B6D11',bg:'#EAF3DE'};
-  if(acts.has('mudanza'))      return{badge:'Productivo',color:'#3B6D11',bg:'#EAF3DE'};
-  if(acts.has('reparacion'))   return{badge:'Productivo',color:'#3B6D11',bg:'#EAF3DE'};
-  if(fibra>0||cajas>0||numInc>0) return{badge:'Parcial',color:'#854F0B',bg:'#FAEEDA'};
-  return{badge:'Bajo',color:'#A32D2D',bg:'#FCEBEB'};
+  if (numPersonas>=5&&fibra>=2000&&acts.has('fibra'))    return {badge:'Productivo',color:'#3B6D11',bg:'#EAF3DE'};
+  if (numPersonas===3&&fibra>=1500&&acts.has('fibra'))   return {badge:'Productivo',color:'#3B6D11',bg:'#EAF3DE'};
+  if (numPersonas>=5&&fibra>=500&&acts.has('fibra')&&acts.has('cajas')&&(acts.has('instalacion')||acts.has('mudanza'))) return {badge:'Productivo',color:'#3B6D11',bg:'#EAF3DE'};
+  if (numPersonas<=2&&cajas>=5&&acts.has('cajas'))       return {badge:'Productivo',color:'#3B6D11',bg:'#EAF3DE'};
+  if (numPersonas<=2&&acts.has('odf'))                   return {badge:'Productivo',color:'#3B6D11',bg:'#EAF3DE'};
+  if (numPersonas<=2&&acts.has('mangas'))                return {badge:'Productivo',color:'#3B6D11',bg:'#EAF3DE'};
+  if (numPersonas<=2&&numInc>6&&acts.has('incidencias')) return {badge:'Productivo',color:'#3B6D11',bg:'#EAF3DE'};
+  if (acts.has('instalacion'))  return {badge:'Productivo',color:'#3B6D11',bg:'#EAF3DE'};
+  if (acts.has('mudanza'))      return {badge:'Productivo',color:'#3B6D11',bg:'#EAF3DE'};
+  if (acts.has('reparacion'))   return {badge:'Productivo',color:'#3B6D11',bg:'#EAF3DE'};
+  if (fibra>0||cajas>0||numInc>0) return {badge:'Parcial',color:'#854F0B',bg:'#FAEEDA'};
+  return {badge:'Bajo',color:'#A32D2D',bg:'#FCEBEB'};
 }
 
-async function iniciarIndicadores(){
-  try{
+async function iniciarIndicadores() {
+  try {
     const res=await fetch('/api/reportes'); todosLosReportes=await res.json();
     const semanas={};
     todosLosReportes.forEach(r=>{semanas[getLunes(r.fecha)]=true;});
@@ -1523,12 +1445,12 @@ async function iniciarIndicadores(){
       return `<option value="${s}">${lunes.toLocaleDateString('es-EC',{day:'2-digit',month:'short'})} – ${sabado.toLocaleDateString('es-EC',{day:'2-digit',month:'short',year:'numeric'})}</option>`;
     }).join('');
     cargarIndicadores();
-  }catch(e){document.getElementById('dias-semana').innerHTML='<p class="empty">Error al cargar.</p>';}
+  } catch(e) { document.getElementById('dias-semana').innerHTML='<p class="empty">Error al cargar.</p>'; }
 }
 
-function cargarIndicadores(){
+function cargarIndicadores() {
   semanaActual=document.getElementById('semana-select').value;
-  if(!semanaActual) return;
+  if (!semanaActual) return;
   const inicio=new Date(semanaActual+'T12:00:00');
   const diasSemana=[];
   for(let i=0;i<6;i++){const d=new Date(inicio);d.setDate(d.getDate()+i);diasSemana.push(d.toISOString().slice(0,10));}
@@ -1542,7 +1464,7 @@ function cargarIndicadores(){
     const integrantes=[...new Set(reportes.flatMap(r=>r.integrantes||[]))];
     const numP=integrantes.length||5;
     const cuadrillaDia=todasLasCuadrillas.find(c=>c.fecha===fecha);
-    const{badge}=calcularBadge(reportes,actividades,numP,!!cuadrillaDia);
+    const {badge}=calcularBadge(reportes,actividades,numP,!!cuadrillaDia);
     if(badge==='Productivo')diasProd++;
     totalFibra+=getMat(reportes,'Fibra Principal');
     totalCajas+=getMat(reportes,'Cajas NAT');
@@ -1618,7 +1540,7 @@ function cargarIndicadores(){
   contMat.innerHTML=sorted.map(([mat,cant])=>`<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><span style="font-size:12px;color:var(--muted);width:150px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${mat}</span><div style="flex:1;height:6px;background:var(--surface2);border-radius:3px;overflow:hidden;"><div style="width:${Math.round(cant/max*100)}%;height:100%;background:var(--accent);border-radius:3px;"></div></div><span style="font-size:12px;color:var(--muted);width:36px;text-align:right;">${cant}</span></div>`).join('');
 }
 
-function exportarInformeSemanal(){
+function exportarInformeSemanal() {
   if(!semanaActual){toast('⚠ Selecciona una semana');return;}
   const inicio=new Date(semanaActual+'T12:00:00');
   const diasSemana=[];
@@ -1634,7 +1556,7 @@ function exportarInformeSemanal(){
     const integrantes=[...new Set(reportes.flatMap(r=>r.integrantes||[]))];
     const numP=integrantes.length||5;
     const cuadrillaDia=todasLasCuadrillas.find(c=>c.fecha===fecha);
-    const{badge}=i===5?{badge:'Extra'}:calcularBadge(reportes,actividades,numP,!!cuadrillaDia);
+    const {badge}=i===5?{badge:'Extra'}:calcularBadge(reportes,actividades,numP,!!cuadrillaDia);
     const allIps=reportes.flatMap(r=>r.ips||[]);
     filas.push({
       'Día':nombres[i],'Fecha':fecha,'Estado':badge,
