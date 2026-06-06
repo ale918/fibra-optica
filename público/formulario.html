@@ -41,6 +41,7 @@
   <!-- ═══ REGISTRO ═══ -->
   <section id="tab-registro" style="display:none;">
     <div id="cuadrilla-hoy-box"></div>
+
     <div class="card">
       <h3>Información del día</h3>
       <div class="form-group">
@@ -57,7 +58,7 @@
       <h3>Actividades del día</h3>
       <p class="card-sub">Selecciona y llena los detalles de cada actividad.</p>
 
-      <!-- FIBRA -->
+      <!-- FIBRA PRINCIPAL -->
       <div class="actividades-grid" style="grid-template-columns:1fr;">
         <div class="actividad-btn" id="act-fibra" onclick="toggleActividad('fibra')">
           <span class="act-icon">📡</span><span class="act-label">Pasado de fibra principal</span>
@@ -83,7 +84,7 @@
         </div>
       </div>
 
-      <!-- CAJAS -->
+      <!-- ARMADO DE CAJA -->
       <div class="actividades-grid" style="grid-template-columns:1fr;margin-top:8px;">
         <div class="actividad-btn" id="act-cajas" onclick="toggleActividad('cajas')">
           <span class="act-icon">📦</span><span class="act-label">Armado de cajas NAT</span>
@@ -130,17 +131,13 @@
           <div class="form-group"><label>Total puertos</label><input type="number" min="1" id="caja-total-reg" class="inp-field" value="16" /></div>
           <div class="form-group"><label>Puertos ocupados</label><input type="number" min="0" id="caja-ocupados-reg" class="inp-field" value="0" /></div>
         </div>
-        <div class="field-row" style="margin-top:8px;">
-          <div class="form-group">
-            <label>Referencia de la caja</label>
-            <input type="text" id="caja-referencia-reg" class="inp-field" placeholder="Ej. Caja 01, NAT Norte..." />
-          </div>
-        </div>
+
         <div id="dist-reg-panel" style="display:none;margin-top:12px;padding-top:10px;border-top:1px solid var(--border);">
           <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">📡 Hilos que reparte esta caja</div>
           <div id="dist-reg-lista"></div>
           <button onclick="agregarDistReg()" style="font-size:12px;padding:5px 12px;margin-top:4px;">+ Agregar buffer</button>
         </div>
+
         <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);">
           <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">📍 Guardar ubicación en mapa</div>
           <div id="caja-gps-status" style="font-size:12px;color:var(--muted);padding:6px 10px;background:var(--surface);border-radius:6px;margin-bottom:8px;">Sin ubicación — la caja no se guardará en el mapa</div>
@@ -152,7 +149,7 @@
         </div>
       </div>
 
-      <!-- INSTALACION -->
+      <!-- INSTALACION CLIENTE -->
       <div class="actividades-grid" style="grid-template-columns:1fr;margin-top:8px;">
         <div class="actividad-btn" id="act-instalacion" onclick="toggleActividad('instalacion')">
           <span class="act-icon">🔌</span><span class="act-label">Instalación cliente final</span>
@@ -305,7 +302,7 @@
         </div>
       </div>
 
-      <!-- REPARACION -->
+      <!-- REPARACION FIBRA -->
       <div class="actividades-grid" style="grid-template-columns:1fr;margin-top:8px;">
         <div class="actividad-btn" id="act-reparacion" onclick="toggleActividad('reparacion')">
           <span class="act-icon">🛠️</span><span class="act-label">Reparación de fibra principal</span>
@@ -336,6 +333,7 @@
       </div>
 
     </div>
+
     <div class="btn-row">
       <button class="btn-primary" onclick="guardarReporte()">Guardar reporte del día</button>
       <button onclick="limpiarFormulario()">Limpiar</button>
@@ -345,10 +343,8 @@
   <!-- ═══ MAPA ═══ -->
   <section id="tab-mapa" style="display:none;">
     <div id="mapa-trabajador-form" style="display:none;">
-
-      <!-- Formulario cajas -->
       <div class="card">
-        <h3>Registrar caja NAT</h3>
+        <h3>Registrar punto en mapa</h3>
         <p class="card-sub">Usa GPS o haz clic en el mapa para fijar la ubicación.</p>
         <div class="field-row">
           <div class="form-group"><label>Tipo</label>
@@ -386,56 +382,16 @@
         <div id="distribucion-panel" style="display:none;margin-top:1rem;">
           <div style="font-size:11px;color:var(--muted);text-transform:uppercase;margin-bottom:8px;">📡 Hilos que distribuye</div>
           <div id="distribucion-lista"></div>
-          <button onclick="agregarDistMapa()" style="font-size:12px;padding:5px 12px;margin-top:4px;">+ Agregar buffer</button>
+          <button onclick="agregarDistribucion()" style="font-size:12px;padding:5px 12px;margin-top:4px;">+ Agregar hilo</button>
         </div>
         <div id="gps-status" style="font-size:12px;color:var(--muted);margin-top:12px;padding:8px;background:var(--surface2);border-radius:6px;">📍 Esperando ubicación...</div>
         <div class="btn-row" style="margin-top:1rem;">
-          <button class="btn-primary" onclick="registrarCaja()">📍 Registrar caja</button>
+          <button class="btn-primary" onclick="registrarCaja()">📍 Registrar punto</button>
           <button onclick="obtenerGPS()">🛰️ Usar GPS</button>
         </div>
       </div>
-
-      <!-- Formulario mangas -->
-      <div class="card">
-        <h3>🔴 Registrar manga</h3>
-        <p class="card-sub">Manga de interconexión entre sectores por fibra óptica.</p>
-        <div class="field-row">
-          <div class="form-group">
-            <label>Nombre / referencia</label>
-            <input type="text" id="manga-mapa-nombre" placeholder="Ej. Manga Quevedo-Buena Fe..." />
-          </div>
-        </div>
-        <div class="field-row">
-          <div class="form-group">
-            <label>Sector que conecta</label>
-            <input type="text" id="manga-mapa-sector" placeholder="Ej. Quevedo → Buena Fe" />
-          </div>
-          <div class="form-group">
-            <label>Tipo de fibra</label>
-            <select id="manga-mapa-tipo" class="sel-field" onchange="actualizarBuffersManga()">
-              <option value="12">12 hilos (1 buffer)</option>
-              <option value="24">24 hilos (2 buffers)</option>
-            </select>
-          </div>
-        </div>
-
-        <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);">
-          <div style="font-size:11px;color:var(--muted);text-transform:uppercase;margin-bottom:8px;">📡 Hilos fusionados</div>
-          <div id="manga-buffers-lista"></div>
-          <button onclick="agregarBufferManga()" style="font-size:12px;padding:5px 12px;margin-top:4px;">+ Agregar buffer</button>
-        </div>
-
-        <div id="manga-gps-status" style="font-size:12px;color:var(--muted);margin-top:12px;padding:8px;background:var(--surface2);border-radius:6px;">📍 GPS obligatorio — usa el botón o haz clic en el mapa</div>
-        <div class="btn-row" style="margin-top:1rem;">
-          <button class="btn-primary" onclick="registrarManga()" style="background:#E24B4A;border-color:#E24B4A;">🔴 Registrar manga</button>
-          <button onclick="obtenerGPSManga()">🛰️ Usar GPS</button>
-          <button onclick="activarSeleccionMapaManga()">🗺️ Marcar en mapa</button>
-        </div>
-      </div>
-
     </div>
 
-    <!-- Mapa -->
     <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:8px;">
         <h3 style="margin:0;">Mapa de red</h3>
@@ -444,19 +400,22 @@
           <button onclick="filtrarMapa('principal')" id="filtro-principal" style="font-size:12px;padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:none;color:var(--muted);cursor:pointer;">📦 Principal</button>
           <button onclick="filtrarMapa('cliente')" id="filtro-cliente" style="font-size:12px;padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:none;color:var(--muted);cursor:pointer;">🔌 Cliente</button>
           <button onclick="filtrarMapa('pasante')" id="filtro-pasante" style="font-size:12px;padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:none;color:var(--muted);cursor:pointer;">➡️ Pasante</button>
-          <button onclick="filtrarMapa('manga')" id="filtro-manga" style="font-size:12px;padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:none;color:var(--muted);cursor:pointer;">🔴 Manga</button>
         </div>
       </div>
+
       <!-- Leyenda -->
       <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:8px;">
         <div style="display:flex;align-items:center;gap:4px;font-size:12px;color:var(--muted);"><span style="width:10px;height:10px;background:#1D9E75;border-radius:50%;display:inline-block;"></span> Principal</div>
         <div style="display:flex;align-items:center;gap:4px;font-size:12px;color:var(--muted);"><span style="width:10px;height:10px;background:#3B82F6;border-radius:50%;display:inline-block;"></span> Cliente</div>
         <div style="display:flex;align-items:center;gap:4px;font-size:12px;color:var(--muted);"><span style="width:10px;height:10px;background:#F59E0B;border-radius:50%;display:inline-block;"></span> Pasante</div>
-        <div style="display:flex;align-items:center;gap:4px;font-size:12px;color:var(--muted);"><span style="width:10px;height:10px;background:#E24B4A;border-radius:50%;display:inline-block;border:2px solid #fff;"></span> Manga</div>
-        <div style="display:flex;align-items:center;gap:4px;font-size:12px;color:var(--muted);"><span style="width:10px;height:10px;background:#0099ff;border-radius:50%;display:inline-block;box-shadow:0 0 0 2px rgba(0,153,255,0.4);"></span> Tú</div>
+        <div style="display:flex;align-items:center;gap:4px;font-size:12px;color:var(--muted);">
+          <span style="width:10px;height:10px;background:#0099ff;border-radius:50%;display:inline-block;border:2px solid rgba(255,255,255,0.3);box-shadow:0 0 0 2px rgba(0,153,255,0.4);"></span> Tú
+        </div>
         <div style="font-size:11px;color:var(--accent);" id="modo-seleccion-label"></div>
       </div>
+
       <div id="mapa" style="height:420px;border-radius:10px;overflow:hidden;border:1px solid var(--border);"></div>
+
       <div style="margin-top:1rem;">
         <div style="font-size:11px;color:var(--muted);text-transform:uppercase;margin-bottom:8px;">Puntos registrados</div>
         <div id="lista-cajas"></div>
