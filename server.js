@@ -299,4 +299,23 @@ app.get('/', (req, res) => {
   }
 });
 
+// Backup descargable
+app.get('/api/backup', (req, res) => {
+  if (!req.session?.usuario || req.session.rol !== 'admin') return res.status(403).json({ error: 'No autorizado' });
+  res.setHeader('Content-Disposition', `attachment; filename=backup_${fechaLocal()}.json`);
+  res.json(db.data);
+});
+
+// Restaurar backup
+app.post('/api/restore', express.json({ limit: '10mb' }), (req, res) => {
+  if (!req.session?.usuario || req.session.rol !== 'admin') return res.status(403).json({ error: 'No autorizado' });
+  try {
+    const datos = req.body;
+    if (!datos.reportes || !datos.cuadrillas) return res.json({ ok: false, error: 'Archivo inválido' });
+    db.data = datos;
+    db.write();
+    res.json({ ok: true });
+  } catch(e) { res.json({ ok: false, error: e.message }); }
+});
+
 app.listen(PORT, () => console.log(`Airnet corriendo en puerto ${PORT}`));
