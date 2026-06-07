@@ -1,7 +1,7 @@
 import express from 'express';
 import session from 'express-session';
 import { Low } from 'lowdb';
-import { JSONFileSync } from 'lowdb/adapters';
+import { JSONFileSync } from 'lowdb/node';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import multer from 'multer';
