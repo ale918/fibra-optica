@@ -25,8 +25,13 @@ const dbPath = process.env.RAILWAY_VOLUME_MOUNT_PATH
 const adapter = new JSONFileSync(dbPath);
 const db = new Low(adapter, {});
 db.read();
-db.data ||= { reportes:[], cajas:[], mangas:[], cuadrillas:[], bodega:[], movimientos:[] };
+if (!db.data) db.data = {};
+if (!db.data.reportes) db.data.reportes = [];
+if (!db.data.cajas) db.data.cajas = [];
 if (!db.data.mangas) db.data.mangas = [];
+if (!db.data.cuadrillas) db.data.cuadrillas = [];
+if (!db.data.bodega) db.data.bodega = [];
+if (!db.data.movimientos) db.data.movimientos = [];
 db.write();
 
 app.use(express.json());
