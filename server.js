@@ -287,7 +287,11 @@ app.get('/api/debug/db', (req, res) => {
 });
 
 app.get('/', (req, res) => {
-  res.sendFile(join(__dirname, 'público', 'login.html'));
+  if (req.session?.usuario) {
+    res.sendFile(join(__dirname, 'público', 'formulario.html'));
+  } else {
+    res.sendFile(join(__dirname, 'público', 'login.html'));
+  }
 });
 
 app.listen(PORT, () => console.log(`Airnet corriendo en puerto ${PORT}`));
