@@ -1,6 +1,7 @@
 import express from 'express';
 import session from 'express-session';
-import { Low, JSONFileSync } from 'lowdb';
+import { Low } from 'lowdb';
+import { JSONFileSync } from 'lowdb/adapters';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import multer from 'multer';
@@ -22,7 +23,7 @@ const dbPath = process.env.RAILWAY_VOLUME_MOUNT_PATH
   : join(__dirname, 'database.json');
 
 const adapter = new JSONFileSync(dbPath);
-const db = new Low(adapter);
+const db = new Low(adapter, {});
 db.read();
 db.data ||= { reportes:[], cajas:[], mangas:[], cuadrillas:[], bodega:[], movimientos:[] };
 if (!db.data.mangas) db.data.mangas = [];
